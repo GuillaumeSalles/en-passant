@@ -1,0 +1,53 @@
+{
+  "name": "en-passant",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "dev": "vite",
+    "dev:local": "bash -c 'until curl -fsS http://127.0.0.1:8788/api/auth/get-session >/dev/null 2>&1; do sleep 1; done; LOCAL_FUNCTIONS_ORIGIN=http://127.0.0.1:8788 vite --host 127.0.0.1'",
+    "dev:vite": "vite",
+    "merge:pgn": "tsx scripts/merge-pgn.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name enpassant",
+    "test": "vitest",
+    "test:e2e": "playwright test",
+    "type-check": "tsc --noEmit",
+    "lint": "oxlint src tests scripts --deny-warnings -A no-unassigned-vars",
+    "check:filenames": "node scripts/check-filenames.mjs",
+    "check:guardrails": "node scripts/check-code-guardrails.mjs",
+    "check": "npm run format:check && npm run lint && npm run check:filenames && npm run check:guardrails && npm run type-check && npm test -- --run && npm run build && npm run test:e2e",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "prepare": "lefthook install"
+  },
+  "dependencies": {
+    "@solidjs/router": "0.17.0-next.3",
+    "@solidjs/web": "2.0.0-beta.14",
+    "better-auth": "^1.6.22",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "solid-js": "2.0.0-beta.14",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@solidjs/testing-library": "^0.8.10",
+    "@types/node": "^20",
+    "jsdom": "^26.0.0",
+    "lefthook": "^2.1.9",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.69.0",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vite": "^6.3.5",
+    "vite-plugin-solid": "3.0.0-next.5",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.0.15",
+    "wrangler": "^4.106.0"
+  }
+}
