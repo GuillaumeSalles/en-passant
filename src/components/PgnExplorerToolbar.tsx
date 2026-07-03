@@ -42,10 +42,7 @@ export function PgnExplorerToolbar() {
 
   return (
     <>
-      <HorizontalDashedDivider
-        animationKey="pgn-explorer-toolbar-top"
-        direction="right-to-left"
-      />
+      <HorizontalDashedDivider animationKey="pgn-explorer-toolbar-top" direction="right-to-left" />
       <div class="flex w-full px-2 py-2">
         <div class="flex gap-2">
           <TooltipIconButton
