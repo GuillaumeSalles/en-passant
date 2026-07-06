@@ -445,6 +445,26 @@ test("moves navigation into a drawer and stacks the panel on mobile and tablet",
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
 
+test("dismisses the signup nudge before opening the auth dialog", async ({ page }) => {
+  await seedRepertoire(page);
+  await page.evaluate(() => {
+    localStorage.setItem("en_passant_signup_nudge_move_count", "5");
+  });
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
+  await expectRepertoireReady(page);
+
+  const signupNudge = page.getByText(
+    "Sign up to make sure you don't lose your repertoires. It's free.",
+  );
+  await expect(signupNudge).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
+
+  await expect(signupNudge).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
+});
+
 test("touch dragging pieces uses finger position and does not allow board scrolling", async ({
   page,
 }) => {

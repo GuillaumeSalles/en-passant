@@ -37,6 +37,7 @@ export function SignupNudge() {
   }
 
   function signUp(): void {
+    dismiss();
     document.dispatchEvent(new CustomEvent("en-passant:open-auth-dialog"));
   }
 
