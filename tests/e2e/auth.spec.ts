@@ -469,7 +469,7 @@ test("loads a backend session without a local signed-in marker", async ({ page }
     )
     .toBeGreaterThan(0);
   await page.getByRole("button", { name: "Account menu" }).click();
-  await expect(page.getByText("Feedback")).toBeVisible();
+  await expect(page.getByText("Feedback")).toHaveCount(0);
   await expect(page.getByText("Sign out")).toBeVisible();
   await expect.poll(() => syncRequests).toBeGreaterThan(0);
   await expect

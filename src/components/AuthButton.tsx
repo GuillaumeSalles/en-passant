@@ -303,7 +303,6 @@ export function AuthButton(props: { class?: string | undefined } = {}) {
                 {signedInUser().email}
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuItem>Feedback</DropdownMenuItem>
             <DropdownMenuItem onClick={logout}>
               <LogOut class="h-4 w-4" />
               Sign out

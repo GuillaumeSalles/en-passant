@@ -84,6 +84,10 @@ Run it before handing off broad refactors.
 
 The Playwright config starts its own Vite server on `127.0.0.1:5174` with
 `--force` so tests do not depend on a developer's already-running server.
+If e2e fails because `127.0.0.1:5174` is already in use, identify the existing
+listener with `lsof -nP -iTCP:5174 -sTCP:LISTEN`; Playwright is configured with
+`reuseExistingServer: false`, so stop that server before rerunning the e2e
+command rather than expecting the test runner to reuse it.
 
 For auth/storage work, use `npm run test:e2e -- tests/e2e/auth.spec.ts` while
 iterating, then run the broader relevant suite and `npm run check` before
