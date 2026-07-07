@@ -15,6 +15,11 @@ type IconBaseProps = IconProps & {
   name: string;
 };
 
+type BrandIconBaseProps = IconProps & {
+  children: JSX.Element;
+  name: string;
+};
+
 function IconBase(props: IconBaseProps): JSX.Element {
   const svgProps = omit(props, "children", "color", "name", "size", "strokeWidth");
   const size = () => props.size ?? 24;
@@ -33,6 +38,25 @@ function IconBase(props: IconBaseProps): JSX.Element {
       stroke-linecap="round"
       stroke-linejoin="round"
       class={`lucide lucide-${props.name}${props.class ? ` ${props.class}` : ""}`}
+    >
+      {props.children}
+    </svg>
+  );
+}
+
+function BrandIconBase(props: BrandIconBaseProps): JSX.Element {
+  const svgProps = omit(props, "children", "color", "name", "size", "strokeWidth");
+  const size = () => props.size ?? 24;
+
+  return (
+    <svg
+      {...svgProps}
+      xmlns="http://www.w3.org/2000/svg"
+      width={size()}
+      height={size()}
+      viewBox="0 0 24 24"
+      fill={props.color ?? "currentColor"}
+      class={`icon icon-${props.name}${props.class ? ` ${props.class}` : ""}`}
     >
       {props.children}
     </svg>
@@ -131,6 +155,14 @@ export function Ellipsis(props: IconProps): JSX.Element {
       <circle cx="19" cy="12" r="1" />
       <circle cx="5" cy="12" r="1" />
     </IconBase>
+  );
+}
+
+export function GitHub(props: IconProps): JSX.Element {
+  return (
+    <BrandIconBase {...props} name="github">
+      <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.24c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.49.99.11-.77.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5Z" />
+    </BrandIconBase>
   );
 }
 
@@ -253,6 +285,14 @@ export function Upload(props: IconProps): JSX.Element {
       <path d="m17 8-5-5-5 5" />
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     </IconBase>
+  );
+}
+
+export function XLogo(props: IconProps): JSX.Element {
+  return (
+    <BrandIconBase {...props} name="x-logo">
+      <path d="M18.9 2h3.38l-7.39 8.45L23.58 22h-6.81l-5.33-6.97L5.34 22H1.96l7.9-9.03L1.52 2h6.98l4.82 6.37L18.9 2Zm-1.19 17.96h1.87L7.49 3.93H5.48l12.23 16.03Z" />
+    </BrandIconBase>
   );
 }
 

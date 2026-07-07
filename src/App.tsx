@@ -26,7 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { MobileNavigationProvider, MobileNavigationTrigger } from "@/components/MobileNavigation";
-import { Info, X } from "@/components/Icons";
+import { GitHub, Info, X, XLogo } from "@/components/Icons";
 import { getChapterScopeFromData } from "@/lib/AppState";
 import { isSafariBrowser } from "@/lib/browser";
 import { APP_ROOT, firstRepertoireChapterPath } from "@/lib/routes";
@@ -47,68 +47,95 @@ function SidebarHeader() {
 
 function SidebarFooter(props: { showGlobalActions?: boolean } = {}) {
   return (
-    <>
-      <HorizontalDashedDivider animate={false} />
+    <Show when={props.showGlobalActions}>
       <div class="flex flex-col gap-2 p-3">
-        <Show when={props.showGlobalActions}>
-          <GlobalActions class="flex-col" buttonClass="w-full" />
-        </Show>
-        <AboutDialog />
+        <AboutDialog buttonClass="w-full" />
+        <GlobalActions class="flex-col" buttonClass="w-full" />
       </div>
-    </>
+    </Show>
   );
 }
 
-function GlobalActions(props: { class?: string; buttonClass?: string } = {}) {
+function GlobalActions(props: { class?: string; buttonClass?: string; showAbout?: boolean } = {}) {
   return (
     <div class={`flex gap-2 ${props.class ?? ""}`}>
+      <Show when={props.showAbout}>
+        <AboutDialog buttonClass={props.buttonClass} />
+      </Show>
       <AuthButton class={props.buttonClass} />
     </div>
   );
 }
 
-function AboutDialog() {
+function AboutDialog(props: { buttonClass?: string | undefined } = {}) {
   return (
     <Dialog>
       <DialogTrigger>
-        <Button type="button" variant="ghost" class="w-full justify-start">
+        <Button type="button" variant="outline" class={props.buttonClass}>
           <Info />
           About
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>About En passant</DialogTitle>
-          <DialogDescription>
-            Build and train your chess repertoires, from PGN import to focused variation practice.
-          </DialogDescription>
+      <DialogContent class="max-w-md gap-5">
+        <DialogHeader class="space-y-0 pr-6 text-left">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-border bg-muted/30">
+              <EnPassantLogo class="h-6 w-6" />
+            </span>
+            <div class="min-w-0">
+              <DialogTitle>En passant</DialogTitle>
+              <DialogDescription class="mt-1">Build and train your repertoire.</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <div class="grid gap-3 text-sm leading-6">
+        <div class="grid gap-3 text-sm leading-6 text-muted-foreground">
           <p>
-            En passant is open source. You can follow the project, inspect the code, or contribute
-            on{" "}
+            I was not satisfied with the existing apps to build and train my own chess repertoire so
+            I decided to build my own and{" "}
             <a
-              class="font-medium text-blue-500 underline-offset-4 hover:underline"
+              class="font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               href={GITHUB_REPO_URL}
               target="_blank"
               rel="noreferrer"
             >
-              GitHub
-            </a>
-            .
+              open source
+            </a>{" "}
+            it. It's still nowhere the level of quality I want it to be; more features and polish to
+            come.
           </p>
           <p>
-            For feedback, ideas, or bug reports, reach me on{" "}
+            Reach out on{" "}
             <a
-              class="font-medium text-blue-500 underline-offset-4 hover:underline"
+              class="font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               href={FEEDBACK_URL}
               target="_blank"
               rel="noreferrer"
             >
-              Twitter
-            </a>
-            .
+              X
+            </a>{" "}
+            for feedback.
           </p>
+        </div>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <Button
+            href={FEEDBACK_URL}
+            target="_blank"
+            rel="noreferrer"
+            variant="outline"
+            class="justify-start"
+          >
+            <XLogo />X
+          </Button>
+          <Button
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            variant="outline"
+            class="justify-start"
+          >
+            <GitHub />
+            GitHub
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -146,7 +173,7 @@ function AppShell(props: { children?: JSX.Element }) {
           <VerticalDashedDivider class="pointer-events-none absolute right-[400px] top-0 z-10 hidden xl:block" />
         </Show>
         <div class="absolute right-0 top-0 z-20 hidden h-[3.25rem] w-[400px] items-center justify-end px-2 xl:flex">
-          <GlobalActions />
+          <GlobalActions showAbout />
         </div>
         <div class="relative hidden w-[200px] min-w-[200px] flex-none flex-col xl:flex">
           <SidebarHeader />
