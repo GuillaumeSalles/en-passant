@@ -583,6 +583,9 @@ test("black repertoire training starts after the automatic white move", async ({
 test("leaving training clears the old session before newly added lines", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
+  await page.addInitScript(() => {
+    Math.random = () => 0.9;
+  });
   await recordPlayedSounds(page);
   await seedRepertoire(page, "1. e4 e5 *");
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");

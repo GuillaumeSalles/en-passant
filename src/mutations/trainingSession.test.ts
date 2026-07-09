@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   completeTrainingLine,
   markTrainingMistake,
@@ -13,6 +13,10 @@ const chapter = chapterStub({
   id: "chapter-1",
   repertoireId: repertoire.id,
   handle: "main",
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function createTrainingContext() {
@@ -36,14 +40,18 @@ function createTrainingContext() {
 }
 
 describe("training session", () => {
-  test("starts a session at the first variation", () => {
+  test("starts a session at the first randomized variation", () => {
+    vi.spyOn(Math, "random")
+      .mockReturnValueOnce(0.6)
+      .mockReturnValueOnce(0.1)
+      .mockReturnValueOnce(0.9);
     const context = createTrainingContext();
 
-    startTrainingSession(context.state, context.route, 3);
+    startTrainingSession(context.state, context.route, 4);
 
     expect(context.state.training.status).toBe("in-progress");
-    expect(context.state.training.variationIndex).toBe(0);
-    expect(context.state.training.session?.queue).toEqual([0, 1, 2]);
+    expect(context.state.training.variationIndex).toBe(3);
+    expect(context.state.training.session?.queue).toEqual([3, 1, 0, 2]);
     expect(context.state.training.session?.results).toEqual([]);
   });
 

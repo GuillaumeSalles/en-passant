@@ -8,8 +8,20 @@ import {
 import { StoreState } from "@/lib/createStore";
 import { MutationContext } from "@/lib/useMutation";
 
-function makeDefaultQueue(variationCount: number): number[] {
-  return Array.from({ length: variationCount }, (_, index) => index);
+function makeTrainingQueue(variationCount: number): number[] {
+  const queue = Array.from({ length: variationCount }, (_, index) => index);
+
+  for (let index = queue.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const current = queue[index];
+    const swap = queue[swapIndex];
+    if (current === undefined || swap === undefined) continue;
+
+    queue[index] = swap;
+    queue[swapIndex] = current;
+  }
+
+  return queue;
 }
 
 function createTrainingSessionDraft(ctx: Context, queue: number[]): TrainingSessionDraft {
@@ -28,7 +40,7 @@ export function startTrainingSession(
   ctx: Context,
   variationCount: number,
 ): void {
-  const queue = makeDefaultQueue(variationCount);
+  const queue = makeTrainingQueue(variationCount);
   const firstVariationIndex = queue[0];
 
   if (variationCount <= 0 || firstVariationIndex === undefined) {
