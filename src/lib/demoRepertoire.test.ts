@@ -25,10 +25,15 @@ describe("createDemoRepertoireSeed", () => {
     const serialized = toPgn(pgn);
 
     expect(Object.values(pgn.moves).map((move) => move.san)).toEqual(
-      expect.arrayContaining(["d4", "Bf4", "e3", "Nf3", "O-O", "c4"]),
+      expect.arrayContaining(["d4", "Bf4", "e3", "Nf3", "c3", "Nbd2", "Bg3", "Bd3", "Ne5"]),
     );
-    expect(Object.values(pgn.moves).filter((move) => move.next.length > 1)).toHaveLength(3);
-    expect(serialized).toContain("{The London bishop reaches f4 before the e-pawn closes it in.}");
-    expect(serialized).toContain("{This is the main central break to watch for.}");
+    expect(
+      Object.values(pgn.moves).reduce(
+        (variationCount, move) => variationCount + Math.max(0, move.next.length - 1),
+        0,
+      ),
+    ).toBe(3);
+    expect(serialized).toContain("{Bishop out before e3.}");
+    expect(serialized).toContain("{Meet ...c5 with c3.}");
   });
 });

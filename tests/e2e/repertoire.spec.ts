@@ -371,8 +371,8 @@ test("creates a demo London System repertoire on first open", async ({ page }) =
   const storedPgn = await firstStoredPgn(page);
 
   expect(storedPgn).toContain("1. d4 Nf6");
-  expect(storedPgn).toContain("{The London bishop reaches f4 before the e-pawn closes it in.}");
-  expect(storedPgn).toContain("(2... e6 3. e3 c5");
+  expect(storedPgn).toContain("{Bishop out before e3.}");
+  expect(storedPgn).toContain("(2... g6 {Castle first; c4 can wait.}");
   expect(consoleMessages).toEqual([]);
 });
 
