@@ -1,4 +1,4 @@
-import { createSignal, createUniqueId } from "solid-js";
+import { createSignal, createUniqueId, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { Button } from "./ui/button";
 import {
@@ -63,7 +63,9 @@ export function LoadPGNDialog(props: {
 
   return (
     <Dialog open={open()} onOpenChange={setOpen}>
-      {props.trigger !== null && <DialogTrigger asChild>{trigger()}</DialogTrigger>}
+      <Show when={props.trigger !== null}>
+        <DialogTrigger asChild>{trigger()}</DialogTrigger>
+      </Show>
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{props.title ?? "Load PGN"}</DialogTitle>
@@ -84,11 +86,11 @@ export function LoadPGNDialog(props: {
           }}
         />
         <DialogFooter class="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end sm:space-x-0">
-          {error() !== null && (
+          <Show when={error() !== null}>
             <p id={errorId} role="alert" class="min-w-0 flex-1 text-left text-sm text-destructive">
               {error()}
             </p>
-          )}
+          </Show>
           <Button type="submit" disabled={submitting()} onClick={submitPgn}>
             {props.submitLabel ?? "Load"}
           </Button>

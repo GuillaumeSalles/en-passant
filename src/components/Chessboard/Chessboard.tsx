@@ -275,6 +275,14 @@ export function Chessboard(props: ChessboardProps) {
     }
   };
 
+  const cleanupWindowListeners = () => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("blur", onWindowBlur);
+    window.removeEventListener("pointerup", onWindowPointerUp);
+    window.removeEventListener("pointermove", onWindowPointerMove);
+    window.removeEventListener("pointercancel", onWindowPointerCancel);
+  };
+
   onSettled(() => {
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("blur", onWindowBlur);
@@ -282,13 +290,7 @@ export function Chessboard(props: ChessboardProps) {
     window.addEventListener("pointermove", onWindowPointerMove);
     window.addEventListener("pointercancel", onWindowPointerCancel);
 
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("blur", onWindowBlur);
-      window.removeEventListener("pointerup", onWindowPointerUp);
-      window.removeEventListener("pointermove", onWindowPointerMove);
-      window.removeEventListener("pointercancel", onWindowPointerCancel);
-    };
+    return cleanupWindowListeners;
   });
 
   createEffect(

@@ -7,7 +7,7 @@ interface SwitchProps {
   id?: string;
   class?: string;
   disabled?: boolean;
-  onKeyDown?: JSX.EventHandlerUnion<HTMLButtonElement, KeyboardEvent>;
+  onKeyDown?: JSX.EventHandler<HTMLButtonElement, KeyboardEvent>;
 }
 
 function Switch(props: SwitchProps) {
@@ -20,7 +20,7 @@ function Switch(props: SwitchProps) {
       type="button"
       aria-checked={checked() ? "true" : "false"}
       disabled={props.disabled}
-      onKeyDown={props.onKeyDown}
+      onKeyDown={(event) => props.onKeyDown?.(event)}
       onClick={() => props.onCheckedChange?.(!checked())}
       class={cn(
         "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors duration-150 ease-emil-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",

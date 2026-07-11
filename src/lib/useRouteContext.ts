@@ -8,7 +8,7 @@ type Params = { repertoireHandle: string; chapterHandle: string };
 export function useRouteContext(): Accessor<Context> {
   const location = useLocation();
   const params = useParams<Params>();
-  return createMemo(() => {
+  const context = createMemo<Context>(() => {
     const segments = location.pathname.split("/");
     const rh = params.repertoireHandle ?? "";
     const ch = params.chapterHandle ?? "";
@@ -17,4 +17,5 @@ export function useRouteContext(): Accessor<Context> {
     }
     return { type: "repertoire-builder", repertoireHandle: rh, chapterHandle: ch };
   });
+  return context;
 }

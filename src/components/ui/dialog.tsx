@@ -51,7 +51,7 @@ function Dialog(props: {
 function DialogTrigger(props: { children: JSX.Element; asChild?: boolean }) {
   const ctx = useContext(DialogContext);
   return (
-    <span style="display:contents" onClick={() => ctx.setOpen(true)}>
+    <span style={{ display: "contents" }} onClick={() => ctx.setOpen(true)}>
       {props.children}
     </span>
   );
@@ -60,7 +60,7 @@ function DialogTrigger(props: { children: JSX.Element; asChild?: boolean }) {
 function DialogClose(props: { children: JSX.Element; asChild?: boolean }) {
   const ctx = useContext(DialogContext);
   return (
-    <span style="display:contents" onClick={() => ctx.setOpen(false)}>
+    <span style={{ display: "contents" }} onClick={() => ctx.setOpen(false)}>
       {props.children}
     </span>
   );

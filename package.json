@@ -36,6 +36,8 @@
     "@playwright/test": "^1.60.0",
     "@solidjs/testing-library": "^0.8.10",
     "@types/node": "^20",
+    "eslint": "^10.7.0",
+    "eslint-plugin-solid": "^0.14.5",
     "jsdom": "^26.0.0",
     "lefthook": "^2.1.9",
     "oxfmt": "^0.54.0",

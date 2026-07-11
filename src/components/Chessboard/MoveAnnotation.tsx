@@ -1,5 +1,5 @@
 import { Orientation } from "@/lib/AppState";
-import { createMemo } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import { getSquarePosition } from "./utils";
 
 const size = 4;
@@ -71,11 +71,12 @@ export function MoveAnnotation(props: {
         "font-size": nagFontSize(),
       }}
     >
-      {props.annotation.type === "nag" ? (
-        props.annotation.glyph
-      ) : (
-        <div class="h-[10%] w-[60%] bg-white" />
-      )}
+      <Show
+        when={props.annotation.type === "nag"}
+        fallback={<div class="h-[10%] w-[60%] bg-white" />}
+      >
+        {props.annotation.type === "nag" ? props.annotation.glyph : null}
+      </Show>
     </div>
   );
 }

@@ -28,7 +28,7 @@ function InlineEditInput(props: InlineEditInputProps) {
       class={cn("min-w-0 flex-1 bg-transparent p-0 outline-none", props.class)}
       value={props.value}
       onInput={(event) => props.onValueInput(event.currentTarget.value)}
-      onBlur={props.onCommit}
+      onBlur={() => props.onCommit()}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
           event.preventDefault();

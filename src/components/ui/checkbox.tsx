@@ -1,6 +1,7 @@
 import { Check } from "../Icons";
 import { cn } from "@/lib/utils";
 import type { JSX } from "@solidjs/web";
+import { Show } from "solid-js";
 
 interface CheckboxProps {
   checked?: boolean | "indeterminate";
@@ -33,7 +34,9 @@ function Checkbox(props: CheckboxProps) {
         props.class,
       )}
     >
-      {isChecked() && <Check class="h-3 w-3" />}
+      <Show when={isChecked()}>
+        <Check class="h-3 w-3" />
+      </Show>
     </button>
   );
 }

@@ -41,34 +41,34 @@ export type ButtonLinkProps = JSX.AnchorHTMLAttributes<HTMLAnchorElement> &
 export type ButtonProps = ButtonElementProps | ButtonLinkProps;
 
 function buttonClass(
-  props: ButtonVariantProps & { class?: JSX.HTMLAttributes<HTMLElement>["class"] },
+  buttonOptions: ButtonVariantProps & { class?: JSX.HTMLAttributes<HTMLElement>["class"] },
 ) {
   return cn(
     buttonVariants({
-      variant: props.variant,
-      size: props.size,
-      className: props.class as string,
+      variant: buttonOptions.variant,
+      size: buttonOptions.size,
+      className: buttonOptions.class as string,
     }),
   );
 }
 
-function ButtonElement(props: { buttonProps: ButtonElementProps }) {
-  const rest = omit(props.buttonProps, "class", "variant", "size", "href");
-  return <button class={buttonClass(props.buttonProps)} {...rest} />;
+function ButtonElement(props: ButtonElementProps) {
+  const rest = omit(props, "class", "variant", "size", "href");
+  return <button class={buttonClass(props)} {...rest} />;
 }
 
-function ButtonLink(props: { linkProps: ButtonLinkProps }) {
-  const rest = omit(props.linkProps, "class", "variant", "size");
-  return <A class={buttonClass(props.linkProps)} {...rest} />;
+function ButtonLink(props: ButtonLinkProps) {
+  const rest = omit(props, "class", "variant", "size");
+  return <A class={buttonClass(props)} {...rest} />;
 }
 
 function Button(props: ButtonProps) {
   return (
     <Show
       when={props.href !== undefined}
-      fallback={<ButtonElement buttonProps={props as ButtonElementProps} />}
+      fallback={<ButtonElement {...(props as ButtonElementProps)} />}
     >
-      <ButtonLink linkProps={props as ButtonLinkProps} />
+      <ButtonLink {...(props as ButtonLinkProps)} />
     </Show>
   );
 }

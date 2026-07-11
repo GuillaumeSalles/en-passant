@@ -61,7 +61,7 @@ export function CapturedPiece(props: {
       piece={props.piece}
       square={props.square}
       boardOrientation={props.boardOrientation}
-      className={styles["CapturedPiece"]}
+      class={styles["CapturedPiece"]}
       dataAttribute="data-captured-piece"
     />
   );
@@ -77,7 +77,7 @@ export function PromotedPiece(props: {
       piece={props.piece}
       square={props.square}
       boardOrientation={props.boardOrientation}
-      className={styles["PromotedPiece"]}
+      class={styles["PromotedPiece"]}
       dataAttribute="data-promoted-piece"
     />
   );
@@ -87,7 +87,7 @@ function StaticAnimatedPiece(props: {
   piece: FenPiece;
   square: string;
   boardOrientation: Orientation;
-  className: string | undefined;
+  class: string | undefined;
   dataAttribute: "data-captured-piece" | "data-promoted-piece";
 }) {
   const position = createMemo(() => getSquarePosition(props.square, props.boardOrientation));
@@ -108,7 +108,7 @@ function StaticAnimatedPiece(props: {
     return (
       <PieceComponent
         svgProps={{
-          class: props.className,
+          class: props.class,
           ...dataProps(),
           style: {
             position: "absolute",

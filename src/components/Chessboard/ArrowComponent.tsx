@@ -110,7 +110,8 @@ function KnightArrow(props: {
       stroke-width="0.2"
       fill="none"
       marker-end={`url(#arrowhead-${props.kind})`}
-      {...props.arrowProps}
+      data-arrow={props.arrowProps["data-arrow"]}
+      data-arrow-kind={props.arrowProps["data-arrow-kind"]}
     />
   );
 }
@@ -155,7 +156,8 @@ function StraightArrow(props: {
       stroke={getHighlightArrowColor(props.kind)}
       stroke-width="0.2"
       marker-end={`url(#arrowhead-${props.kind})`}
-      {...props.arrowProps}
+      data-arrow={props.arrowProps["data-arrow"]}
+      data-arrow-kind={props.arrowProps["data-arrow-kind"]}
     />
   );
 }

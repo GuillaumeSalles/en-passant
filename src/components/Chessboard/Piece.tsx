@@ -3,6 +3,7 @@ import { defaultPieces } from "./pieces";
 import { FenPiece } from "./Chessboard";
 import { getSquarePosition } from "./utils";
 import { createMemo } from "solid-js";
+import { Dynamic } from "@solidjs/web";
 import styles from "./Chessboard.module.css";
 
 export function Piece(props: {
@@ -14,10 +15,11 @@ export function Piece(props: {
 }) {
   const position = createMemo(() => getSquarePosition(props.square, props.boardOrientation));
 
-  const PieceComponent = defaultPieces[props.piece as keyof typeof defaultPieces];
+  const PieceComponent = createMemo(() => defaultPieces[props.piece as keyof typeof defaultPieces]);
 
   return (
-    <PieceComponent
+    <Dynamic
+      component={PieceComponent()}
       svgProps={{
         class: props.introActive ? styles["IntroPiece"] : undefined,
         style: {

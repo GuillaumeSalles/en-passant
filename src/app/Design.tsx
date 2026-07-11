@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import {
   ArrowLeft,
   ArrowRight,
@@ -135,7 +135,9 @@ function ButtonSamples() {
               size={size}
               aria-label={size.includes("icon") ? size : undefined}
             >
-              {size.includes("icon") ? <Settings /> : size}
+              <Show when={size.includes("icon")} fallback={size}>
+                <Settings />
+              </Show>
             </Button>
           )}
         </For>

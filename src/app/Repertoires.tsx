@@ -343,7 +343,7 @@ function RepertoireSidebarItem(props: {
   onRenameRepertoire: (args: { repertoireId: string; name: string }) => void;
 }) {
   const [isRenaming, setIsRenaming] = createSignal(false);
-  const [draftName, setDraftName] = createSignal(props.repertoire.name);
+  const [draftName, setDraftName] = createSignal(untrack(() => props.repertoire.name));
   const [createFromPgnOpen, setCreateFromPgnOpen] = createSignal(false);
 
   function createChapter(pgn?: string) {
@@ -435,7 +435,7 @@ function ChapterSidebarItem(props: {
   onRenameChapter: (args: { chapterId: string; name: string }) => void;
 }) {
   const [isRenaming, setIsRenaming] = createSignal(false);
-  const [draftName, setDraftName] = createSignal(props.chapter.name);
+  const [draftName, setDraftName] = createSignal(untrack(() => props.chapter.name));
 
   function startRenaming() {
     setDraftName(untrack(() => props.chapter.name));

@@ -52,7 +52,7 @@ function ContextMenuTrigger(props: {
   };
 
   return (
-    <span style="display:contents" onContextMenu={handleContextMenu}>
+    <span style={{ display: "contents" }} onContextMenu={handleContextMenu}>
       {props.children}
     </span>
   );

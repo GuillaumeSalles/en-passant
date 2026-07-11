@@ -12,7 +12,9 @@ const TooltipTrigger = (props: { children: JSX.Element; asChild?: boolean }) => 
   <span class="tooltip-trigger inline-flex">{props.children}</span>
 );
 
-function TooltipContent(props: JSX.HTMLAttributes<HTMLDivElement> & { sideOffset?: number }) {
+function TooltipContent(
+  props: JSX.HTMLAttributes<HTMLDivElement> & { sideOffset?: number | undefined },
+) {
   const rest = omit(props, "sideOffset", "class", "children");
   const style = (): JSX.CSSProperties & { "--tooltip-side-offset": string } => ({
     "--tooltip-side-offset": `${props.sideOffset ?? 4}px`,

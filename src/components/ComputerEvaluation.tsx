@@ -21,6 +21,7 @@ export type EvaluationRow =
       kind: "placeholder";
       index: number;
     };
+type EvaluationLineRow = Extract<EvaluationRow, { kind: "evaluation" }>;
 
 function toggleShowEvalBar(state: StoreState<AppState>) {
   state.set("engineSettings", {
@@ -152,16 +153,12 @@ export function ComputerEvaluation(props: {
         <Show when={isEnabled()}>
           <For each={evaluationRows()}>
             {(row) => (
-              <>
-                {row.kind === "evaluation" ? (
-                  <EvaluationLine
-                    evaluation={row.evaluation}
-                    onAddEvalMoves={props.onAddEvalMoves}
-                  />
-                ) : (
-                  <EvaluationLinePlaceholder />
-                )}
-              </>
+              <Show when={row.kind === "evaluation"} fallback={<EvaluationLinePlaceholder />}>
+                <EvaluationLine
+                  evaluation={(row as EvaluationLineRow).evaluation}
+                  onAddEvalMoves={props.onAddEvalMoves}
+                />
+              </Show>
             )}
           </For>
         </Show>

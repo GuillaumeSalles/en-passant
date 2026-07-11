@@ -66,7 +66,7 @@ function DropdownMenuTrigger(props: { children: JSX.Element; asChild?: boolean }
 
   return (
     <span
-      style="display:contents"
+      style={{ display: "contents" }}
       onClick={(e) => {
         const trigger = getTriggerElement(e.target);
         ctx.setTriggerRect(trigger?.getBoundingClientRect() ?? null);

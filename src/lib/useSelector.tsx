@@ -7,5 +7,6 @@ import { useRouteContext } from "./useRouteContext";
 export function useSelector<T>(selector: (state: AppState, ctx: Context) => T): Accessor<T> {
   const state = useState();
   const ctx = useRouteContext();
-  return createMemo(() => selector(state, ctx()));
+  const selected = createMemo(() => selector(state, ctx()));
+  return selected;
 }

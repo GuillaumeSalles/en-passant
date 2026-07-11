@@ -20,11 +20,7 @@ function TooltipIconButton(props: TooltipIconButtonProps) {
             {props.icon}
           </Button>
         </TooltipTrigger>
-        <TooltipContent
-          {...(props.sideOffset === undefined ? {} : { sideOffset: props.sideOffset })}
-        >
-          {props.tooltip}
-        </TooltipContent>
+        <TooltipContent sideOffset={props.sideOffset}>{props.tooltip}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
