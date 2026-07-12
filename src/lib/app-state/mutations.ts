@@ -446,6 +446,10 @@ export function moveToLastMainLineMove(state: MutableAppState, ctx: Context): Mu
 }
 
 export function spacebar(state: MutableAppState, ctx: Context, animate = true): MutationResult {
+  if (ctx.type !== "repertoire-builder") {
+    return;
+  }
+
   if (state.evaluations.length === 0) {
     return;
   }

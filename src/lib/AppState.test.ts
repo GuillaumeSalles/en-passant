@@ -30,6 +30,7 @@ import {
   normalizePgn,
   selectPreselectedVariation,
   setNagOnSelectedMove,
+  spacebar,
 } from "./AppState";
 import { STARTING_FEN } from "./chess";
 
@@ -365,6 +366,45 @@ test("ignores stale engine evaluations", () => {
   expect(state.evaluations).toHaveLength(1);
   expect(state.evaluations[0]?.score).toEqual({ type: "cp", value: -34 });
   expect(state.evaluations[0]?.moves[0]?.san).toBe("e5");
+});
+
+test("spacebar plays the best move in chapter editing", () => {
+  const state = fromPgn("*");
+
+  updateEvaluation(state, ctx, {
+    index: 0,
+    depth: 20,
+    score: { type: "cp", value: 34 },
+    pv: ["e2e4"],
+    request: { fen: STARTING_FEN, depth: 20 },
+  });
+
+  spacebar(state, ctx);
+
+  expect(selectedMove(state, ctx)?.san).toBe("e4");
+  expect(toPgn(getLoadedPgn(state))).toBe("1. e4 *");
+});
+
+test("spacebar does not play the best move while training", () => {
+  const trainingCtx: Context = {
+    type: "variation-training",
+    repertoireHandle: "white",
+    chapterHandle: "chapter",
+  };
+  const state = fromPgn("*");
+
+  updateEvaluation(state, trainingCtx, {
+    index: 0,
+    depth: 20,
+    score: { type: "cp", value: 34 },
+    pv: ["e2e4"],
+    request: { fen: STARTING_FEN, depth: 20 },
+  });
+
+  spacebar(state, trainingCtx);
+
+  expect(selectedMove(state, trainingCtx)).toBeNull();
+  expect(Object.keys(state.training.variation.moves)).toHaveLength(0);
 });
 
 describe("delete move", () => {
