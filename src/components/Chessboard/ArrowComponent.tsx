@@ -5,6 +5,12 @@ import { getHighlightArrowColor } from "./utils";
 
 const squareHalfWidth = 0.5;
 const headLength = 0.3;
+type ArrowRenderProps = {
+  "data-arrow": string;
+  "data-arrow-kind": ArrowKind;
+  "data-arrow-preview": string | undefined;
+  opacity: string | undefined;
+};
 
 export function ArrowHeadMarker(props: { kind: ArrowKind }) {
   return (
@@ -21,6 +27,7 @@ export function ArrowComponent(props: {
   to: string;
   kind: ArrowKind;
   boardOrientation: Orientation;
+  isPreview: boolean;
 }) {
   const positions = createMemo(() => ({
     from: getSquarePosition(props.from, props.boardOrientation),
@@ -41,6 +48,8 @@ export function ArrowComponent(props: {
   const arrowProps = createMemo(() => ({
     "data-arrow": `${props.from}${props.to}`,
     "data-arrow-kind": props.kind,
+    "data-arrow-preview": props.isPreview ? "true" : undefined,
+    opacity: props.isPreview ? "0.42" : undefined,
   }));
 
   return (
@@ -61,7 +70,7 @@ function KnightArrow(props: {
   from: { x: number; y: number };
   to: { x: number; y: number };
   kind: ArrowKind;
-  arrowProps: { "data-arrow": string; "data-arrow-kind": ArrowKind };
+  arrowProps: ArrowRenderProps;
 }) {
   const path = createMemo(() => {
     const dx = props.to.x - props.from.x;
@@ -112,6 +121,8 @@ function KnightArrow(props: {
       marker-end={`url(#arrowhead-${props.kind})`}
       data-arrow={props.arrowProps["data-arrow"]}
       data-arrow-kind={props.arrowProps["data-arrow-kind"]}
+      data-arrow-preview={props.arrowProps["data-arrow-preview"]}
+      opacity={props.arrowProps.opacity}
     />
   );
 }
@@ -120,7 +131,7 @@ function StraightArrow(props: {
   from: { x: number; y: number };
   to: { x: number; y: number };
   kind: ArrowKind;
-  arrowProps: { "data-arrow": string; "data-arrow-kind": ArrowKind };
+  arrowProps: ArrowRenderProps;
 }) {
   const line = createMemo(() => {
     const dx = props.to.x - props.from.x;
@@ -158,6 +169,8 @@ function StraightArrow(props: {
       marker-end={`url(#arrowhead-${props.kind})`}
       data-arrow={props.arrowProps["data-arrow"]}
       data-arrow-kind={props.arrowProps["data-arrow-kind"]}
+      data-arrow-preview={props.arrowProps["data-arrow-preview"]}
+      opacity={props.arrowProps.opacity}
     />
   );
 }

@@ -1290,6 +1290,18 @@ test("draws and toggles board arrows", async ({ page }) => {
 
   await openRepertoire(page);
 
+  const previewSource = await squareCenter(page, "b1");
+  const previewTarget = await squareCenter(page, "c3");
+  await page.mouse.move(previewSource.x, previewSource.y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(previewTarget.x, previewTarget.y, { steps: 8 });
+  const previewArrow = page.locator('[data-arrow="b1c3"][data-arrow-preview="true"]');
+  await expect(previewArrow).toHaveAttribute("data-arrow-kind", "normal");
+  await expect(previewArrow).toHaveAttribute("opacity", "0.42");
+  await page.mouse.up({ button: "right" });
+  await expect(previewArrow).toHaveCount(0);
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveAttribute("data-arrow-kind", "normal");
+
   await dragBetweenSquares(page, "c3", "f6", { button: "right" });
   await expect(page.locator('[data-arrow="c3f6"]')).toHaveAttribute("data-arrow-kind", "normal");
 

@@ -25,6 +25,7 @@ import { Piece } from "./Piece";
 import { CapturedPiece, MovingPiece, PromotedPiece } from "./MovingPiece";
 import type { PieceMovement } from "./MovingPiece";
 import { Arrows } from "./Arrows";
+import type { PreviewArrow } from "./Arrows";
 import { MoveAnnotation } from "./MoveAnnotation";
 import type { MoveAnnotationData } from "./MoveAnnotation";
 
@@ -86,6 +87,8 @@ export type DraggingData =
   | {
       type: "arrow";
       sourceSquare: string;
+      hoverSquare: string | null;
+      highlightKind: HighlightKind;
     };
 
 export function Chessboard(props: ChessboardProps) {
@@ -186,6 +189,17 @@ export function Chessboard(props: ChessboardProps) {
     const animation = activeAnimation();
     return animation?.promotion === null || animation === null ? [] : [animation.promotion];
   });
+  const previewArrow = createMemo<PreviewArrow | null>(() => {
+    const data = draggingData();
+    if (data == null || data.type !== "arrow") return null;
+    if (data.hoverSquare === null || data.hoverSquare === data.sourceSquare) return null;
+
+    return {
+      from: data.sourceSquare,
+      to: data.hoverSquare,
+      kind: data.highlightKind,
+    };
+  });
 
   const onWindowPointerMove = (e: PointerEvent) => {
     const hoverSquare = squareFromPointer(e, boardFrameRef, props.boardOrientation);
@@ -199,7 +213,11 @@ export function Chessboard(props: ChessboardProps) {
           hoverSquare: hoverSquare,
         };
       }
-      return current;
+      return {
+        ...current,
+        hoverSquare,
+        highlightKind: getHighlightKindFromEvent(e),
+      };
     });
   };
 
@@ -256,7 +274,12 @@ export function Chessboard(props: ChessboardProps) {
 
   const onPointerDown = (event: PointerEvent, sourceSquare: string, piece?: FenPiece) => {
     if (event.button === 2) {
-      setDraggingData({ type: "arrow", sourceSquare });
+      setDraggingData({
+        type: "arrow",
+        sourceSquare,
+        hoverSquare: sourceSquare,
+        highlightKind: getHighlightKindFromEvent(event),
+      });
       return;
     }
 
@@ -446,7 +469,11 @@ export function Chessboard(props: ChessboardProps) {
               <MovingPiece movement={movement} boardOrientation={props.boardOrientation} />
             )}
           </For>
-          <Arrows arrows={props.arrows} boardOrientation={props.boardOrientation} />
+          <Arrows
+            arrows={props.arrows}
+            boardOrientation={props.boardOrientation}
+            previewArrow={previewArrow()}
+          />
           <For each={annotationEntries()}>
             {(item) => (
               <MoveAnnotation

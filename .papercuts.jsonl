@@ -1,0 +1,1 @@
+{"kind":"cut","id":"pc_17fb8b25cb3a","ts":"2026-07-12T12:28:44.999Z","agent":"agent","text":"No guardrail catches optional boolean props when a required boolean would be narrower; consider a custom allowlisted check in scripts/check-code-guardrails.mjs.","tags":["lint"],"severity":"minor","cwd":"/Users/guillaume/chess/en-passant"}
