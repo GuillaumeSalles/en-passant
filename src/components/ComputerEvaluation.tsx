@@ -6,22 +6,15 @@ import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Settings } from "./Icons";
 import { Slider } from "./ui/slider";
-import { EvaluationLine, EvaluationLinePlaceholder } from "./EvalLine";
+import { EvaluationLineSlot } from "./EvalLine";
 import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { StoreState } from "@/lib/createStore";
 
-export type EvaluationRow =
-  | {
-      kind: "evaluation";
-      evaluation: Eval;
-    }
-  | {
-      kind: "placeholder";
-      index: number;
-    };
-type EvaluationLineRow = Extract<EvaluationRow, { kind: "evaluation" }>;
+export function getEvaluationLineIndexes(numberOfLines: number): number[] {
+  return Array.from({ length: numberOfLines }, (_, index) => index);
+}
 
 function toggleShowEvalBar(state: StoreState<AppState>) {
   state.set("engineSettings", {
@@ -44,19 +37,6 @@ function updateDepth(state: StoreState<AppState>, _ctx: Context, depth: number) 
   });
 }
 
-export function getEvaluationRows(evaluations: Eval[], numberOfLines: number): EvaluationRow[] {
-  const evaluationsByIndex = new Map(
-    evaluations.map((evaluation) => [evaluation.index, evaluation]),
-  );
-
-  return Array.from({ length: numberOfLines }, (_, index) => {
-    const evaluation = evaluationsByIndex.get(index);
-    return evaluation === undefined
-      ? { kind: "placeholder", index }
-      : { kind: "evaluation", evaluation };
-  });
-}
-
 export function ComputerEvaluation(props: {
   evaluations: Eval[];
   onNumberOfLinesChange: (numberOfLines: number) => void;
@@ -72,8 +52,11 @@ export function ComputerEvaluation(props: {
   const onToggleShowEvalBar = useMutation(toggleShowEvalBar);
   const onToggleShowBestMoveArrow = useMutation(toggleShowBestMoveArrow);
   const onUpdateDepth = useMutation(updateDepth);
-  const evaluationRows = createMemo<EvaluationRow[]>(() =>
-    getEvaluationRows(props.evaluations, numberOfLines()),
+  const evaluationsByIndex = createMemo(
+    () => new Map(props.evaluations.map((evaluation) => [evaluation.index, evaluation])),
+  );
+  const evaluationLineIndexes = createMemo<number[]>(() =>
+    getEvaluationLineIndexes(numberOfLines()),
   );
 
   return (
@@ -151,14 +134,12 @@ export function ComputerEvaluation(props: {
       <HorizontalDashedDivider direction="right-to-left" />
       <div class="flex flex-col">
         <Show when={isEnabled()}>
-          <For each={evaluationRows()}>
-            {(row) => (
-              <Show when={row.kind === "evaluation"} fallback={<EvaluationLinePlaceholder />}>
-                <EvaluationLine
-                  evaluation={(row as EvaluationLineRow).evaluation}
-                  onAddEvalMoves={props.onAddEvalMoves}
-                />
-              </Show>
+          <For each={evaluationLineIndexes()}>
+            {(lineIndex) => (
+              <EvaluationLineSlot
+                evaluation={evaluationsByIndex().get(lineIndex)}
+                onAddEvalMoves={props.onAddEvalMoves}
+              />
             )}
           </For>
         </Show>

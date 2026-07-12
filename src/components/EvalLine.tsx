@@ -2,9 +2,9 @@ import { Eval, EvalMove } from "@/lib/AppState";
 import { EvalBadge } from "./EvalBadge";
 import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
 import type { JSX } from "@solidjs/web";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 
-function EvaluationLineFrame(props: { children: JSX.Element; ariaHidden?: "true" }) {
+function EvaluationLineFrame(props: { children: JSX.Element; ariaHidden?: "true" | undefined }) {
   return (
     <>
       <div
@@ -18,12 +18,12 @@ function EvaluationLineFrame(props: { children: JSX.Element; ariaHidden?: "true"
   );
 }
 
-export function EvaluationLine(props: {
+function EvaluationLineContent(props: {
   evaluation: Eval;
   onAddEvalMoves: (moves: EvalMove[]) => void;
 }) {
   return (
-    <EvaluationLineFrame>
+    <>
       <EvalBadge score={props.evaluation.score} />
       <For each={props.evaluation.moves}>
         {(move, index) => (
@@ -35,17 +35,32 @@ export function EvaluationLine(props: {
           </span>
         )}
       </For>
-    </EvaluationLineFrame>
+    </>
   );
 }
 
-export function EvaluationLinePlaceholder() {
+function EvaluationLinePlaceholder() {
   return (
-    <EvaluationLineFrame ariaHidden="true">
+    <>
       <span class="h-5 w-12 shrink-0 rounded-md bg-muted" />
       <span class="h-3 w-10 shrink-0 rounded-sm bg-muted" />
       <span class="h-3 w-14 shrink-0 rounded-sm bg-muted" />
       <span class="h-3 w-12 shrink-0 rounded-sm bg-muted" />
+    </>
+  );
+}
+
+export function EvaluationLineSlot(props: {
+  evaluation: Eval | undefined;
+  onAddEvalMoves: (moves: EvalMove[]) => void;
+}) {
+  return (
+    <EvaluationLineFrame ariaHidden={props.evaluation === undefined ? "true" : undefined}>
+      <Show when={props.evaluation} fallback={<EvaluationLinePlaceholder />}>
+        {(evaluation) => (
+          <EvaluationLineContent evaluation={evaluation()} onAddEvalMoves={props.onAddEvalMoves} />
+        )}
+      </Show>
     </EvaluationLineFrame>
   );
 }
