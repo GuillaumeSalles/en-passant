@@ -1,0 +1,443 @@
+#!/usr/bin/env node
+
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+const crypto = require("node:crypto")
+const childProcess = require("node:child_process")
+
+const CONTRACT = 1
+const SEVERITIES = new Set(["minor", "major", "blocker"])
+const SEVERITY_RANK = { blocker: 0, major: 1, minor: 2 }
+
+function usage() {
+  return [
+    "usage:",
+    "  papercuts add <text|-> [--tag <tag>]... [--severity minor|major|blocker]",
+    "  papercuts list [--format json|md] [--all]",
+    "  papercuts resolve <id-prefix>",
+    "  papercuts schema",
+    "  papercuts doctor",
+  ].join("\n")
+}
+
+function envelope(data, meta = {}) {
+  return {
+    ok: true,
+    data,
+    meta: {
+      contract: CONTRACT,
+      file: getLogFile(),
+      agent_source: process.env.PAPERCUTS_AGENT ? "env" : "detected",
+      ...meta,
+    },
+  }
+}
+
+function fail(code, message, suggestedFix, exitCode = 2) {
+  process.stderr.write(
+    JSON.stringify({
+      ok: false,
+      error: {
+        code,
+        message,
+        suggested_fix: suggestedFix,
+      },
+      meta: {
+        contract: CONTRACT,
+      },
+    }) + "\n",
+  )
+  process.exit(exitCode)
+}
+
+function readStdin() {
+  return fs.readFileSync(0, "utf8").trim()
+}
+
+function parseFlags(args) {
+  const positional = []
+  const tags = []
+  let severity = "minor"
+  let format = "json"
+  let all = false
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (arg === "--tag") {
+      const value = args[(i += 1)]
+      if (!value) fail("usage", "--tag requires a value", usage())
+      tags.push(value)
+    } else if (arg.startsWith("--tag=")) {
+      tags.push(arg.slice("--tag=".length))
+    } else if (arg === "--severity") {
+      const value = args[(i += 1)]
+      if (!value) fail("usage", "--severity requires a value", usage())
+      severity = value
+    } else if (arg.startsWith("--severity=")) {
+      severity = arg.slice("--severity=".length)
+    } else if (arg === "--format") {
+      const value = args[(i += 1)]
+      if (!value) fail("usage", "--format requires a value", usage())
+      format = value
+    } else if (arg.startsWith("--format=")) {
+      format = arg.slice("--format=".length)
+    } else if (arg === "--all") {
+      all = true
+    } else {
+      positional.push(arg)
+    }
+  }
+
+  if (!SEVERITIES.has(severity)) {
+    fail(
+      "bad_input",
+      `Unknown severity: ${severity}`,
+      "Use one of: minor, major, blocker.",
+      65,
+    )
+  }
+
+  if (!new Set(["json", "md"]).has(format)) {
+    fail("bad_input", `Unknown format: ${format}`, "Use --format json or --format md.", 65)
+  }
+
+  return { positional, tags: [...new Set(tags)], severity, format, all }
+}
+
+function getWorkspaceRoot() {
+  return path.resolve(__dirname)
+}
+
+function getGitRoot() {
+  try {
+    return childProcess
+      .execFileSync("git", ["rev-parse", "--show-toplevel"], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      .trim()
+  } catch {
+    return null
+  }
+}
+
+function isInside(parent, child) {
+  const relative = path.relative(parent, child)
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
+}
+
+function getLogFile() {
+  if (process.env.PAPERCUTS_FILE) {
+    return path.resolve(process.env.PAPERCUTS_FILE)
+  }
+
+  const gitRoot = getGitRoot()
+  if (gitRoot) {
+    return path.join(gitRoot, ".papercuts.jsonl")
+  }
+
+  const workspaceRoot = getWorkspaceRoot()
+  if (isInside(workspaceRoot, process.cwd())) {
+    return path.join(workspaceRoot, ".papercuts.jsonl")
+  }
+
+  return path.join(os.homedir(), ".papercuts", "log.jsonl")
+}
+
+function ensureLogDir() {
+  fs.mkdirSync(path.dirname(getLogFile()), { recursive: true })
+}
+
+function readEvents() {
+  const file = getLogFile()
+  if (!fs.existsSync(file)) return []
+
+  const lines = fs.readFileSync(file, "utf8").split(/\r?\n/)
+  const events = []
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim()
+    if (!line) continue
+    try {
+      events.push(JSON.parse(line))
+    } catch (error) {
+      fail(
+        "bad_input",
+        `Invalid JSONL at ${file}:${index + 1}: ${error.message}`,
+        "Run `papercuts doctor`, remove or fix the malformed line, then retry.",
+        65,
+      )
+    }
+  }
+  return events
+}
+
+function withLock(callback) {
+  ensureLogDir()
+  const lockFile = `${getLogFile()}.lock`
+  const started = Date.now()
+
+  while (true) {
+    try {
+      const fd = fs.openSync(lockFile, "wx")
+      try {
+        return callback()
+      } finally {
+        fs.closeSync(fd)
+        fs.rmSync(lockFile, { force: true })
+      }
+    } catch (error) {
+      if (error && error.code === "EEXIST") {
+        if (Date.now() - started > 5000) {
+          fail(
+            "lock_timeout",
+            `Timed out waiting for ${lockFile}`,
+            "Retry the papercuts command; another agent may have been writing.",
+            75,
+          )
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50)
+        continue
+      }
+      throw error
+    }
+  }
+}
+
+function nowIso() {
+  return process.env.PAPERCUTS_NOW || new Date().toISOString()
+}
+
+function agentName() {
+  if (process.env.PAPERCUTS_AGENT) return process.env.PAPERCUTS_AGENT
+  if (process.env.CLAUDECODE) return "claude-code"
+  if (process.env.CODEX_SANDBOX || process.env.CODEX_HOME) return "codex"
+  return "agent"
+}
+
+function makeId(text, tags, severity) {
+  const hash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ text: text.trim(), tags: [...tags].sort(), severity }))
+    .digest("hex")
+  return `pc_${hash.slice(0, 12)}`
+}
+
+function appendEvent(event) {
+  fs.appendFileSync(getLogFile(), `${JSON.stringify(event)}\n`, "utf8")
+}
+
+function fold(events) {
+  const cuts = new Map()
+  const resolved = new Set()
+
+  for (const event of events) {
+    if (event.kind === "cut" && !cuts.has(event.id)) {
+      cuts.set(event.id, event)
+    } else if (event.kind === "resolve") {
+      const match = [...cuts.keys()].find((id) => id === event.id || id.startsWith(event.id))
+      if (match) resolved.add(match)
+    }
+  }
+
+  return [...cuts.values()]
+    .map((cut) => ({ ...cut, resolved: resolved.has(cut.id) }))
+    .sort((a, b) => {
+      const severity = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+      if (severity !== 0) return severity
+      return b.ts.localeCompare(a.ts)
+    })
+}
+
+function commandAdd(args) {
+  const { positional, tags, severity } = parseFlags(args)
+  const text = positional[0] === "-" ? readStdin() : positional.join(" ").trim()
+
+  if (!text) {
+    fail(
+      "usage",
+      "papercuts add requires complaint text",
+      'Run `papercuts add "what hurt and what would have prevented it" --tag tooling`.',
+    )
+  }
+
+  return withLock(() => {
+    const events = readEvents()
+    const id = makeId(text, tags, severity)
+    const existing = fold(events).find((cut) => cut.id === id && !cut.resolved)
+    if (existing) {
+      return envelope({ changed: false, record: existing })
+    }
+
+    const record = {
+      kind: "cut",
+      id,
+      ts: nowIso(),
+      agent: agentName(),
+      text,
+      tags,
+      severity,
+      cwd: process.cwd(),
+    }
+    appendEvent(record)
+    return envelope({ changed: true, record })
+  })
+}
+
+function commandList(args) {
+  const { format, all } = parseFlags(args)
+  const cuts = fold(readEvents()).filter((cut) => all || !cut.resolved)
+
+  if (format === "md") {
+    if (cuts.length === 0) {
+      return "# Papercuts\n\nNo open papercuts.\n"
+    }
+
+    return [
+      "# Papercuts",
+      "",
+      ...cuts.flatMap((cut) => [
+        `- ${cut.id} [${cut.severity}]${cut.resolved ? " [resolved]" : ""} ${cut.text}`,
+        `  - tags: ${cut.tags.length ? cut.tags.join(", ") : "none"}`,
+        `  - agent: ${cut.agent}; ts: ${cut.ts}`,
+      ]),
+      "",
+    ].join("\n")
+  }
+
+  return envelope({ cuts })
+}
+
+function commandResolve(args) {
+  const idPrefix = args[0]
+  if (!idPrefix) {
+    fail("usage", "papercuts resolve requires an id or unique id prefix", usage())
+  }
+
+  return withLock(() => {
+    const cuts = fold(readEvents())
+    const matches = cuts.filter((cut) => cut.id === idPrefix || cut.id.startsWith(idPrefix))
+    if (matches.length === 0) {
+      fail("not_found", `No papercut matches ${idPrefix}`, "Run `papercuts list --format md`.", 66)
+    }
+    if (matches.length > 1) {
+      fail(
+        "bad_input",
+        `${idPrefix} matches multiple papercuts`,
+        "Use a longer id prefix from `papercuts list --format md`.",
+        65,
+      )
+    }
+
+    const cut = matches[0]
+    if (cut.resolved) {
+      return envelope({ changed: false, record: cut })
+    }
+
+    const record = {
+      kind: "resolve",
+      id: cut.id,
+      ts: nowIso(),
+      agent: agentName(),
+    }
+    appendEvent(record)
+    return envelope({ changed: !cut.resolved, record })
+  })
+}
+
+function commandSchema() {
+  return envelope({
+    commands: {
+      add: {
+        mutation: "append",
+        args: ["text or -"],
+        flags: ["--tag <tag>", "--severity minor|major|blocker"],
+      },
+      list: {
+        mutation: "read-only",
+        flags: ["--format json|md", "--all"],
+      },
+      resolve: {
+        mutation: "append",
+        args: ["id-prefix"],
+      },
+      doctor: {
+        mutation: "read-only",
+      },
+    },
+    env: ["PAPERCUTS_FILE", "PAPERCUTS_AGENT", "PAPERCUTS_NOW"],
+    records: {
+      cut: ["kind", "id", "ts", "agent", "text", "tags", "severity", "cwd"],
+      resolve: ["kind", "id", "ts", "agent"],
+    },
+    exit_codes: {
+      0: "success",
+      2: "usage",
+      65: "bad input",
+      66: "not found",
+      75: "lock timeout",
+    },
+  })
+}
+
+function commandDoctor() {
+  const events = readEvents()
+  const cuts = fold(events)
+  const ids = new Set()
+  const duplicateIds = new Set()
+
+  for (const event of events) {
+    if (!event.kind || !event.id || !event.ts || !event.agent) {
+      fail(
+        "bad_input",
+        `Malformed record for ${event.id || "unknown id"}`,
+        "Every record needs kind, id, ts, and agent fields.",
+        65,
+      )
+    }
+    if (event.kind === "cut") {
+      if (!event.text || !Array.isArray(event.tags) || !SEVERITIES.has(event.severity)) {
+        fail(
+          "bad_input",
+          `Malformed cut record ${event.id}`,
+          "Cut records need text, tags array, and severity minor|major|blocker.",
+          65,
+        )
+      }
+      if (ids.has(event.id)) duplicateIds.add(event.id)
+      ids.add(event.id)
+    }
+  }
+
+  return envelope({
+    valid: true,
+    events: events.length,
+    open: cuts.filter((cut) => !cut.resolved).length,
+    resolved: cuts.filter((cut) => cut.resolved).length,
+    duplicate_ids: [...duplicateIds],
+  })
+}
+
+function main() {
+  const [command, ...args] = process.argv.slice(2)
+  let result
+
+  if (command === "add" || command === "log") {
+    result = commandAdd(args)
+  } else if (command === "list") {
+    result = commandList(args)
+  } else if (command === "resolve") {
+    result = commandResolve(args)
+  } else if (command === "schema") {
+    result = commandSchema()
+  } else if (command === "doctor") {
+    result = commandDoctor()
+  } else {
+    fail("usage", command ? `Unknown command: ${command}` : "Missing command", usage())
+  }
+
+  process.stdout.write(typeof result === "string" ? result : JSON.stringify(result) + "\n")
+}
+
+main()

@@ -111,6 +111,10 @@ handoff.
 
 - Use focused tests while iterating, then run `npm run check` before handing off
   substantive work.
+- When local setup, docs, commands, or tools cause avoidable friction, log it
+  before pushing through:
+  `./papercuts add "<what hurt and what would have prevented it>" --tag <area>`.
+  Use `--severity major` for time sinks and `--severity blocker` for hard walls.
 - If a flaky or nondeterministic test appears while working, treat it as a
   first-priority stability bug: reproduce it, identify the race/isolation issue,
   and fix the test or app behavior so the suite runs consistently.
