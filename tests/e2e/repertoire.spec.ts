@@ -1316,6 +1316,68 @@ test("draws and toggles board arrows", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("clears a board arrow preview when right-button release is missed", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await openRepertoire(page);
+
+  const source = await squareCenter(page, "b1");
+  const target = await squareCenter(page, "c3");
+
+  await page.evaluate(
+    async ({ source, target }) => {
+      const sourceSquare = document.querySelector('[data-square="b1"]');
+      if (sourceSquare === null) {
+        throw new Error("Cannot find b1; square is not visible");
+      }
+
+      const nextFrame = () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+
+      const dispatchPointer = (point: { x: number; y: number }, buttons: number) => {
+        sourceSquare.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            cancelable: true,
+            button: -1,
+            buttons,
+            clientX: point.x,
+            clientY: point.y,
+            isPrimary: true,
+            pointerId: 1,
+            pointerType: "mouse",
+          }),
+        );
+      };
+
+      sourceSquare.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          buttons: 2,
+          clientX: source.x,
+          clientY: source.y,
+          isPrimary: true,
+          pointerId: 1,
+          pointerType: "mouse",
+        }),
+      );
+      await nextFrame();
+      dispatchPointer(target, 2);
+      await nextFrame();
+      dispatchPointer(target, 0);
+    },
+    { source, target },
+  );
+
+  await expect(page.locator('[data-arrow="b1c3"][data-arrow-preview="true"]')).toHaveCount(0);
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveCount(0);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("adds and toggles square highlights", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

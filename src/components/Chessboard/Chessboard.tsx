@@ -91,6 +91,11 @@ export type DraggingData =
       highlightKind: HighlightKind;
     };
 
+function isDragButtonPressed(event: Pick<PointerEvent, "buttons">, data: DraggingData): boolean {
+  const buttonMask = data.type === "piece" ? 1 : 2;
+  return (event.buttons & buttonMask) !== 0;
+}
+
 export function Chessboard(props: ChessboardProps) {
   const canDrag = () => props.canDrag ?? true;
   const [draggingData, setDraggingData] = createSignal<DraggingData | null>(null);
@@ -202,6 +207,12 @@ export function Chessboard(props: ChessboardProps) {
   });
 
   const onWindowPointerMove = (e: PointerEvent) => {
+    const data = draggingData();
+    if (data !== null && !isDragButtonPressed(e, data)) {
+      setDraggingData(null);
+      return;
+    }
+
     const hoverSquare = squareFromPointer(e, boardFrameRef, props.boardOrientation);
 
     setDraggingData((current) => {
