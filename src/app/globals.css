@@ -40,6 +40,13 @@
 }
 
 @layer components {
+  .app-viewport {
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+  }
+
   .motion-dialog-overlay {
     opacity: 1;
     transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);

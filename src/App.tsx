@@ -160,7 +160,7 @@ function AppShell(props: { children?: JSX.Element }) {
 
   return (
     <MobileNavigationProvider openDrawer={() => setIsDrawerOpen(true)}>
-      <div class="relative flex h-screen w-screen flex-row overflow-hidden font-[family-name:var(--font-geist-sans)] antialiased">
+      <div class="app-viewport relative flex flex-row overflow-hidden font-[family-name:var(--font-geist-sans)] antialiased">
         <Show when={isSafariBrowser()}>
           <HorizontalDashedDivider
             class="pointer-events-none absolute left-0 right-0 top-0 z-10"

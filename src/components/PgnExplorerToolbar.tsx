@@ -43,7 +43,10 @@ export function PgnExplorerToolbar() {
   return (
     <>
       <HorizontalDashedDivider animationKey="pgn-explorer-toolbar-top" direction="right-to-left" />
-      <div class="flex w-full px-2 py-2">
+      <div
+        data-pgn-explorer-toolbar
+        class="flex w-full px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
+      >
         <div class="flex gap-2">
           <TooltipIconButton
             aria-label="Flip board"

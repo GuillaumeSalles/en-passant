@@ -505,6 +505,33 @@ test("playing a move on mobile does not scroll down to the move list", async ({ 
   expect(consoleMessages).toEqual([]);
 });
 
+test("mobile shell uses dynamic viewport sizing for browser controls", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openRepertoire(page);
+
+  const viewportStyles = await page.evaluate(() => {
+    const appShell = document.querySelector(".app-viewport");
+    const toolbar = document.querySelector("[data-pgn-explorer-toolbar]");
+    if (!(appShell instanceof HTMLElement) || !(toolbar instanceof HTMLElement)) {
+      throw new Error("Expected app shell and PGN toolbar to be visible");
+    }
+
+    return {
+      dynamicViewportSupported: CSS.supports("height", "100dvh"),
+      shellHeight: getComputedStyle(appShell).height,
+      toolbarPaddingBottom: getComputedStyle(toolbar).paddingBottom,
+      viewportHeight: `${window.innerHeight}px`,
+    };
+  });
+
+  expect(viewportStyles.dynamicViewportSupported).toBe(true);
+  expect(viewportStyles.shellHeight).toBe(viewportStyles.viewportHeight);
+  expect(Number.parseFloat(viewportStyles.toolbarPaddingBottom)).toBeGreaterThanOrEqual(8);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("creates a chapter from the repertoire overview before training", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
