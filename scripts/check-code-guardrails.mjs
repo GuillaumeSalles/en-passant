@@ -16,6 +16,31 @@ const coreLibFiles = new Set(
     "src/lib/utils.ts",
   ].map((filePath) => path.normalize(filePath)),
 );
+const optionalBooleanPropAllowlist = new Set(
+  [
+    "src/App.tsx:SidebarFooter.showGlobalActions",
+    "src/App.tsx:GlobalActions.showAbout",
+    "src/components/Chessboard/Chessboard.tsx:ChessboardProps.canDrag",
+    "src/components/LoadPgnDialog.tsx:LoadPGNDialog.open",
+    "src/components/ui/HorizontalDashedDivider.tsx:HorizontalDashedDivider.animate",
+    "src/components/ui/checkbox.tsx:CheckboxProps.checked",
+    "src/components/ui/checkbox.tsx:CheckboxProps.disabled",
+    "src/components/ui/context-menu.tsx:ContextMenuTrigger.disabled",
+    "src/components/ui/context-menu.tsx:ContextMenuItem.inset",
+    "src/components/ui/dialog.tsx:Dialog.open",
+    "src/components/ui/dialog.tsx:DialogTrigger.asChild",
+    "src/components/ui/dialog.tsx:DialogClose.asChild",
+    "src/components/ui/dropdown-menu.tsx:DropdownMenu.open",
+    "src/components/ui/dropdown-menu.tsx:DropdownMenuTrigger.asChild",
+    "src/components/ui/dropdown-menu.tsx:DropdownMenuItem.inset",
+    "src/components/ui/dropdown-menu.tsx:DropdownMenuLabel.inset",
+    "src/components/ui/inline-edit-input.tsx:InlineEditInputProps.autoFocus",
+    "src/components/ui/switch.tsx:SwitchProps.checked",
+    "src/components/ui/switch.tsx:SwitchProps.disabled",
+    "src/components/ui/tooltip.tsx:TooltipTrigger.asChild",
+    "src/lib/app-state/pgnTree.ts:addMove.forceBlackMoveNumber",
+  ].map((entry) => path.normalize(entry)),
+);
 
 function relative(filePath) {
   return path.relative(root, filePath);
@@ -73,6 +98,33 @@ function isDoubleUnknownAssertion(node) {
   return ts.isAsExpression(node.parent);
 }
 
+function typeIncludesBoolean(typeNode) {
+  if (typeNode === undefined) return false;
+  if (typeNode.kind === ts.SyntaxKind.BooleanKeyword) return true;
+  if (ts.isUnionTypeNode(typeNode)) {
+    return typeNode.types.some(typeIncludesBoolean);
+  }
+  return false;
+}
+
+function namedScope(node) {
+  if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+    return node.name.text;
+  }
+  if (ts.isFunctionDeclaration(node) && node.name !== undefined) {
+    return node.name.text;
+  }
+  if (
+    ts.isVariableDeclaration(node) &&
+    ts.isIdentifier(node.name) &&
+    node.initializer !== undefined &&
+    (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+  ) {
+    return node.name.text;
+  }
+  return null;
+}
+
 function hasExpectErrorDescription(line) {
   return /@ts-expect-error\s+\S/.test(line);
 }
@@ -106,7 +158,10 @@ for (const filePath of files) {
     });
   }
 
-  function visit(node) {
+  function visit(node, scopes = []) {
+    const scope = namedScope(node);
+    const nextScopes = scope === null ? scopes : [...scopes, scope];
+
     if (node.kind === ts.SyntaxKind.AnyKeyword) {
       errors.push(
         `${rel}:${lineAndColumn(sourceFile, node.getStart(sourceFile))}: any is forbidden`,
@@ -125,6 +180,23 @@ for (const filePath of files) {
       );
     }
 
+    if (
+      isProductionSource(filePath) &&
+      !rel.endsWith(".d.ts") &&
+      ts.isPropertySignature(node) &&
+      node.questionToken !== undefined &&
+      typeIncludesBoolean(node.type)
+    ) {
+      const scopeName = nextScopes.at(-1) ?? "<inline>";
+      const propName = node.name.getText(sourceFile);
+      const key = path.normalize(`${rel}:${scopeName}.${propName}`);
+      if (!optionalBooleanPropAllowlist.has(key)) {
+        errors.push(
+          `${rel}:${lineAndColumn(sourceFile, node.getStart(sourceFile))}: optional boolean prop ${scopeName}.${propName} must be required, or explicitly allowlisted in scripts/check-code-guardrails.mjs`,
+        );
+      }
+    }
+
     if (coreLibFiles.has(normalizedRel) && ts.isImportDeclaration(node)) {
       const specifier = importText(node);
       if (specifier !== null && isForbiddenCoreImport(specifier)) {
@@ -134,7 +206,7 @@ for (const filePath of files) {
       }
     }
 
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => visit(child, nextScopes));
   }
 
   visit(sourceFile);
