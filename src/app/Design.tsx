@@ -321,7 +321,7 @@ function DisplaySamples() {
           <EvalBadge score={{ type: "stalemate" }} />
         </div>
       </div>
-      <HorizontalDashedDivider animate={false} />
+      <HorizontalDashedDivider animation="none" />
       <div class="flex h-16 items-stretch gap-3">
         <VerticalDashedDivider />
         <div class="grid content-center gap-1 text-sm">

@@ -77,7 +77,7 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
               {(chapter, index) => (
                 <>
                   <Show when={index() > 0}>
-                    <HorizontalDashedDivider animate={false} />
+                    <HorizontalDashedDivider animation="none" />
                   </Show>
                   <div class="flex min-w-0 flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="min-w-0">

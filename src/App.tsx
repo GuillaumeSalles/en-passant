@@ -206,7 +206,7 @@ function AppShell(props: { children?: JSX.Element }) {
                   <X />
                 </Button>
               </div>
-              <HorizontalDashedDivider animate={false} />
+              <HorizontalDashedDivider animation="none" />
               <div class="min-h-0 flex-1 overflow-y-auto" onClick={closeDrawerAfterNavigation}>
                 <Repertoires />
               </div>

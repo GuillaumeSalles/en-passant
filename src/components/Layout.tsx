@@ -30,7 +30,7 @@ export function Layout(props: {
             {evalBar()}
           </div>
         </div>
-        <HorizontalDashedDivider class="xl:hidden" animate={false} />
+        <HorizontalDashedDivider class="xl:hidden" animation="none" />
         <div class="relative flex min-h-0 w-full min-w-0 flex-none flex-col xl:w-[400px] xl:min-w-[400px] xl:max-w-[400px] xl:flex-1 xl:flex-shrink-0">
           {panelChildren()}
         </div>

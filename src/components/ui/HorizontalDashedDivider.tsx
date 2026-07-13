@@ -7,13 +7,13 @@ const completedAnimations = new Set<string>();
 export function HorizontalDashedDivider(props: {
   class?: string;
   animationKey?: string;
-  animate?: boolean;
+  animation?: "auto" | "none";
   direction?: "left-to-right" | "right-to-left";
 }) {
   const [hasAnimated, setHasAnimated] = createSignal(
     untrack(
       () =>
-        props.animate === false ||
+        props.animation === "none" ||
         (props.animationKey !== undefined && completedAnimations.has(props.animationKey)),
     ),
   );
