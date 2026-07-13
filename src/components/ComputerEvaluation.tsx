@@ -66,6 +66,7 @@ export function ComputerEvaluation(props: {
           <Switch
             id="evaluation"
             checked={isEnabled()}
+            disabled={false}
             onCheckedChange={onToggleEngine}
             onKeyDown={(e) => {
               e.stopPropagation();

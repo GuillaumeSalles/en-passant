@@ -2,16 +2,16 @@ import type { JSX } from "@solidjs/web";
 import { cn } from "@/lib/utils";
 
 interface SwitchProps {
-  checked?: boolean;
+  checked: boolean;
   onCheckedChange?: (checked: boolean) => void;
   id?: string;
   class?: string;
-  disabled?: boolean;
+  disabled: boolean;
   onKeyDown?: JSX.EventHandler<HTMLButtonElement, KeyboardEvent>;
 }
 
 function Switch(props: SwitchProps) {
-  const checked = () => props.checked ?? false;
+  const checked = () => props.checked;
 
   return (
     <button

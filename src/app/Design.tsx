@@ -191,7 +191,12 @@ function FormSamples() {
           <Label for="design-checkbox">Save locally</Label>
         </div>
         <div class="flex items-center gap-2">
-          <Switch id="design-switch" checked={enabled()} onCheckedChange={setEnabled} />
+          <Switch
+            id="design-switch"
+            checked={enabled()}
+            disabled={false}
+            onCheckedChange={setEnabled}
+          />
           <Label for="design-switch">Computer evaluation</Label>
         </div>
         <div class="grid gap-2">
