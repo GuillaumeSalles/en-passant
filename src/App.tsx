@@ -45,18 +45,18 @@ function SidebarHeader() {
   );
 }
 
-function SidebarFooter(props: { showGlobalActions?: boolean } = {}) {
+function SidebarFooter(props: { showGlobalActions: boolean }) {
   return (
     <Show when={props.showGlobalActions}>
       <div class="flex flex-col gap-2 p-3">
         <AboutDialog buttonClass="w-full" />
-        <GlobalActions class="flex-col" buttonClass="w-full" />
+        <GlobalActions class="flex-col" buttonClass="w-full" showAbout={false} />
       </div>
     </Show>
   );
 }
 
-function GlobalActions(props: { class?: string; buttonClass?: string; showAbout?: boolean } = {}) {
+function GlobalActions(props: { class?: string; buttonClass?: string; showAbout: boolean }) {
   return (
     <div class={`flex gap-2 ${props.class ?? ""}`}>
       <Show when={props.showAbout}>
@@ -173,14 +173,14 @@ function AppShell(props: { children?: JSX.Element }) {
           <VerticalDashedDivider class="pointer-events-none absolute right-[400px] top-0 z-10 hidden xl:block" />
         </Show>
         <div class="absolute right-0 top-0 z-20 hidden h-[3.25rem] w-[400px] items-center justify-end px-2 xl:flex">
-          <GlobalActions showAbout />
+          <GlobalActions showAbout={true} />
         </div>
         <div class="relative hidden w-[200px] min-w-[200px] flex-none flex-col xl:flex">
           <SidebarHeader />
           <div class="min-h-0 flex-1 overflow-y-auto">
             <Repertoires />
           </div>
-          <SidebarFooter />
+          <SidebarFooter showGlobalActions={false} />
         </div>
         <Show when={isDrawerOpen()}>
           <>
