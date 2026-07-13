@@ -106,6 +106,18 @@
     transform-origin: top center;
   }
 
+  .motion-menu-content[data-side="top"] {
+    transform-origin: bottom left;
+  }
+
+  .motion-menu-content[data-side="top"][data-align="end"] {
+    transform-origin: bottom right;
+  }
+
+  .motion-menu-content[data-side="top"][data-align="center"] {
+    transform-origin: bottom center;
+  }
+
   .motion-context-menu-content {
     opacity: 1;
     transform: scale(1);

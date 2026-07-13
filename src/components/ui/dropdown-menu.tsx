@@ -29,7 +29,7 @@ type DropdownMenuPosition = {
   transform?: string;
 };
 
-type DropdownMenuSide = "bottom" | "right";
+type DropdownMenuSide = "bottom" | "right" | "top";
 
 const DropdownMenuContext = createContext<DropdownMenuContextType>({
   open: () => false,
@@ -103,7 +103,9 @@ function DropdownMenuContent(props: {
     const position =
       side() === "right"
         ? positionRightMenu(rect, a, sideOffset())
-        : positionBottomMenu(rect, a, sideOffset());
+        : side() === "top"
+          ? positionTopMenu(rect, a, sideOffset())
+          : positionBottomMenu(rect, a, sideOffset());
 
     return (
       <>
@@ -142,6 +144,21 @@ function positionBottomMenu(
       : align === "center"
         ? { left: rect.left + rect.width / 2, transform: "translateX(-50%)" }
         : { left: rect.left }),
+  };
+}
+
+function positionTopMenu(
+  rect: DOMRect,
+  align: "start" | "end" | "center",
+  sideOffset: number,
+): DropdownMenuPosition {
+  return {
+    top: rect.top - sideOffset,
+    ...(align === "end"
+      ? { right: window.innerWidth - rect.right, transform: "translateY(-100%)" }
+      : align === "center"
+        ? { left: rect.left + rect.width / 2, transform: "translate(-50%, -100%)" }
+        : { left: rect.left, transform: "translateY(-100%)" }),
   };
 }
 

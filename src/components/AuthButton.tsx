@@ -36,6 +36,7 @@ import {
 type EmailAuthStep = "email" | "code";
 
 type EmailOtpSignInResult = { ok: true; isNewUser: boolean } | { ok: false; message: string };
+type AuthButtonMenuSide = "bottom" | "top";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -88,7 +89,9 @@ function userInitial(user: { email: string; name: string }): string {
   return userDisplayName(user).trim().charAt(0).toUpperCase() || "?";
 }
 
-export function AuthButton(props: { class?: string | undefined } = {}) {
+export function AuthButton(
+  props: { class?: string | undefined; menuSide?: AuthButtonMenuSide | undefined } = {},
+) {
   const [step, setStep] = createSignal<EmailAuthStep>("email");
   const [email, setEmail] = createSignal("");
   const [code, setCode] = createSignal("");
@@ -296,7 +299,12 @@ export function AuthButton(props: { class?: string | undefined } = {}) {
               <ChevronDown class="ml-auto h-4 w-4 flex-none text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={8} class="w-52">
+          <DropdownMenuContent
+            align="end"
+            side={props.menuSide ?? "bottom"}
+            sideOffset={8}
+            class="w-52"
+          >
             <DropdownMenuLabel class="min-w-0">
               <div class="truncate text-sm">{userDisplayName(signedInUser())}</div>
               <div class="truncate text-xs font-normal text-muted-foreground">

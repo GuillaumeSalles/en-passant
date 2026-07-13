@@ -50,19 +50,24 @@ function SidebarFooter(props: { showGlobalActions: boolean }) {
     <Show when={props.showGlobalActions}>
       <div class="flex flex-col gap-2 p-3">
         <AboutDialog buttonClass="w-full" />
-        <GlobalActions class="flex-col" buttonClass="w-full" showAbout={false} />
+        <GlobalActions class="flex-col" buttonClass="w-full" showAbout={false} menuSide="top" />
       </div>
     </Show>
   );
 }
 
-function GlobalActions(props: { class?: string; buttonClass?: string; showAbout: boolean }) {
+function GlobalActions(props: {
+  class?: string;
+  buttonClass?: string;
+  showAbout: boolean;
+  menuSide?: "bottom" | "top";
+}) {
   return (
     <div class={`flex gap-2 ${props.class ?? ""}`}>
       <Show when={props.showAbout}>
         <AboutDialog buttonClass={props.buttonClass} />
       </Show>
-      <AuthButton class={props.buttonClass} />
+      <AuthButton class={props.buttonClass} menuSide={props.menuSide} />
     </div>
   );
 }

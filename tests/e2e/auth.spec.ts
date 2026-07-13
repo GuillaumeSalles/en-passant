@@ -478,6 +478,32 @@ test("loads a backend session without a local signed-in marker", async ({ page }
   expect(consoleMessages).toEqual([]);
 });
 
+test("mobile account menu opens above the username", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const auth = await mockSignedInUser(page);
+  auth.signIn();
+
+  await openAuthPage(page);
+  await page.getByRole("button", { name: "Open navigation" }).click();
+
+  const drawer = page.locator('aside[aria-label="Navigation"]');
+  await expect(drawer).toBeVisible();
+  const accountMenuTrigger = drawer.getByRole("button", { name: "Account menu" });
+  await expect(accountMenuTrigger).toBeVisible();
+  await accountMenuTrigger.click();
+
+  const accountMenu = page.locator(".motion-menu-content").filter({ hasText: "Sign out" });
+  await expect(accountMenu).toBeVisible();
+  const triggerBox = await accountMenuTrigger.boundingBox();
+  const menuBox = await accountMenu.boundingBox();
+  if (triggerBox === null || menuBox === null) {
+    throw new Error("Expected account menu trigger and popup boxes to be available");
+  }
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(triggerBox.y - 1);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("signing out clears local repertoire data", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   const auth = await mockSignedInUser(page);
