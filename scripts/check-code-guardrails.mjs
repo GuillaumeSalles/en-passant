@@ -104,6 +104,7 @@ function typeIncludesBoolean(typeNode) {
   if (ts.isUnionTypeNode(typeNode)) {
     return typeNode.types.some(typeIncludesBoolean);
   }
+  if (ts.isParenthesizedTypeNode(typeNode)) return typeIncludesBoolean(typeNode.type);
   return false;
 }
 
