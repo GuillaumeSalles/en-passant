@@ -212,7 +212,7 @@ function FormSamples() {
         <div class="rounded-md border border-border bg-muted/30 px-2 py-1 text-sm">
           <InlineEditInput
             aria-label="Inline name"
-            autoFocus={false}
+            focusOnMount="none"
             value={inlineName()}
             onValueInput={setInlineName}
             onCommit={commitInlineName}

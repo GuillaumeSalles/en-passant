@@ -10,16 +10,24 @@ type InlineEditInputProps = Omit<
   onValueInput: (value: string) => void;
   onCommit: () => void;
   onCancel: () => void;
-  autoFocus?: boolean | undefined;
+  focusOnMount?: "select" | "none";
 };
 
 function InlineEditInput(props: InlineEditInputProps) {
-  const rest = omit(props, "autoFocus", "class", "onCancel", "onCommit", "onValueInput", "value");
+  const rest = omit(
+    props,
+    "focusOnMount",
+    "class",
+    "onCancel",
+    "onCommit",
+    "onValueInput",
+    "value",
+  );
 
   return (
     <input
       ref={(el) => {
-        if (props.autoFocus === false) return;
+        if (props.focusOnMount === "none") return;
         queueMicrotask(() => {
           el.focus();
           el.select();
