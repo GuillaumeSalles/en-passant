@@ -14,14 +14,18 @@ import { Textarea } from "./ui/textarea";
 import { Upload } from "./Icons";
 import { TooltipIconButton } from "./ui/tooltip-icon-button";
 
+type LoadPgnDialogState = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
 export function LoadPGNDialog(props: {
   onLoad: (pgn: string) => void | Promise<void>;
   trigger?: JSX.Element | null;
   title?: string;
   description?: string;
   submitLabel?: string;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  state?: LoadPgnDialogState;
 }) {
   const [pgn, setPgn] = createSignal("");
   const [uncontrolledOpen, setUncontrolledOpen] = createSignal(false);
@@ -32,12 +36,17 @@ export function LoadPGNDialog(props: {
     props.trigger ?? (
       <TooltipIconButton aria-label="Load PGN" icon={<Upload />} tooltip="Load PGN" />
     );
-  const open = () => props.open ?? uncontrolledOpen();
+  const state = () => props.state;
+  const open = () => state()?.open ?? uncontrolledOpen();
 
   function setOpen(open: boolean) {
-    if (props.open === undefined) setUncontrolledOpen(open);
+    const controlledState = state();
+    if (controlledState === undefined) {
+      setUncontrolledOpen(open);
+    } else {
+      controlledState.onOpenChange(open);
+    }
     if (!open) setError(null);
-    props.onOpenChange?.(open);
   }
 
   function focusPgnTextarea(element: HTMLTextAreaElement) {

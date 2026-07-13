@@ -419,8 +419,7 @@ function RepertoireSidebarItem(props: {
         description="Paste a PGN to create a new chapter."
         submitLabel="Create chapter"
         trigger={null}
-        open={createFromPgnOpen()}
-        onOpenChange={setCreateFromPgnOpen}
+        state={{ open: createFromPgnOpen(), onOpenChange: setCreateFromPgnOpen }}
       />
     </>
   );
