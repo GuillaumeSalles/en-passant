@@ -593,7 +593,7 @@ function SidebarLink(props: {
     <li class="group/sidebar-item relative">
       {content()}
 
-      <DropdownMenu open={open()} onOpenChange={setOpen}>
+      <DropdownMenu state={{ open: open(), onOpenChange: setOpen }}>
         <DropdownMenuTrigger>
           <Button
             variant="ghost"

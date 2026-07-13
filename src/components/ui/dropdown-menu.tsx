@@ -17,6 +17,11 @@ type DropdownMenuContextType = {
   setTriggerRect: (rect: DOMRect | null) => void;
 };
 
+type DropdownMenuState = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
 type DropdownMenuPosition = {
   top: number;
   left?: number;
@@ -33,19 +38,17 @@ const DropdownMenuContext = createContext<DropdownMenuContextType>({
   setTriggerRect: () => {},
 });
 
-function DropdownMenu(props: {
-  children: JSX.Element;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
+function DropdownMenu(props: { children: JSX.Element; state?: DropdownMenuState }) {
   const [uncontrolled, setUncontrolled] = createSignal(false);
-  const controlledOpen = createMemo(() => props.open);
-  const onOpenChange = createMemo(() => props.onOpenChange);
-  const isControlled = () => controlledOpen() !== undefined;
-  const open = () => (isControlled() ? (controlledOpen() ?? false) : uncontrolled());
+  const controlledState = createMemo(() => props.state);
+  const open = () => controlledState()?.open ?? uncontrolled();
   const setOpen = (v: boolean) => {
-    if (!untrack(isControlled)) setUncontrolled(v);
-    untrack(onOpenChange)?.(v);
+    const state = untrack(controlledState);
+    if (state === undefined) {
+      setUncontrolled(v);
+      return;
+    }
+    state.onOpenChange(v);
   };
   const [triggerRect, setTriggerRect] = createSignal<DOMRect | null>(null);
 
