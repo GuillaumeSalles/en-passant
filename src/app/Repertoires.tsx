@@ -315,7 +315,7 @@ function NewRepertoireMenu(props: { onCreate: (input: CreateNewRepertoireInput) 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger>
         <Button variant="outline" size="sm-icon" aria-label="Create repertoire">
           <Plus />
         </Button>
@@ -594,7 +594,7 @@ function SidebarLink(props: {
       {content()}
 
       <DropdownMenu open={open()} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
+        <DropdownMenuTrigger>
           <Button
             variant="ghost"
             size="sm-icon"

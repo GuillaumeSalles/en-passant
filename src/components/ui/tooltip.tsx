@@ -8,7 +8,7 @@ const Tooltip = (props: { children: JSX.Element }) => (
   <div class="tooltip-root relative inline-flex">{props.children}</div>
 );
 
-const TooltipTrigger = (props: { children: JSX.Element; asChild?: boolean }) => (
+const TooltipTrigger = (props: { children: JSX.Element }) => (
   <span class="tooltip-trigger inline-flex">{props.children}</span>
 );
 

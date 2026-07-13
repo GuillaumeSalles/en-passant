@@ -15,7 +15,7 @@ function TooltipIconButton(props: TooltipIconButtonProps) {
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
+        <TooltipTrigger>
           <Button variant={props.variant ?? "outline"} size={props.size ?? "icon"} {...rest}>
             {props.icon}
           </Button>

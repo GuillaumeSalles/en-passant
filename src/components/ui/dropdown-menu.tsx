@@ -56,7 +56,7 @@ function DropdownMenu(props: {
   );
 }
 
-function DropdownMenuTrigger(props: { children: JSX.Element; asChild?: boolean }) {
+function DropdownMenuTrigger(props: { children: JSX.Element }) {
   const ctx = useContext(DropdownMenuContext);
 
   function getTriggerElement(target: EventTarget | null): Element | null {

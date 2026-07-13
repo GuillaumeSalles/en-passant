@@ -220,7 +220,7 @@ function OverlaySamples() {
       <div class="flex flex-wrap items-center gap-2">
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger asChild>
+            <TooltipTrigger>
               <Button variant="outline">Tooltip</Button>
             </TooltipTrigger>
             <TooltipContent>Inspect details</TooltipContent>
@@ -228,7 +228,7 @@ function OverlaySamples() {
         </TooltipProvider>
         <TooltipIconButton aria-label="Upload" icon={<Upload />} tooltip="Upload PGN" />
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger>
             <Button variant="outline">
               Menu
               <Ellipsis />
@@ -257,7 +257,7 @@ function OverlaySamples() {
           </ContextMenuContent>
         </ContextMenu>
         <Dialog>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button>Dialog</Button>
           </DialogTrigger>
           <DialogContent class="max-w-sm">
@@ -280,7 +280,7 @@ function OverlaySamples() {
         <div class="flex justify-start">
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button aria-label="Left edge tooltip" variant="outline" size="sm">
                   Left edge
                 </Button>
@@ -292,7 +292,7 @@ function OverlaySamples() {
         <div class="flex justify-end">
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger>
                 <Button aria-label="Right edge tooltip" variant="outline" size="sm">
                   Right edge
                 </Button>

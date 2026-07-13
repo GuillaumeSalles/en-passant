@@ -64,7 +64,7 @@ export function LoadPGNDialog(props: {
   return (
     <Dialog open={open()} onOpenChange={setOpen}>
       <Show when={props.trigger !== null}>
-        <DialogTrigger asChild>{trigger()}</DialogTrigger>
+        <DialogTrigger>{trigger()}</DialogTrigger>
       </Show>
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
