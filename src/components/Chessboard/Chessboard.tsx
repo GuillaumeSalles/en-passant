@@ -37,7 +37,7 @@ type ChessboardProps = {
   squareHighlights: { [square: string]: SquareHighlightKind };
   onHighlightSquare: (square: string, highlight: HighlightKind) => void;
   onDrawArrow: (from: string, to: string, type: HighlightKind) => void;
-  canDrag?: boolean;
+  canDrag: boolean;
   pieceToAnimate?: BoardAnimation | null;
   annotations: { [square: string]: MoveAnnotationData[] };
 };
@@ -97,7 +97,7 @@ function isDragButtonPressed(event: Pick<PointerEvent, "buttons">, data: Draggin
 }
 
 export function Chessboard(props: ChessboardProps) {
-  const canDrag = () => props.canDrag ?? true;
+  const canDrag = () => props.canDrag;
   const [draggingData, setDraggingData] = createSignal<DraggingData | null>(null);
   const [activeAnimation, setActiveAnimation] = createSignal<BoardAnimation | null>(null);
   const [introActive, setIntroActive] = createSignal(true);
