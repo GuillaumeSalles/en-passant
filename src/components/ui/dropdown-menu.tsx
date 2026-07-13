@@ -160,17 +160,12 @@ function positionRightMenu(
   };
 }
 
-function DropdownMenuItem(props: {
-  children: JSX.Element;
-  class?: string;
-  onClick?: () => void;
-  inset?: boolean;
-}) {
+function DropdownMenuItem(props: { children: JSX.Element; class?: string; onClick?: () => void }) {
   const ctx = useContext(DropdownMenuContext);
 
   return (
     <div
-      class={cn(menuItemClass, props.inset && menuInsetClass, props.class)}
+      class={cn(menuItemClass, props.class)}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
         props.onClick?.();
@@ -182,12 +177,8 @@ function DropdownMenuItem(props: {
   );
 }
 
-function DropdownMenuLabel(props: { children: JSX.Element; class?: string; inset?: boolean }) {
-  return (
-    <div class={cn(menuLabelClass, props.inset && menuInsetClass, props.class)}>
-      {props.children}
-    </div>
-  );
+function DropdownMenuLabel(props: { children: JSX.Element; class?: string }) {
+  return <div class={cn(menuLabelClass, props.class)}>{props.children}</div>;
 }
 
 function DropdownMenuShortcut(props: JSX.HTMLAttributes<HTMLSpanElement>) {

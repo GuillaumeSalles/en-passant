@@ -144,17 +144,12 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function ContextMenuItem(props: {
-  children: JSX.Element;
-  class?: string;
-  onClick?: () => void;
-  inset?: boolean;
-}) {
+function ContextMenuItem(props: { children: JSX.Element; class?: string; onClick?: () => void }) {
   const ctx = useContext(ContextMenuContext);
 
   return (
     <div
-      class={cn(menuItemClass, props.inset && menuInsetClass, props.class)}
+      class={cn(menuItemClass, props.class)}
       onClick={() => {
         props.onClick?.();
         ctx.setOpen(false);
