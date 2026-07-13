@@ -82,7 +82,7 @@ effects.
   `/stockfish-17-lite-single.js`; avoid `/favicon.ico`.
 - Wait for user-ready controls, preferably helpers such as
   `expectRepertoireReady(page)`.
-- Playwright starts Vite on `127.0.0.1:5174` with `--force` and
+- Playwright starts Vite on `localhost:5174` with `--force` and
   `reuseExistingServer: false`. If the port is busy, identify the listener with
   `lsof -nP -iTCP:5174 -sTCP:LISTEN` and stop it.
 - For auth/storage work, iterate with

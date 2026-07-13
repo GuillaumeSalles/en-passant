@@ -582,9 +582,9 @@ test("starts Google sign in", async ({ page }) => {
   expect(requestBody).toMatchObject({
     provider: "google",
     callbackURL:
-      "http://127.0.0.1:5174/app/repertoires/untitled-repertoire/chapter-1?auth_event=signin",
+      "http://localhost:5174/app/repertoires/untitled-repertoire/chapter-1?auth_event=signin",
     newUserCallbackURL:
-      "http://127.0.0.1:5174/app/repertoires/untitled-repertoire/chapter-1?auth_event=signup",
+      "http://localhost:5174/app/repertoires/untitled-repertoire/chapter-1?auth_event=signup",
     disableRedirect: true,
   });
 });

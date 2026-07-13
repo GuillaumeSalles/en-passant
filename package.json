@@ -5,7 +5,7 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "vite",
-    "dev:local": "bash -c 'until curl -fsS http://127.0.0.1:8788/api/auth/get-session >/dev/null 2>&1; do sleep 1; done; LOCAL_FUNCTIONS_ORIGIN=http://127.0.0.1:8788 vite --host 127.0.0.1'",
+    "dev:local": "bash -c 'until curl -fsS http://localhost:8788/api/auth/get-session >/dev/null 2>&1; do sleep 1; done; LOCAL_FUNCTIONS_ORIGIN=http://localhost:8788 vite --host localhost'",
     "dev:vite": "vite",
     "merge:pgn": "tsx scripts/merge-pgn.ts",
     "build": "vite build",
