@@ -158,6 +158,16 @@ export function Ellipsis(props: IconProps): JSX.Element {
   );
 }
 
+export function Download(props: IconProps): JSX.Element {
+  return (
+    <IconBase {...props} name="download">
+      <path d="M12 15V3" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    </IconBase>
+  );
+}
+
 export function GitHub(props: IconProps): JSX.Element {
   return (
     <BrandIconBase {...props} name="github">

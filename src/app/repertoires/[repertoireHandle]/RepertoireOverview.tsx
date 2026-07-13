@@ -1,6 +1,6 @@
 import { createMemo, For, Show } from "solid-js";
 import { MobileNavigationTrigger } from "@/components/MobileNavigation";
-import { Brain, Pencil, Plus, Trash } from "@/components/Icons";
+import { Brain, Download, Pencil, Plus, Trash } from "@/components/Icons";
 import { Button } from "@/components/ui/button";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import type { Chapter } from "@/lib/AppState";
@@ -10,6 +10,8 @@ import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { createNewChapter } from "@/mutations/createNewChapter";
 import { deleteChapter } from "@/app/Repertoires";
+import { useState } from "@/app/AppStateProvider";
+import { exportChapterPgn } from "@/lib/exportPgn";
 
 function compareChapters(left: Chapter, right: Chapter): number {
   const byName = left.name.localeCompare(right.name, undefined, {
@@ -20,6 +22,8 @@ function compareChapters(left: Chapter, right: Chapter): number {
 }
 
 export function RepertoireOverview(props: { repertoireHandle: string }) {
+  const state = useState();
+
   useLoadRepertoiresAndChapters();
 
   const repertoires = useSelector((state) => state.repertoires);
@@ -48,6 +52,12 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
     const currentRepertoire = repertoire();
     if (currentRepertoire === undefined) return;
     return onCreateNewChapter({ repertoireId: currentRepertoire.id });
+  }
+
+  function exportChapter(chapter: Chapter): void {
+    const currentRepertoire = repertoire();
+    if (currentRepertoire === undefined) return;
+    void exportChapterPgn({ state, repertoire: currentRepertoire, chapter });
   }
 
   return (
@@ -83,7 +93,7 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
                     <div class="min-w-0">
                       <div class="truncate font-medium">{chapter.name}</div>
                     </div>
-                    <div class="flex flex-none items-center gap-2">
+                    <div class="flex flex-none flex-wrap items-center gap-2">
                       <Button href={trainingPath(props.repertoireHandle, chapter.handle)} size="sm">
                         <Brain />
                         Train
@@ -95,6 +105,10 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
                       >
                         <Pencil />
                         Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => exportChapter(chapter)}>
+                        <Download />
+                        Export PGN
                       </Button>
                       <Button
                         variant="outline"

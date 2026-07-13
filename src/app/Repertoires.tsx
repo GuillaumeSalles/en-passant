@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, Show, untrack } from "solid-js";
 import { Button } from "@/components/ui/button";
+import { useState } from "@/app/AppStateProvider";
 import { Chapter, Orientation, Repertoire } from "@/lib/AppState";
 import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapters";
 import { useSelector } from "@/lib/useSelector";
@@ -24,6 +25,7 @@ import { createNewChapter } from "@/mutations/createNewChapter";
 import { APP_ROOT, repertoireOverviewPath, repertoirePath, routePath } from "@/lib/routes";
 import { formatRepertoireName, MAX_REPERTOIRE_NAME_LENGTH } from "@/lib/repertoireNames";
 import { LoadPGNDialog } from "@/components/LoadPgnDialog";
+import { exportChapterPgn } from "@/lib/exportPgn";
 
 function compareByNameThenId<T extends { name: string }>(
   [leftId, left]: [string, T],
@@ -239,6 +241,7 @@ async function renameChapter(
 }
 
 export function Repertoires() {
+  const state = useState();
   const onCreateNewRepertoire = useMutation(createNewRepertoire, { context: true });
   const onDeleteChapter = useMutation(deleteChapter, { context: true });
   const onDeleteRepertoire = useMutation(deleteRepertoire, { context: true });
@@ -291,6 +294,9 @@ export function Repertoires() {
                             otherChapterId !== chapterId && otherChapter.repertoireId === id,
                         )}
                         onDeleteChapter={onDeleteChapter}
+                        onExportChapter={({ repertoire, chapter }) =>
+                          exportChapterPgn({ state, repertoire, chapter })
+                        }
                         onRenameChapter={onRenameChapter}
                       />
                     );
@@ -431,6 +437,7 @@ function ChapterSidebarItem(props: {
   chapter: Chapter;
   canDelete: boolean;
   onDeleteChapter: (args: { chapterId: string; pgnId: string }) => void;
+  onExportChapter: (args: { repertoire: Repertoire; chapter: Chapter }) => Promise<void>;
   onRenameChapter: (args: { chapterId: string; name: string }) => void;
 }) {
   const [isRenaming, setIsRenaming] = createSignal(false);
@@ -479,6 +486,16 @@ function ChapterSidebarItem(props: {
       }
       dropdownContent={
         <DropdownMenuContent>
+          <DropdownMenuItem
+            onClick={() =>
+              void props.onExportChapter({
+                repertoire: props.repertoire,
+                chapter: props.chapter,
+              })
+            }
+          >
+            Export PGN
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={startRenaming}>Rename</DropdownMenuItem>
           <Show when={props.canDelete}>
             <DropdownMenuItem
