@@ -18,6 +18,11 @@ type DialogContextType = {
   descriptionId: string;
 };
 
+type DialogState = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
 const DialogContext = createContext<DialogContextType>({
   open: () => false,
   setOpen: () => {},
@@ -25,18 +30,18 @@ const DialogContext = createContext<DialogContextType>({
   descriptionId: "",
 });
 
-function Dialog(props: {
-  children: JSX.Element;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
+function Dialog(props: { children: JSX.Element; state?: DialogState }) {
   const [uncontrolled, setUncontrolled] = createSignal(false);
   const id = createUniqueId();
-  const isControlled = () => props.open !== undefined;
-  const open = () => (isControlled() ? (props.open ?? false) : uncontrolled());
+  const state = () => props.state;
+  const open = () => state()?.open ?? uncontrolled();
   const setOpen = (v: boolean) => {
-    if (!isControlled()) setUncontrolled(v);
-    props.onOpenChange?.(v);
+    const controlledState = state();
+    if (controlledState === undefined) {
+      setUncontrolled(v);
+      return;
+    }
+    controlledState.onOpenChange(v);
   };
 
   return (

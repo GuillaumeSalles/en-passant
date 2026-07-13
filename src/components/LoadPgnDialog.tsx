@@ -62,7 +62,7 @@ export function LoadPGNDialog(props: {
   }
 
   return (
-    <Dialog open={open()} onOpenChange={setOpen}>
+    <Dialog state={{ open: open(), onOpenChange: setOpen }}>
       <Show when={props.trigger !== null}>
         <DialogTrigger>{trigger()}</DialogTrigger>
       </Show>

@@ -190,7 +190,7 @@ export function AuthButton(props: { class?: string | undefined } = {}) {
     <Show
       when={currentAuthUser()}
       fallback={
-        <Dialog open={isAuthDialogOpen()} onOpenChange={setIsAuthDialogOpen}>
+        <Dialog state={{ open: isAuthDialogOpen(), onOpenChange: setIsAuthDialogOpen }}>
           <DialogTrigger>
             <Button variant="outline" class={props.class}>
               <LogIn class="mr-2 h-4 w-4" />
