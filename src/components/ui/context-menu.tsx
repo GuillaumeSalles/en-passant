@@ -1,4 +1,4 @@
-import { createContext, createSignal, omit, useContext, createEffect } from "solid-js";
+import { createContext, createEffect, createSignal, omit, useContext } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import { cn } from "@/lib/utils";
@@ -14,9 +14,13 @@ import {
 type ContextMenuContextType = {
   open: () => boolean;
   setOpen: (open: boolean) => void;
-  position: () => { x: number; y: number };
-  setPosition: (pos: { x: number; y: number }) => void;
+  position: () => ContextMenuPosition;
+  setPosition: (pos: ContextMenuPosition) => void;
 };
+
+type ContextMenuPosition = { x: number; y: number };
+
+const VIEWPORT_PADDING = 8;
 
 const ContextMenuContext = createContext<ContextMenuContextType>({
   open: () => false,
@@ -61,11 +65,41 @@ function ContextMenuTrigger(props: {
 function ContextMenuContent(props: { children: JSX.Element; class?: string }) {
   const ctx = useContext(ContextMenuContext);
   let contentRef: HTMLDivElement | undefined;
+  const [contentPosition, setContentPosition] = createSignal<ContextMenuPosition>({ x: 0, y: 0 });
+  const [positionReady, setPositionReady] = createSignal(false);
+
+  const clampContentPosition = (position: ContextMenuPosition) => {
+    const content = contentRef;
+    if (content === undefined) return;
+
+    const maxX = Math.max(
+      VIEWPORT_PADDING,
+      window.innerWidth - content.offsetWidth - VIEWPORT_PADDING,
+    );
+    const maxY = Math.max(
+      VIEWPORT_PADDING,
+      window.innerHeight - content.offsetHeight - VIEWPORT_PADDING,
+    );
+    setContentPosition({
+      x: clamp(position.x, VIEWPORT_PADDING, maxX),
+      y: clamp(position.y, VIEWPORT_PADDING, maxY),
+    });
+    setPositionReady(true);
+  };
 
   createEffect(
-    () => ctx.open(),
-    (open) => {
+    () => [ctx.open(), ctx.position()] as const,
+    ([open, position]) => {
+      setContentPosition(position);
       if (!open) return;
+
+      setPositionReady(false);
+      const clampPosition = () => clampContentPosition(position);
+      clampPosition();
+      const animationFrame = window.requestAnimationFrame(clampPosition);
+      const resizeObserver = new ResizeObserver(clampPosition);
+      if (contentRef !== undefined) resizeObserver.observe(contentRef);
+      window.addEventListener("resize", clampPosition);
 
       const onMouseDown = (e: MouseEvent) => {
         if (!contentRef?.contains(e.target as Node)) ctx.setOpen(false);
@@ -76,6 +110,9 @@ function ContextMenuContent(props: { children: JSX.Element; class?: string }) {
       document.addEventListener("mousedown", onMouseDown);
       document.addEventListener("keydown", onKeyDown);
       return () => {
+        window.cancelAnimationFrame(animationFrame);
+        resizeObserver.disconnect();
+        window.removeEventListener("resize", clampPosition);
         document.removeEventListener("mousedown", onMouseDown);
         document.removeEventListener("keydown", onKeyDown);
       };
@@ -86,13 +123,25 @@ function ContextMenuContent(props: { children: JSX.Element; class?: string }) {
     <Show when={ctx.open()}>
       <div
         ref={contentRef}
-        style={{ position: "fixed", left: `${ctx.position().x}px`, top: `${ctx.position().y}px` }}
+        style={{
+          position: "fixed",
+          left: `${contentPosition().x}px`,
+          top: `${contentPosition().y}px`,
+          "max-height": `calc(100vh - ${VIEWPORT_PADDING * 2}px)`,
+          "max-width": `calc(100vw - ${VIEWPORT_PADDING * 2}px)`,
+          overflow: "auto",
+          visibility: positionReady() ? "visible" : "hidden",
+        }}
         class={cn("motion-context-menu-content", menuContentClass, props.class)}
       >
         {props.children}
       </div>
     </Show>
   );
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function ContextMenuItem(props: {

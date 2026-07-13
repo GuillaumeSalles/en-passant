@@ -37,6 +37,38 @@ test("design tooltips stay within the viewport near screen edges", async ({ page
   );
 });
 
+test("design context menus stay within the viewport near screen edges", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 320 });
+  await page.goto("/design");
+
+  const trigger = page.getByRole("button", { name: "Context menu" });
+  await trigger.evaluate((element) => {
+    element.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        button: 2,
+        cancelable: true,
+        clientX: 358,
+        clientY: 318,
+      }),
+    );
+  });
+
+  const menu = page.locator(".motion-context-menu-content");
+  await expect(menu).toBeVisible();
+
+  const box = await menu.boundingBox();
+  const viewport = page.viewportSize();
+  if (box === null || viewport === null) {
+    throw new Error("Expected context menu and viewport boxes to be available");
+  }
+
+  expect(box.x).toBeGreaterThanOrEqual(7);
+  expect(box.y).toBeGreaterThanOrEqual(7);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width - 7);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height - 7);
+});
+
 test("shows the signup nudge on the design page", async ({ page }) => {
   await page.goto("/design");
 
