@@ -12,7 +12,7 @@ test("does not propagate Space keydown", () => {
   window.addEventListener("keydown", onWindowKeyDown);
 
   try {
-    render(() => <Checkbox checked={false} />);
+    render(() => <Checkbox checked={false} disabled={false} />);
 
     fireEvent.keyDown(screen.getByRole("checkbox"), { key: " " });
 
@@ -28,6 +28,7 @@ test("toggles when activated", () => {
   render(() => (
     <Checkbox
       checked={false}
+      disabled={false}
       onCheckedChange={(checked) => {
         changes.push(checked);
       }}

@@ -91,6 +91,7 @@ export function ComputerEvaluation(props: {
             <Checkbox
               id="show-eval-bar"
               checked={showEvalBar()}
+              disabled={false}
               onCheckedChange={onToggleShowEvalBar}
             />
             <Label for="show-eval-bar">Show evaluation bar</Label>
@@ -99,6 +100,7 @@ export function ComputerEvaluation(props: {
             <Checkbox
               id="show-best-move-arrow"
               checked={showBestMoveArrow()}
+              disabled={false}
               onCheckedChange={onToggleShowBestMoveArrow}
             />
             <Label for="show-best-move-arrow">Show best move arrow</Label>

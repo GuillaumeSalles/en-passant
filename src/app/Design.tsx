@@ -182,7 +182,12 @@ function FormSamples() {
       </SampleFrame>
       <SampleFrame class="grid content-start gap-4">
         <div class="flex items-center gap-2">
-          <Checkbox id="design-checkbox" checked={checked()} onCheckedChange={setChecked} />
+          <Checkbox
+            id="design-checkbox"
+            checked={checked()}
+            disabled={false}
+            onCheckedChange={setChecked}
+          />
           <Label for="design-checkbox">Save locally</Label>
         </div>
         <div class="flex items-center gap-2">

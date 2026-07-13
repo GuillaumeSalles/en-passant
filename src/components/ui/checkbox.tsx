@@ -4,11 +4,11 @@ import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 
 interface CheckboxProps {
-  checked?: boolean | "indeterminate";
+  checked: boolean | "indeterminate";
   onCheckedChange?: (checked: boolean) => void;
   id?: string;
   class?: string;
-  disabled?: boolean;
+  disabled: boolean;
 }
 
 function Checkbox(props: CheckboxProps) {
