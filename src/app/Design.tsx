@@ -247,7 +247,7 @@ function OverlaySamples() {
           </DropdownMenuContent>
         </DropdownMenu>
         <ContextMenu>
-          <ContextMenuTrigger>
+          <ContextMenuTrigger disabled={false}>
             <Button variant="outline">Context menu</Button>
           </ContextMenuTrigger>
           <ContextMenuContent>

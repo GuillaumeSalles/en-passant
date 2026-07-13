@@ -42,7 +42,7 @@ function ContextMenu(props: { children: JSX.Element }) {
 
 function ContextMenuTrigger(props: {
   children: JSX.Element;
-  disabled?: boolean;
+  disabled: boolean;
   onContextMenu?: () => void;
 }) {
   const ctx = useContext(ContextMenuContext);
