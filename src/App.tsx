@@ -9,6 +9,8 @@ import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Repertoires } from "@/app/Repertoires";
 import { Design } from "@/app/Design";
 import { Debug } from "@/app/Debug";
+import { GameViewer } from "@/app/GameViewer";
+import { Games } from "@/app/Games";
 import { NotFound } from "@/app/NotFound";
 import { Repertoire } from "@/components/Repertoire";
 import { RepertoireOverview } from "@/app/repertoires/[repertoireHandle]/RepertoireOverview";
@@ -367,6 +369,11 @@ function TrainRoute() {
   );
 }
 
+function GameRoute() {
+  const params = useParams<{ gameId: string }>();
+  return <GameViewer gameId={params.gameId} />;
+}
+
 function Root(props: { children?: JSX.Element }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -399,6 +406,8 @@ export default function App() {
       <Route path="/design" component={Design} />
       <Route path="/debug" component={Debug} />
       <Route path={APP_ROOT} component={AppRootRoute} />
+      <Route path={`${APP_ROOT}/games`} component={Games} />
+      <Route path={`${APP_ROOT}/games/:gameId`} component={GameRoute} />
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle`}
         component={RepertoireOverviewRoute}

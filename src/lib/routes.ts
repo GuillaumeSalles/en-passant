@@ -23,6 +23,10 @@ export function repertoireOverviewPath(repertoireHandle: string): string {
   return `${APP_ROOT}/repertoires/${repertoireHandle}`;
 }
 
+export function importedGamePath(gameId: string): string {
+  return `${APP_ROOT}/games/${gameId}`;
+}
+
 function compareByNameThenId(
   left: { id: string; name: string },
   right: { id: string; name: string },

@@ -11,6 +11,12 @@ export type Context =
       type: "variation-training";
       repertoireHandle: string;
       chapterHandle: string;
+    }
+  | {
+      type: "imported-game";
+      gameId: string;
+      repertoireHandle: string;
+      chapterHandle: string;
     };
 
 export type Orientation = "white" | "black";

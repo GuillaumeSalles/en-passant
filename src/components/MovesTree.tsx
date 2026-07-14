@@ -34,6 +34,7 @@ import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import {
   createEffect,
+  createContext,
   createMemo,
   createSignal,
   For,
@@ -41,16 +42,26 @@ import {
   onCleanup,
   Show,
   Switch,
+  useContext,
 } from "solid-js";
+
+type MovesTreeReadOnly = () => boolean;
+
+const MovesTreeReadOnlyContext = createContext<MovesTreeReadOnly>(() => false);
+
+function useMovesTreeReadOnly(): MovesTreeReadOnly {
+  return useContext(MovesTreeReadOnlyContext);
+}
 
 function isMoveListBesideBoard() {
   return window.matchMedia(`(min-width: ${SIDE_PANEL_BREAKPOINT})`).matches;
 }
 
-export function MovesTree() {
+export function MovesTree(props: { readOnly?: boolean } = {}) {
   const moves = useSelector((state, ctx) => getPgn(state, ctx)?.moves ?? {});
   const selectedMove = useSelector(selectSelectedMoveId);
   const preselectedVariation = useSelector(selectPreselectedVariation);
+  const readOnly = () => props.readOnly === true;
   const [commentEditorRequest, setCommentEditorRequest] = createSignal<CommentEditorRequest | null>(
     null,
   );
@@ -59,6 +70,10 @@ export function MovesTree() {
   const moveRows = createMemo(() => buildMoveRows(moves(), rootMoveIds(), commentEditorRequest()));
 
   function requestComment(moveId: number, placement: CommentPlacement) {
+    if (readOnly()) {
+      return;
+    }
+
     setCommentEditorRequest((request) => ({
       moveId,
       placement,
@@ -66,46 +81,50 @@ export function MovesTree() {
     }));
   }
 
-  const removeCommentShortcutListener = addCommentShortcutListener((placement) => {
-    const moveId = selectedMove();
-    if (moveId !== null) {
-      requestComment(moveId, placement);
-    }
-  });
-  onCleanup(removeCommentShortcutListener);
+  if (!readOnly()) {
+    const removeCommentShortcutListener = addCommentShortcutListener((placement) => {
+      const moveId = selectedMove();
+      if (moveId !== null) {
+        requestComment(moveId, placement);
+      }
+    });
+    onCleanup(removeCommentShortcutListener);
+  }
 
   return (
-    <div
-      data-moves-tree
-      class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2 text-xs"
-    >
-      <For each={moveRows()}>
-        {(row) => (
-          <Switch>
-            <Match when={row.type === "main" && row}>
-              {(mainRow) => (
-                <MainMovesRow
-                  row={mainRow()}
-                  selectedMoveId={highlightedMove()}
-                  onComment={requestComment}
-                  onCommentEditDone={() => setCommentEditorRequest(null)}
-                />
-              )}
-            </Match>
-            <Match when={row.type === "variation" && row}>
-              {(variationRow) => (
-                <VariationMovesRow
-                  row={variationRow()}
-                  selectedMoveId={highlightedMove()}
-                  onComment={requestComment}
-                  onCommentEditDone={() => setCommentEditorRequest(null)}
-                />
-              )}
-            </Match>
-          </Switch>
-        )}
-      </For>
-    </div>
+    <MovesTreeReadOnlyContext value={readOnly}>
+      <div
+        data-moves-tree
+        class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2 text-xs"
+      >
+        <For each={moveRows()}>
+          {(row) => (
+            <Switch>
+              <Match when={row.type === "main" && row}>
+                {(mainRow) => (
+                  <MainMovesRow
+                    row={mainRow()}
+                    selectedMoveId={highlightedMove()}
+                    onComment={requestComment}
+                    onCommentEditDone={() => setCommentEditorRequest(null)}
+                  />
+                )}
+              </Match>
+              <Match when={row.type === "variation" && row}>
+                {(variationRow) => (
+                  <VariationMovesRow
+                    row={variationRow()}
+                    selectedMoveId={highlightedMove()}
+                    onComment={requestComment}
+                    onCommentEditDone={() => setCommentEditorRequest(null)}
+                  />
+                )}
+              </Match>
+            </Switch>
+          )}
+        </For>
+      </div>
+    </MovesTreeReadOnlyContext>
   );
 }
 
@@ -120,6 +139,7 @@ function CommentAfter(props: {
   placement: CommentPlacement;
   onEditDone: () => void;
 }) {
+  const readOnly = useMovesTreeReadOnly();
   const onSelectMove = useMutation(selectMove);
   const onUpdateMoveCommentAfter = useMutation(updateMoveCommentAfter);
   const onUpdateMoveCommentBefore = useMutation(updateMoveCommentBefore);
@@ -145,6 +165,10 @@ function CommentAfter(props: {
   );
 
   function commit() {
+    if (readOnly()) {
+      return;
+    }
+
     if (!editingActive) {
       return;
     }
@@ -177,6 +201,10 @@ function CommentAfter(props: {
   }
 
   function startEditing(comment: string) {
+    if (readOnly()) {
+      return;
+    }
+
     editingActive = true;
     committedComment = comment;
     setDraft(comment);
@@ -188,7 +216,7 @@ function CommentAfter(props: {
       when={isEditing()}
       fallback={
         <div
-          class="cursor-text text-blue-300"
+          class={readOnly() ? "text-blue-300" : "cursor-text text-blue-300"}
           onClick={() => onSelectMove(props.moveId)}
           onDblClick={() => startEditing(props.comment)}
         >
@@ -355,7 +383,10 @@ function MoveComponent(props: {
   canMoveVariationDown: boolean;
   onComment: (moveId: number, placement: CommentPlacement) => void;
 }) {
-  const canEditMoves = useSelector((_state, ctx) => ctx.type === "repertoire-builder");
+  const readOnly = useMovesTreeReadOnly();
+  const canEditMoves = useSelector(
+    (_state, ctx) => ctx.type === "repertoire-builder" && !readOnly(),
+  );
   const move = useSelector((state, ctx) => selectMoveById(state, ctx, props.moveId));
   const isSelected = createMemo(() => props.isSelected());
 

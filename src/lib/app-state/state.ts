@@ -209,6 +209,11 @@ export function getPgn(state: AppState, ctx: Context): NormalizedPgn | null {
     return getChapterPgn(state, ctx);
   }
 
+  if (ctx.type === "imported-game") {
+    const gamePgn = state.pgns[ctx.gameId];
+    return gamePgn?.status === "success" ? gamePgn.data : null;
+  }
+
   return state.training.variation;
 }
 
