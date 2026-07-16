@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parsePgnMoves } from "./pgn-parser";
+import { parsePgnMoves, parsePgnTags } from "./pgn-parser";
 
 describe("parsePgnMoves", () => {
   test("ignores tags, move numbers, and result markers", () => {
@@ -23,6 +23,30 @@ describe("parsePgnMoves", () => {
     expect(moves[0]!.commentAfter).toBe("best by test");
     expect(moves[1]!.commentAfter).toBe("");
     expect(moves[2]!.commentAfter).toBeUndefined();
+  });
+
+  test("extracts clock and elapsed move time annotations from move comments", () => {
+    const moves = parsePgnMoves(
+      "1. e4 {[%clk 0:09:58]} e5 {[%emt 0:00:04] [%clk 0:09:56] book response} 2. Nf3 *",
+    );
+
+    expect(moves[0]!.clock).toBe("0:09:58");
+    expect(moves[0]!.commentAfter).toBeUndefined();
+    expect(moves[1]!.clock).toBe("0:09:56");
+    expect(moves[1]!.timeSpent).toBe("0:00:04");
+    expect(moves[1]!.commentAfter).toBe("book response");
+  });
+
+  test("parses PGN tags", () => {
+    expect(
+      parsePgnTags(`[Event "Rated rapid game"]
+[TimeControl "600+5"]
+
+1. e4 *`),
+    ).toEqual({
+      Event: "Rated rapid game",
+      TimeControl: "600+5",
+    });
   });
 
   test("attaches comments before moves when they precede a move token", () => {

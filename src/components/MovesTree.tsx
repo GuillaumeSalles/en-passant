@@ -1,5 +1,6 @@
 import {
   deleteMove,
+  formatMoveTimeSpent,
   getNagGlyph,
   getNagMeaning,
   getPgn,
@@ -93,10 +94,7 @@ export function MovesTree(props: { readOnly?: boolean } = {}) {
 
   return (
     <MovesTreeReadOnlyContext value={readOnly}>
-      <div
-        data-moves-tree
-        class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2 text-xs"
-      >
+      <div data-moves-tree class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto py-2 text-xs">
         <For each={moveRows()}>
           {(row) => (
             <Switch>
@@ -263,6 +261,37 @@ function MoveSlot(props: {
   );
 }
 
+function moveTimeSpent(move: MoveTokenData | "dots" | undefined): string | null {
+  return typeof move === "object" ? formatMoveTimeSpent(move.timeSpent) : null;
+}
+
+function timeSpentBarWidth(move: MoveTokenData | "dots" | undefined): string {
+  if (typeof move !== "object" || move.timeSpentShare === null) return "0%";
+  return `${Math.round(move.timeSpentShare * 100)}%`;
+}
+
+function RowTimeSpent(props: {
+  color: "white" | "black";
+  move: MoveTokenData | "dots" | undefined;
+}) {
+  return (
+    <div
+      data-move-time-spent={typeof props.move === "object" ? props.move.timeSpent : undefined}
+      class="flex w-[4.75rem] items-center justify-end gap-0.5"
+    >
+      <span class="flex h-1 w-7 justify-end overflow-hidden">
+        <span
+          class={cn("h-full rounded-sm", props.color === "white" ? "bg-primary" : "bg-secondary")}
+          style={{ width: timeSpentBarWidth(props.move) }}
+        />
+      </span>
+      <span class="block w-[30px] text-left text-[10px] tabular-nums leading-[0.9] text-muted-foreground">
+        {moveTimeSpent(props.move)}
+      </span>
+    </div>
+  );
+}
+
 function MainMovesRow(props: {
   row: MainMovesRowData;
   selectedMoveId: number | null;
@@ -273,7 +302,7 @@ function MainMovesRow(props: {
     <>
       <Show when={props.row.commentBefore}>
         {(commentBefore) => (
-          <div class="flex flex-row gap-2 py-1">
+          <div class="flex flex-row gap-2 px-4 py-1">
             <CommentAfter
               moveId={commentBefore().moveId}
               comment={commentBefore().comment}
@@ -284,22 +313,34 @@ function MainMovesRow(props: {
           </div>
         )}
       </Show>
-      <div class="flex flex-row gap-2 py-1">
+      <div
+        class={cn(
+          "flex h-7 min-h-7 max-h-7 flex-row items-center gap-2 px-4",
+          "w-full",
+          props.row.index % 2 === 0 && "bg-muted/20",
+        )}
+      >
         <div class="w-4 text-center text-muted-foreground">{props.row.index}</div>
-        <MoveSlot
-          move={props.row.whiteMove}
-          selectedMoveId={props.selectedMoveId}
-          onComment={props.onComment}
-        />
-        <MoveSlot
-          move={props.row.blackMove}
-          selectedMoveId={props.selectedMoveId}
-          onComment={props.onComment}
-        />
+        <div class="flex flex-row items-center gap-24">
+          <MoveSlot
+            move={props.row.whiteMove}
+            selectedMoveId={props.selectedMoveId}
+            onComment={props.onComment}
+          />
+          <MoveSlot
+            move={props.row.blackMove}
+            selectedMoveId={props.selectedMoveId}
+            onComment={props.onComment}
+          />
+        </div>
+        <div class="ml-auto flex h-full shrink-0 flex-col items-end justify-center">
+          <RowTimeSpent color="white" move={props.row.whiteMove} />
+          <RowTimeSpent color="black" move={props.row.blackMove} />
+        </div>
       </div>
       <Show when={props.row.commentAfter}>
         {(commentAfter) => (
-          <div class="flex flex-row gap-2 py-1">
+          <div class="flex flex-row gap-2 px-4 py-1">
             <CommentAfter
               moveId={commentAfter().moveId}
               comment={commentAfter().comment}
@@ -321,7 +362,7 @@ function VariationMovesRow(props: {
   onCommentEditDone: () => void;
 }) {
   return (
-    <div class="flex flex-row gap-2">
+    <div class="flex flex-row gap-2 px-4">
       <div class="flex flex-row gap-4 pl-2">
         <For each={Array.from({ length: props.row.indent })}>
           {(_, index) => (
@@ -431,19 +472,21 @@ function MoveComponent(props: {
             moveRef = el;
           }}
         >
-          <span>{move()?.san}</span>
-          <For each={move()?.nags ?? []}>
-            {(nag) => (
-              <span
-                data-nag={nag}
-                data-nag-meaning={getNagMeaning(nag)}
-                title={getNagMeaning(nag)}
-                class="font-semibold text-amber-500"
-              >
-                {getNagGlyph(nag)}
-              </span>
-            )}
-          </For>
+          <span class="inline-flex min-w-0 items-baseline gap-0.5">
+            <span>{move()?.san}</span>
+            <For each={move()?.nags ?? []}>
+              {(nag) => (
+                <span
+                  data-nag={nag}
+                  data-nag-meaning={getNagMeaning(nag)}
+                  title={getNagMeaning(nag)}
+                  class="font-semibold text-amber-500"
+                >
+                  {getNagGlyph(nag)}
+                </span>
+              )}
+            </For>
+          </span>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent class="w-48">

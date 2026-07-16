@@ -153,8 +153,10 @@ function AppShell(props: { children?: JSX.Element }) {
   const [isDrawerOpen, setIsDrawerOpen] = createSignal(false);
   const location = useLocation();
 
-  const hasRightPanel = createMemo(() =>
-    new RegExp(`^${APP_ROOT}/repertoires/[^/]+/[^/]+`).test(location.pathname),
+  const hasRightPanel = createMemo(
+    () =>
+      new RegExp(`^${APP_ROOT}/repertoires/[^/]+/[^/]+`).test(location.pathname) ||
+      new RegExp(`^${APP_ROOT}/games/[^/]+`).test(location.pathname),
   );
 
   function closeDrawerAfterNavigation(event: MouseEvent) {

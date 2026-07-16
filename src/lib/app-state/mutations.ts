@@ -323,8 +323,11 @@ function move(
       next: [],
       prev: null,
       halfMoveNumber: 0,
+      clock: null,
       commentBefore: null,
       commentAfter: null,
+      timeSpent: null,
+      timeSpentShare: null,
     };
 
     setPgnMoveIdCounter(pgn, newId);
@@ -369,8 +372,11 @@ function move(
     next: [],
     prev: currentMove.id,
     halfMoveNumber: currentMove.halfMoveNumber + 1,
+    clock: null,
     commentBefore: null,
     commentAfter: null,
+    timeSpent: null,
+    timeSpentShare: null,
   };
 
   setPgnMoveIdCounter(pgn, newId);

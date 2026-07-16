@@ -3,10 +3,14 @@ export type ParsedPgnMove = {
     notation: string;
   };
   nags: number[];
+  clock?: string;
   commentBefore?: string;
   commentAfter?: string;
+  timeSpent?: string;
   variations: ParsedPgnMove[][];
 };
+
+export type ParsedPgnTags = Record<string, string>;
 
 type Token =
   | { type: "comment"; value: string }
@@ -56,7 +60,7 @@ export function parsePgnMoves(pgn: string): ParsedPgnMove[] {
       if (token.type === "comment") {
         index++;
         if (previousMove !== null && !isExpectingMoveAfterNumber) {
-          previousMove.commentAfter = appendComment(previousMove.commentAfter, token.value);
+          appendMoveComment(previousMove, token.value);
         } else {
           pendingCommentBefore = appendComment(pendingCommentBefore, token.value);
         }
@@ -98,6 +102,46 @@ export function parsePgnMoves(pgn: string): ParsedPgnMove[] {
   return parseLine();
 }
 
+function appendMoveComment(move: ParsedPgnMove, comment: string): void {
+  const annotation = extractMoveTimeAnnotation(comment);
+  if (annotation.clock !== undefined) {
+    move.clock = annotation.clock;
+  }
+
+  if (annotation.timeSpent !== undefined) {
+    move.timeSpent = annotation.timeSpent;
+  }
+
+  if (annotation.comment !== undefined) {
+    move.commentAfter = appendComment(move.commentAfter, annotation.comment);
+  }
+}
+
+function extractMoveTimeAnnotation(comment: string): {
+  clock: string | undefined;
+  comment: string | undefined;
+  timeSpent: string | undefined;
+} {
+  let clock: string | undefined;
+  let timeSpent: string | undefined;
+  const cleanedComment = comment
+    .replace(/\[%clk\s+([^\]\s]+)\s*\]/gi, (_match, value: string) => {
+      clock = value;
+      return "";
+    })
+    .replace(/\[%emt\s+([^\]\s]+)\s*\]/gi, (_match, value: string) => {
+      timeSpent = value;
+      return "";
+    })
+    .trim();
+
+  return {
+    clock,
+    comment: cleanedComment === "" && comment.trim() !== "" ? undefined : cleanedComment,
+    timeSpent,
+  };
+}
+
 function appendComment(existingComment: string | undefined, comment: string): string {
   return existingComment === undefined ? comment : `${existingComment}\n${comment}`;
 }
@@ -107,6 +151,20 @@ function removeTags(pgn: string): string {
     .split("\n")
     .filter((line) => !line.trim().startsWith("["))
     .join("\n");
+}
+
+export function parsePgnTags(pgn: string): ParsedPgnTags {
+  const tags: ParsedPgnTags = {};
+  for (const line of pgn.split("\n")) {
+    const match = line.trim().match(/^\[([A-Za-z0-9_]+)\s+"((?:\\"|[^"])*)"\]$/);
+    if (match === null) continue;
+
+    const [, key, value] = match;
+    if (key === undefined || value === undefined) continue;
+    tags[key] = value.replace(/\\"/g, '"');
+  }
+
+  return tags;
 }
 
 function tokenize(pgn: string): Token[] {

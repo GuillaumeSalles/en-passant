@@ -29,6 +29,7 @@ export type {
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";
 export {
+  formatMoveTimeSpent,
   getMoveNumber,
   getVariationsEnds,
   isMoveWhite,

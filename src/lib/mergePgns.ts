@@ -108,6 +108,8 @@ function findMoveBySan(pgn: MutableMergePgn, moveIds: number[], san: string): nu
 function mergeMoveAnnotations(targetMove: Move, sourceMove: Move): void {
   targetMove.commentBefore ??= sourceMove.commentBefore;
   targetMove.commentAfter ??= sourceMove.commentAfter;
+  targetMove.clock ??= sourceMove.clock;
+  targetMove.timeSpent ??= sourceMove.timeSpent;
   if (targetMove.nags.length === 0) {
     targetMove.nags = [...sourceMove.nags];
   }

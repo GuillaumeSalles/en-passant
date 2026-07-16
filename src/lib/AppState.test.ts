@@ -7,6 +7,7 @@ import {
   back,
   deleteMove,
   emptyState,
+  formatMoveTimeSpent,
   forward,
   moveFromChessboard,
   promoteVariation,
@@ -258,6 +259,44 @@ test("preserves move NAGs when serializing", () => {
   expect(e5?.nags).toEqual([2]);
   expect(nf3?.nags).toEqual([18]);
   expect(toPgn(pgn)).toBe("1. e4 $2 $9 e5 $2 2. Nf3 $18 Nc6 *");
+});
+
+test("derives elapsed move time from clock annotations when serializing", () => {
+  const pgn = normalizePgn(`[TimeControl "600+2"]
+
+1. e4 {[%clk 0:09:58.5]} e5 {[%clk 0:09:56] book response} 2. Nf3 {[%clk 0:09:55]} *`);
+  const e4 = Object.values(pgn.moves).find((move) => move.san === "e4");
+  const e5 = Object.values(pgn.moves).find((move) => move.san === "e5");
+  const nf3 = Object.values(pgn.moves).find((move) => move.san === "Nf3");
+
+  expect(e4?.clock).toBe("0:09:58.5");
+  expect(e4?.timeSpent).toBe("0:00:03.5");
+  expect(e4?.timeSpentShare).toBeCloseTo(3.5 / 6);
+  expect(e4?.commentAfter).toBeNull();
+  expect(e5?.clock).toBe("0:09:56");
+  expect(e5?.timeSpent).toBe("0:00:06");
+  expect(e5?.timeSpentShare).toBe(1);
+  expect(e5?.commentAfter).toBe("book response");
+  expect(nf3?.clock).toBe("0:09:55");
+  expect(nf3?.timeSpent).toBe("0:00:05.5");
+  expect(nf3?.timeSpentShare).toBeCloseTo(5.5 / 6);
+  expect(formatMoveTimeSpent(e4?.timeSpent ?? null)).toBe("3.5s");
+  expect(formatMoveTimeSpent(e5?.timeSpent ?? null)).toBe("6.0s");
+  expect(formatMoveTimeSpent("0:01:05.5")).toBe("1m 05.5s");
+  expect(toPgn(pgn)).toBe(
+    "1. e4 {[%clk 0:09:58.5]} e5 {[%clk 0:09:56] book response} 2. Nf3 {[%clk 0:09:55]} *",
+  );
+});
+
+test("preserves elapsed move time annotations when no clock is available", () => {
+  const pgn = normalizePgn("1. e4 {[%emt 0:00:01.5]} *");
+  const e4 = Object.values(pgn.moves).find((move) => move.san === "e4");
+
+  expect(e4?.clock).toBeNull();
+  expect(e4?.timeSpent).toBe("0:00:01.5");
+  expect(e4?.timeSpentShare).toBe(1);
+  expect(formatMoveTimeSpent(e4?.timeSpent ?? null)).toBe("1.5s");
+  expect(toPgn(pgn)).toBe("1. e4 {[%emt 0:00:01.5]} *");
 });
 
 test("provides glyphs and meanings for NAGs up to 19", () => {

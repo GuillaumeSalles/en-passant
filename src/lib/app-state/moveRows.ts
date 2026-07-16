@@ -17,6 +17,8 @@ type MoveRowTask =
 export type MoveTokenData = {
   moveId: number;
   class?: string;
+  timeSpent: string | null;
+  timeSpentShare: number | null;
   canPromoteVariation: boolean;
   canMoveVariationUp: boolean;
   canMoveVariationDown: boolean;
@@ -63,6 +65,8 @@ function mainMoveToken(move: Move): MoveTokenData {
   return {
     moveId: move.id,
     class: "w-14",
+    timeSpent: move.timeSpent,
+    timeSpentShare: move.timeSpentShare,
     canPromoteVariation: false,
     canMoveVariationUp: false,
     canMoveVariationDown: false,
@@ -76,6 +80,8 @@ function variationMoveToken(
 ): MoveTokenData {
   return {
     moveId: move.id,
+    timeSpent: move.timeSpent,
+    timeSpentShare: move.timeSpentShare,
     canPromoteVariation: true,
     canMoveVariationUp,
     canMoveVariationDown,

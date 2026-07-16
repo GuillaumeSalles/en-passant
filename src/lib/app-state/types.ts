@@ -176,8 +176,11 @@ export type Move = {
   next: number[];
   prev: number | null;
   halfMoveNumber: number;
+  clock: string | null;
   commentBefore: string | null;
   commentAfter: string | null;
+  timeSpent: string | null;
+  timeSpentShare: number | null;
 };
 
 export type EvalMove = {
