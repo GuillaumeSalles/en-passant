@@ -170,6 +170,7 @@ export async function seedIndexedDb(
     chapters: ChapterRecord[];
     pgns: PgnRecord[];
     clearLocalStorage?: boolean;
+    databaseVersion?: number;
   },
 ): Promise<void> {
   await gotoStorageOrigin(page);
@@ -184,7 +185,10 @@ export async function seedIndexedDb(
         });
       const openSeedDatabase = () =>
         new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant");
+          const openRequest =
+            records.databaseVersion === undefined
+              ? indexedDB.open("en-passant")
+              : indexedDB.open("en-passant", records.databaseVersion);
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onupgradeneeded = () => {
             const db = openRequest.result;
