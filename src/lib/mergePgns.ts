@@ -55,6 +55,7 @@ function clonePgn(pgn: NormalizedPgn): MutableMergePgn {
 function cloneMove(move: Move): Move {
   return {
     ...move,
+    metadata: [...move.metadata],
     nags: [...move.nags],
     next: [...move.next],
   };
@@ -110,6 +111,11 @@ function mergeMoveAnnotations(targetMove: Move, sourceMove: Move): void {
   targetMove.commentAfter ??= sourceMove.commentAfter;
   targetMove.clock ??= sourceMove.clock;
   targetMove.timeSpent ??= sourceMove.timeSpent;
+  for (const metadata of sourceMove.metadata) {
+    if (!targetMove.metadata.includes(metadata)) {
+      targetMove.metadata.push(metadata);
+    }
+  }
   if (targetMove.nags.length === 0) {
     targetMove.nags = [...sourceMove.nags];
   }

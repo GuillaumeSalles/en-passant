@@ -27,14 +27,23 @@ describe("parsePgnMoves", () => {
 
   test("extracts clock and elapsed move time annotations from move comments", () => {
     const moves = parsePgnMoves(
-      "1. e4 {[%clk 0:09:58]} e5 {[%emt 0:00:04] [%clk 0:09:56] book response} 2. Nf3 *",
+      "1. e4 {[%clk 0:09:58]} e5 {[%emt 0:00:04] [%timestamp 7.2] [%clk 0:09:56] book response} 2. Nf3 *",
     );
 
     expect(moves[0]!.clock).toBe("0:09:58");
+    expect(moves[0]!.metadata).toEqual(["[%clk 0:09:58]"]);
     expect(moves[0]!.commentAfter).toBeUndefined();
     expect(moves[1]!.clock).toBe("0:09:56");
-    expect(moves[1]!.timeSpent).toBe("0:00:04");
+    expect(moves[1]!.metadata).toEqual(["[%emt 0:00:04]", "[%timestamp 7.2]", "[%clk 0:09:56]"]);
+    expect(moves[1]!.timeSpent).toBe("7.2");
     expect(moves[1]!.commentAfter).toBe("book response");
+  });
+
+  test("keeps non-time metadata out of visible comments", () => {
+    const moves = parsePgnMoves("1. e4 {[%eval 0.23] [%cal Ge2e4] engine note} *");
+
+    expect(moves[0]!.metadata).toEqual(["[%eval 0.23]", "[%cal Ge2e4]"]);
+    expect(moves[0]!.commentAfter).toBe("engine note");
   });
 
   test("parses PGN tags", () => {
@@ -50,9 +59,12 @@ describe("parsePgnMoves", () => {
   });
 
   test("attaches comments before moves when they precede a move token", () => {
-    const moves = parsePgnMoves("{start} 1. e4 1... {before black} e5 2. {before knight} Nf3 *");
+    const moves = parsePgnMoves(
+      "{[%eval 0.1] start} 1. e4 1... {before black} e5 2. {before knight} Nf3 *",
+    );
 
     expect(moves[0]!.commentBefore).toBe("start");
+    expect(moves[0]!.metadata).toEqual(["[%eval 0.1]"]);
     expect(moves[1]!.commentBefore).toBe("before black");
     expect(moves[2]!.commentBefore).toBe("before knight");
   });

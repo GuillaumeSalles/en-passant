@@ -6,11 +6,22 @@ export type ParsedPgnMove = {
   clock?: string;
   commentBefore?: string;
   commentAfter?: string;
+  metadata: string[];
   timeSpent?: string;
+  timeSpentSource?: TimeSpentSource;
   variations: ParsedPgnMove[][];
 };
 
 export type ParsedPgnTags = Record<string, string>;
+
+type TimeSpentSource = "timestamp" | "emt";
+type MoveCommentData = {
+  clock: string | undefined;
+  comment: string | undefined;
+  metadata: string[];
+  timeSpent: string | undefined;
+  timeSpentSource: TimeSpentSource | undefined;
+};
 
 type Token =
   | { type: "comment"; value: string }
@@ -36,6 +47,7 @@ export function parsePgnMoves(pgn: string): ParsedPgnMove[] {
     const moves: ParsedPgnMove[] = [];
     let previousMove: ParsedPgnMove | null = null;
     let pendingCommentBefore: string | undefined;
+    let pendingCommentMetadata = emptyMoveCommentData();
     let isExpectingMoveAfterNumber = false;
 
     while (index < tokens.length) {
@@ -62,7 +74,11 @@ export function parsePgnMoves(pgn: string): ParsedPgnMove[] {
         if (previousMove !== null && !isExpectingMoveAfterNumber) {
           appendMoveComment(previousMove, token.value);
         } else {
-          pendingCommentBefore = appendComment(pendingCommentBefore, token.value);
+          const commentData = extractMoveCommentData(token.value);
+          pendingCommentMetadata = mergeMoveCommentData(pendingCommentMetadata, commentData);
+          if (commentData.comment !== undefined) {
+            pendingCommentBefore = appendComment(pendingCommentBefore, commentData.comment);
+          }
         }
         continue;
       }
@@ -86,12 +102,15 @@ export function parsePgnMoves(pgn: string): ParsedPgnMove[] {
       previousMove = {
         notation: { notation: moveToken.notation },
         nags: moveToken.nag === null ? [] : [moveToken.nag],
+        metadata: [],
         variations: [],
       };
+      applyMoveCommentData(previousMove, pendingCommentMetadata);
       if (pendingCommentBefore !== undefined) {
         previousMove.commentBefore = pendingCommentBefore;
       }
       pendingCommentBefore = undefined;
+      pendingCommentMetadata = emptyMoveCommentData();
       isExpectingMoveAfterNumber = false;
       moves.push(previousMove);
     }
@@ -103,43 +122,105 @@ export function parsePgnMoves(pgn: string): ParsedPgnMove[] {
 }
 
 function appendMoveComment(move: ParsedPgnMove, comment: string): void {
-  const annotation = extractMoveTimeAnnotation(comment);
-  if (annotation.clock !== undefined) {
-    move.clock = annotation.clock;
-  }
+  const commentData = extractMoveCommentData(comment);
+  applyMoveCommentData(move, commentData);
 
-  if (annotation.timeSpent !== undefined) {
-    move.timeSpent = annotation.timeSpent;
-  }
-
-  if (annotation.comment !== undefined) {
-    move.commentAfter = appendComment(move.commentAfter, annotation.comment);
+  if (commentData.comment !== undefined) {
+    move.commentAfter = appendComment(move.commentAfter, commentData.comment);
   }
 }
 
-function extractMoveTimeAnnotation(comment: string): {
-  clock: string | undefined;
-  comment: string | undefined;
-  timeSpent: string | undefined;
-} {
+function emptyMoveCommentData(): MoveCommentData {
+  return {
+    clock: undefined,
+    comment: undefined,
+    metadata: [],
+    timeSpent: undefined,
+    timeSpentSource: undefined,
+  };
+}
+
+function extractMoveCommentData(comment: string): MoveCommentData {
   let clock: string | undefined;
   let timeSpent: string | undefined;
+  let timeSpentSource: TimeSpentSource | undefined;
+  const metadata: string[] = [];
   const cleanedComment = comment
-    .replace(/\[%clk\s+([^\]\s]+)\s*\]/gi, (_match, value: string) => {
-      clock = value;
-      return "";
-    })
-    .replace(/\[%emt\s+([^\]\s]+)\s*\]/gi, (_match, value: string) => {
-      timeSpent = value;
-      return "";
-    })
+    .replace(
+      /\[%([A-Za-z][A-Za-z0-9_-]*)(?:\s+([^\]]*?))?\s*\]/g,
+      (_match, rawKey: string, rawValue: string | undefined) => {
+        const key = rawKey.toLowerCase();
+        const value = rawValue?.trim() ?? "";
+        const metadataText = value === "" ? `[%${rawKey}]` : `[%${rawKey} ${value}]`;
+        metadata.push(metadataText);
+
+        if (key === "clk") {
+          clock = value;
+        } else if (key === "timestamp") {
+          timeSpent = value;
+          timeSpentSource = "timestamp";
+        } else if (key === "emt" && timeSpentSource !== "timestamp") {
+          timeSpent = value;
+          timeSpentSource = "emt";
+        }
+
+        return "";
+      },
+    )
     .trim();
 
   return {
     clock,
     comment: cleanedComment === "" && comment.trim() !== "" ? undefined : cleanedComment,
+    metadata,
     timeSpent,
+    timeSpentSource,
   };
+}
+
+function mergeMoveCommentData(left: MoveCommentData, right: MoveCommentData): MoveCommentData {
+  const result: MoveCommentData = {
+    clock: right.clock ?? left.clock,
+    comment: undefined,
+    metadata: [...left.metadata, ...right.metadata],
+    timeSpent: left.timeSpent,
+    timeSpentSource: left.timeSpentSource,
+  };
+  const source = right.timeSpentSource;
+  if (
+    right.timeSpent !== undefined &&
+    source !== undefined &&
+    shouldApplyTimeSpent(left.timeSpentSource, source)
+  ) {
+    result.timeSpent = right.timeSpent;
+    result.timeSpentSource = source;
+  }
+  return result;
+}
+
+function applyMoveCommentData(move: ParsedPgnMove, commentData: MoveCommentData): void {
+  if (commentData.clock !== undefined) {
+    move.clock = commentData.clock;
+  }
+  move.metadata.push(...commentData.metadata);
+
+  const source = commentData.timeSpentSource;
+  if (
+    commentData.timeSpent !== undefined &&
+    source !== undefined &&
+    shouldApplyTimeSpent(move.timeSpentSource, source)
+  ) {
+    move.timeSpent = commentData.timeSpent;
+    move.timeSpentSource = source;
+  }
+}
+
+function shouldApplyTimeSpent(
+  currentSource: TimeSpentSource | undefined,
+  nextSource: TimeSpentSource | undefined,
+): boolean {
+  if (nextSource === undefined) return false;
+  return nextSource === "timestamp" || currentSource !== "timestamp";
 }
 
 function appendComment(existingComment: string | undefined, comment: string): string {

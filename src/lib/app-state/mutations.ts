@@ -326,6 +326,7 @@ function move(
       clock: null,
       commentBefore: null,
       commentAfter: null,
+      metadata: [],
       timeSpent: null,
       timeSpentShare: null,
     };
@@ -375,6 +376,7 @@ function move(
     clock: null,
     commentBefore: null,
     commentAfter: null,
+    metadata: [],
     timeSpent: null,
     timeSpentShare: null,
   };

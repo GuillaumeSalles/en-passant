@@ -299,6 +299,30 @@ test("preserves elapsed move time annotations when no clock is available", () =>
   expect(toPgn(pgn)).toBe("1. e4 {[%emt 0:00:01.5]} *");
 });
 
+test("uses timestamp annotations before elapsed time and derived clock time", () => {
+  const pgn = normalizePgn(`[TimeControl "600+2"]
+
+1. e4 {[%clk 0:09:58] [%emt 0:00:09] [%timestamp 1.2] direct note} *`);
+  const e4 = Object.values(pgn.moves).find((move) => move.san === "e4");
+
+  expect(e4?.clock).toBe("0:09:58");
+  expect(e4?.timeSpent).toBe("1.2");
+  expect(e4?.timeSpentShare).toBe(1);
+  expect(e4?.metadata).toEqual(["[%clk 0:09:58]", "[%emt 0:00:09]", "[%timestamp 1.2]"]);
+  expect(e4?.commentAfter).toBe("direct note");
+  expect(formatMoveTimeSpent(e4?.timeSpent ?? null)).toBe("1.2s");
+  expect(toPgn(pgn)).toBe("1. e4 {[%clk 0:09:58] [%emt 0:00:09] [%timestamp 1.2] direct note} *");
+});
+
+test("keeps PGN metadata out of visible move comments", () => {
+  const pgn = normalizePgn("1. e4 {[%eval 0.23] [%cal Ge2e4] engine note} *");
+  const e4 = Object.values(pgn.moves).find((move) => move.san === "e4");
+
+  expect(e4?.metadata).toEqual(["[%eval 0.23]", "[%cal Ge2e4]"]);
+  expect(e4?.commentAfter).toBe("engine note");
+  expect(toPgn(pgn)).toBe("1. e4 {[%eval 0.23] [%cal Ge2e4] engine note} *");
+});
+
 test("provides glyphs and meanings for NAGs up to 19", () => {
   expect(
     Array.from({ length: 19 }, (_, index) => {

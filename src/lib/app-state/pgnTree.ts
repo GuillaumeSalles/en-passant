@@ -86,6 +86,7 @@ export function normalizePgn(pgn: string): NormalizedPgn {
         clock: pgnMove.clock ?? null,
         commentBefore: pgnMove.commentBefore ?? null,
         commentAfter: pgnMove.commentAfter ?? null,
+        metadata: [...pgnMove.metadata],
         timeSpent,
         timeSpentShare: null,
       };
@@ -269,12 +270,16 @@ function formatMinuteSecondsText(seconds: number): string {
 }
 
 function moveCommentAfter(move: Move): string | null {
-  const annotations =
-    move.clock !== null
+  const annotations = [
+    ...move.metadata,
+    ...(move.metadata.length === 0 && move.clock !== null
       ? [`[%clk ${move.clock}]`]
-      : move.timeSpent === null
+      : move.metadata.length === 0 && move.timeSpent === null
         ? []
-        : [`[%emt ${move.timeSpent}]`];
+        : move.metadata.length === 0
+          ? [`[%emt ${move.timeSpent}]`]
+          : []),
+  ];
   const comments =
     move.commentAfter === null || move.commentAfter === "" ? [] : [move.commentAfter];
   const parts = [...annotations, ...comments];

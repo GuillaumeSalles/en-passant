@@ -179,6 +179,7 @@ export type Move = {
   clock: string | null;
   commentBefore: string | null;
   commentAfter: string | null;
+  metadata: string[];
   timeSpent: string | null;
   timeSpentShare: number | null;
 };
