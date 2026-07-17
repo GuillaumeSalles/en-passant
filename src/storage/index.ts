@@ -3,6 +3,7 @@ import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
 
 const DB_NAME = "en-passant";
+const DB_VERSION = 1;
 
 const REPERTOIRE_STORE_NAME = "repertoires";
 const CHAPTERS_STORE_NAME = "chapters";
@@ -212,9 +213,7 @@ function hasRequiredStores(db: IDBDatabase): boolean {
 
 async function connect(onUpgrade: (db: IDBDatabase) => void): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    // Open the installed version so compatible additive schemas survive app rollbacks and
-    // local branch switches. A new database still starts at IndexedDB's default version 1.
-    const request = indexedDB.open(DB_NAME);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
       reject(new Error(`Failed to open IndexedDB: ${request.error?.message}`));

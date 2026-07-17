@@ -596,30 +596,6 @@ test("opens repertoires with the repertoire side at the bottom", async ({ page }
   expect(consoleMessages).toEqual([]);
 });
 
-test("opens repertoire data from a newer compatible IndexedDB version", async ({ page }) => {
-  const consoleMessages = collectUnexpectedConsole(page);
-
-  await seedIndexedDb(page, {
-    repertoires: [repertoire],
-    chapters: [chapter],
-    pgns: [
-      {
-        id: chapter.pgnId,
-        pgn: defaultPgn,
-        updatedAt: syncedAt,
-        deletedAt: null,
-        dirty: false,
-      },
-    ],
-    databaseVersion: 2,
-  });
-  await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
-
-  await expectRepertoireReady(page);
-  await expect(page.getByText("Untitled Repertoire").first()).toBeVisible();
-  expect(consoleMessages).toEqual([]);
-});
-
 test("black repertoire training starts after the automatic white move", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
