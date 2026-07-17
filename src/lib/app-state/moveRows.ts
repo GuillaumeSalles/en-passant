@@ -35,6 +35,7 @@ export type MainMovesRowData = {
   id: string;
   type: "main";
   index: number;
+  hasAlternateBackground: boolean;
   whiteMove: MoveTokenData | "dots";
   blackMove: MoveTokenData | "dots" | undefined;
   commentBefore: MoveCommentData | undefined;
@@ -50,6 +51,7 @@ export type VariationRowData = {
   id: string;
   type: "variation";
   indent: number;
+  hasAlternateBackground: boolean;
   items: VariationRowItem[];
 };
 
@@ -126,6 +128,7 @@ function mainMovesRow(
   whiteMove: MoveTokenData | "dots",
   blackMove: MoveTokenData | "dots" | undefined,
   indexMove: Move,
+  hasAlternateBackground: boolean,
   commentBefore: MoveCommentData | undefined,
   commentAfter: MoveCommentData | undefined,
 ): MainMovesRowData {
@@ -133,6 +136,7 @@ function mainMovesRow(
     id,
     type: "main",
     index: getMoveNumber(indexMove),
+    hasAlternateBackground,
     whiteMove,
     blackMove,
     commentBefore,
@@ -217,6 +221,8 @@ export function buildMoveRows(
 ): MoveListRow[] {
   const rows: MoveListRow[] = [];
   const tasks: MoveRowTask[] = [];
+  let mainRowCount = 0;
+  let previousRowHasAlternateBackground = false;
 
   const firstRootMove = getMove(movesData, rootMoveIdsData[0]);
   if (firstRootMove !== undefined && rootMoveIdsData.length === 1) {
@@ -243,6 +249,13 @@ export function buildMoveRows(
     tasks.splice(cursor, 0, ...nextTasks);
   }
 
+  function nextMainRowHasAlternateBackground(): boolean {
+    const hasAlternateBackground = mainRowCount % 2 === 1;
+    mainRowCount += 1;
+    previousRowHasAlternateBackground = hasAlternateBackground;
+    return hasAlternateBackground;
+  }
+
   function appendMainTask(task: Extract<MoveRowTask, { type: "main" }>, cursor: number): void {
     const whiteMove = task.move;
     const blackMove = firstChild(movesData, whiteMove);
@@ -254,6 +267,7 @@ export function buildMoveRows(
           mainMoveToken(whiteMove),
           undefined,
           whiteMove,
+          nextMainRowHasAlternateBackground(),
           moveComment(whiteMove, "before", commentEditorRequest),
           moveComment(whiteMove, "after", commentEditorRequest),
         ),
@@ -275,6 +289,7 @@ export function buildMoveRows(
         mainMoveToken(whiteMove),
         mainMoveToken(blackMove),
         whiteMove,
+        nextMainRowHasAlternateBackground(),
         moveComment(whiteMove, "before", commentEditorRequest),
         moveComment(blackMove, "after", commentEditorRequest),
       ),
@@ -292,6 +307,7 @@ export function buildMoveRows(
         mainMoveToken(whiteMove),
         "dots",
         whiteMove,
+        nextMainRowHasAlternateBackground(),
         moveComment(whiteMove, "before", commentEditorRequest),
         moveComment(whiteMove, "after", commentEditorRequest),
       ),
@@ -311,6 +327,7 @@ export function buildMoveRows(
         "dots",
         mainMoveToken(blackMove),
         blackMove,
+        nextMainRowHasAlternateBackground(),
         moveComment(blackMove, "before", commentEditorRequest),
         moveComment(blackMove, "after", commentEditorRequest),
       ),
@@ -343,6 +360,7 @@ export function buildMoveRows(
       id: `variation-${task.move.id}`,
       type: "variation",
       indent: task.indent,
+      hasAlternateBackground: previousRowHasAlternateBackground,
       items,
     });
   }

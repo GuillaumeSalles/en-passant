@@ -43,6 +43,7 @@ import {
   onCleanup,
   Show,
   Switch,
+  untrack,
   useContext,
 } from "solid-js";
 
@@ -58,11 +59,12 @@ function isMoveListBesideBoard() {
   return window.matchMedia(`(min-width: ${SIDE_PANEL_BREAKPOINT})`).matches;
 }
 
-export function MovesTree(props: { readOnly?: boolean } = {}) {
+export function MovesTree(props: { readOnly: boolean }) {
+  const isReadOnly = untrack(() => props.readOnly);
   const moves = useSelector((state, ctx) => getPgn(state, ctx)?.moves ?? {});
   const selectedMove = useSelector(selectSelectedMoveId);
   const preselectedVariation = useSelector(selectPreselectedVariation);
-  const readOnly = () => props.readOnly === true;
+  const readOnly = () => isReadOnly;
   const [commentEditorRequest, setCommentEditorRequest] = createSignal<CommentEditorRequest | null>(
     null,
   );
@@ -82,7 +84,7 @@ export function MovesTree(props: { readOnly?: boolean } = {}) {
     }));
   }
 
-  if (!readOnly()) {
+  if (!isReadOnly) {
     const removeCommentShortcutListener = addCommentShortcutListener((placement) => {
       const moveId = selectedMove();
       if (moveId !== null) {
@@ -317,7 +319,7 @@ function MainMovesRow(props: {
         class={cn(
           "flex h-7 min-h-7 max-h-7 flex-row items-center gap-2 px-4",
           "w-full",
-          props.row.index % 2 === 0 && "bg-muted/20",
+          props.row.hasAlternateBackground && "bg-muted/20",
         )}
       >
         <div class="w-4 text-center text-muted-foreground">{props.row.index}</div>
@@ -362,7 +364,7 @@ function VariationMovesRow(props: {
   onCommentEditDone: () => void;
 }) {
   return (
-    <div class="flex flex-row gap-2 px-4">
+    <div class={cn("flex flex-row gap-2 px-4", props.row.hasAlternateBackground && "bg-muted/20")}>
       <div class="flex flex-row gap-4 pl-2">
         <For each={Array.from({ length: props.row.indent })}>
           {(_, index) => (

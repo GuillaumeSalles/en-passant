@@ -325,7 +325,7 @@ export function VariationTraining(props: { repertoireHandle: string; chapterHand
               animationKey="variation-training-moves"
               direction="right-to-left"
             />
-            <MovesTree />
+            <MovesTree readOnly={false} />
             <PgnExplorerToolbar />
           </>
         }

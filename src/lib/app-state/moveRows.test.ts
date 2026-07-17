@@ -39,6 +39,7 @@ describe("buildMoveRows", () => {
         id: "variation-0",
         type: "variation",
         indent: 1,
+        hasAlternateBackground: false,
         items: [
           { type: "move-number", moveNumber: 1, isWhite: true },
           { type: "move", move: { moveId: 0, canPromoteVariation: true } },
@@ -75,6 +76,44 @@ describe("buildMoveRows", () => {
           comment: "",
           editRequestVersion: 4,
         },
+      },
+    ]);
+  });
+
+  test("alternates backgrounds across rendered partial main rows", () => {
+    expect(rowsFromPgn("1. e4 {best by test} e5 2. Nf3 Nc6 *")).toMatchObject([
+      {
+        id: "partial-white-0",
+        hasAlternateBackground: false,
+      },
+      {
+        id: "partial-black-1",
+        hasAlternateBackground: true,
+      },
+      {
+        id: "main-2-3",
+        hasAlternateBackground: false,
+      },
+    ]);
+  });
+
+  test("matches variation backgrounds to the row above", () => {
+    expect(rowsFromPgn("1. e4 {best by test} e5 (1... c5) 2. Nf3 Nc6 *")).toMatchObject([
+      {
+        id: "partial-white-0",
+        hasAlternateBackground: false,
+      },
+      {
+        id: "partial-black-2",
+        hasAlternateBackground: true,
+      },
+      {
+        id: "variation-1",
+        hasAlternateBackground: true,
+      },
+      {
+        id: "main-3-4",
+        hasAlternateBackground: false,
       },
     ]);
   });

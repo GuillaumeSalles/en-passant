@@ -236,7 +236,7 @@ export function Repertoire(props: { repertoireHandle: string; chapterHandle: str
               }
             }}
           />
-          <MovesTree />
+          <MovesTree readOnly={false} />
           <Show when={nextMoveIds().length > 1}>
             <VariationSelector />
           </Show>
