@@ -1,35 +1,22 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   completeTrainingLine,
+  ensureTrainingSession,
   markTrainingMistake,
   resetTrainingSession,
-  startTrainingSession,
+  startTrainingLine,
 } from "@/mutations/trainingSession";
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 
 const repertoire = repertoireStub({ id: "rep-1", handle: "white" });
-const chapter = chapterStub({
-  id: "chapter-1",
-  repertoireId: repertoire.id,
-  handle: "main",
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+const chapter = chapterStub({ id: "chapter-1", repertoireId: repertoire.id, handle: "main" });
 
 function createTrainingContext() {
   return createMutationContext(
     {
-      repertoires: {
-        status: "success",
-        data: { [repertoire.id]: repertoire },
-      },
-      chapters: {
-        status: "success",
-        data: { [chapter.id]: chapter },
-      },
+      repertoires: { status: "success", data: { [repertoire.id]: repertoire } },
+      chapters: { status: "success", data: { [chapter.id]: chapter } },
     },
     {
       type: "variation-training",
@@ -40,73 +27,76 @@ function createTrainingContext() {
 }
 
 describe("training session", () => {
-  test("starts a session at the first randomized variation", () => {
-    vi.spyOn(Math, "random")
-      .mockReturnValueOnce(0.6)
-      .mockReturnValueOnce(0.1)
-      .mockReturnValueOnce(0.9);
+  test("keeps results for unchanged lines when the chapter lines change", () => {
     const context = createTrainingContext();
-
-    startTrainingSession(context.state, context.route, 4);
-
-    expect(context.state.training.status).toBe("in-progress");
-    expect(context.state.training.variationIndex).toBe(3);
-    expect(context.state.training.session?.queue).toEqual([3, 1, 0, 2]);
-    expect(context.state.training.session?.results).toEqual([]);
-  });
-
-  test("marks a mistake for the active session", () => {
-    const context = createTrainingContext();
-    startTrainingSession(context.state, context.route, 1);
-
-    markTrainingMistake(context.state, context.route);
-
-    expect(context.state.training.status).toBe("failure");
-    expect(context.state.training.session).toMatchObject({
-      repertoireHandle: "white",
-      chapterHandle: "main",
-      queue: [0],
-      queueCursor: 0,
-      currentMistakeCount: 1,
-      results: [],
+    ensureTrainingSession(context.state, context.route, ["line-a", "line-b"]);
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a", "line-b"],
+      lineId: "line-a",
+      variationIndex: 0,
     });
-  });
+    completeTrainingLine(context, { lineId: "line-a" });
 
-  test("records the line result and completes when there are no more queued lines", () => {
-    const context = createTrainingContext();
-    startTrainingSession(context.state, context.route, 1);
-    markTrainingMistake(context.state, context.route);
+    ensureTrainingSession(context.state, context.route, ["line-a", "line-c"]);
 
-    completeTrainingLine(context, { variationIndex: 0 });
-
-    expect(context.state.training.status).toBe("complete");
+    expect(context.state.training.session?.lineIds).toEqual(["line-a", "line-c"]);
     expect(context.state.training.session?.results).toEqual([
-      { variationIndex: 0, mistakeCount: 1 },
+      { lineId: "line-a", mistakeCount: 0 },
     ]);
-    expect(context.state.training.session?.currentMistakeCount).toBe(0);
   });
 
-  test("resets the active training session", () => {
+  test("records mistakes on the active line", () => {
     const context = createTrainingContext();
-    startTrainingSession(context.state, context.route, 2);
-    markTrainingMistake(context.state, context.route);
-    context.state.set("selectedMoveId", 1);
-    context.state.set("preselectedVariation", 2);
-    context.state.set("animation", {
-      id: 1,
-      movements: [{ piece: "P", from: "e2", to: "e4" }],
-      captures: [],
-      promotion: null,
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
     });
+    markTrainingMistake(context.state, context.route);
+    completeTrainingLine(context, { lineId: "line-a" });
+
+    expect(context.state.training.status).toBe("success");
+    expect(context.state.training.session?.results).toEqual([
+      { lineId: "line-a", mistakeCount: 1 },
+    ]);
+  });
+
+  test("retraining a line replaces its previous result", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    markTrainingMistake(context.state, context.route);
+    completeTrainingLine(context, { lineId: "line-a" });
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    completeTrainingLine(context, { lineId: "line-a" });
+
+    expect(context.state.training.session?.results).toEqual([
+      { lineId: "line-a", mistakeCount: 0 },
+    ]);
+  });
+
+  test("resets results while retaining the current line list", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a", "line-b"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    completeTrainingLine(context, { lineId: "line-a" });
 
     resetTrainingSession(context.state, context.route);
 
-    expect(context.state.training.status).toBe("in-progress");
-    expect(context.state.training.variationIndex).toBe(0);
-    expect(context.state.training.session).toBeNull();
-    expect(context.state.training.variation.rootMoveIds).toEqual([]);
-    expect(context.state.selectedMoveId).toBeNull();
-    expect(context.state.preselectedVariation).toBeNull();
-    expect(context.state.animation).toBeNull();
+    expect(context.state.training.session).toMatchObject({
+      lineIds: ["line-a", "line-b"],
+      activeLineId: null,
+      results: [],
+    });
   });
 });

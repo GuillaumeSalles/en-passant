@@ -152,15 +152,15 @@ export type MutableAppState = StoreState<AppState>;
 export type TrainingState = "in-progress" | "failure" | "success" | "complete";
 
 export type TrainingLineResult = {
-  variationIndex: number;
+  lineId: string;
   mistakeCount: number;
 };
 
 export type TrainingSessionDraft = {
   repertoireHandle: string;
   chapterHandle: string;
-  queue: number[];
-  queueCursor: number;
+  lineIds: string[];
+  activeLineId: string | null;
   currentMistakeCount: number;
   results: TrainingLineResult[];
 };

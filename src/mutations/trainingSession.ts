@@ -1,65 +1,92 @@
-import {
-  AppState,
-  Context,
-  emptyNormalizedPgn,
-  TrainingLineResult,
-  TrainingSessionDraft,
-} from "@/lib/AppState";
+import { AppState, Context, emptyNormalizedPgn, TrainingSessionDraft } from "@/lib/AppState";
 import { StoreState } from "@/lib/createStore";
 import { MutationContext } from "@/lib/useMutation";
 
-function makeTrainingQueue(variationCount: number): number[] {
-  const queue = Array.from({ length: variationCount }, (_, index) => index);
-
-  for (let index = queue.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    const current = queue[index];
-    const swap = queue[swapIndex];
-    if (current === undefined || swap === undefined) continue;
-
-    queue[index] = swap;
-    queue[swapIndex] = current;
-  }
-
-  return queue;
-}
-
-function createTrainingSessionDraft(ctx: Context, queue: number[]): TrainingSessionDraft {
+function createTrainingSessionDraft(ctx: Context, lineIds: string[]): TrainingSessionDraft {
   return {
     repertoireHandle: ctx.repertoireHandle,
     chapterHandle: ctx.chapterHandle,
-    queue,
-    queueCursor: 0,
+    lineIds,
+    activeLineId: null,
     currentMistakeCount: 0,
     results: [],
   };
 }
 
-export function startTrainingSession(
+export function ensureTrainingSession(
   state: StoreState<AppState>,
   ctx: Context,
-  variationCount: number,
+  lineIds: string[],
 ): void {
-  const queue = makeTrainingQueue(variationCount);
-  const firstVariationIndex = queue[0];
+  const currentSession = state.training.session;
+  const lineIdSet = new Set(lineIds);
 
-  if (variationCount <= 0 || firstVariationIndex === undefined) {
+  if (
+    currentSession !== null &&
+    currentSession.repertoireHandle === ctx.repertoireHandle &&
+    currentSession.chapterHandle === ctx.chapterHandle
+  ) {
+    const results = currentSession.results.filter((result) => lineIdSet.has(result.lineId));
+    if (
+      currentSession.lineIds.length === lineIds.length &&
+      currentSession.lineIds.every((lineId, index) => lineId === lineIds[index]) &&
+      results.length === currentSession.results.length
+    ) {
+      return;
+    }
     state.set("training", {
       ...state.training,
-      status: "complete",
-      variationIndex: 0,
-      variation: emptyNormalizedPgn(),
-      session: null,
+      session: {
+        ...currentSession,
+        lineIds,
+        activeLineId:
+          currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
+            ? currentSession.activeLineId
+            : null,
+        results,
+      },
     });
     return;
   }
 
-  const currentSession = state.training.session;
+  state.set("training", {
+    ...state.training,
+    status: lineIds.length === 0 ? "complete" : "in-progress",
+    session: createTrainingSessionDraft(ctx, lineIds),
+  });
+}
+
+export function startTrainingLine(
+  state: StoreState<AppState>,
+  ctx: Context,
+  details: { lineIds: string[]; lineId: string; variationIndex: number },
+): void {
+  ensureTrainingSession(state, ctx, details.lineIds);
+  const session = state.training.session;
+  if (session === null) return;
+
+  state.set("training", {
+    ...state.training,
+    status: "in-progress",
+    variationIndex: details.variationIndex,
+    variation: emptyNormalizedPgn(),
+    session: {
+      ...session,
+      activeLineId: details.lineId,
+      currentMistakeCount: 0,
+    },
+  });
+  state.set("selectedMoveId", null);
+  state.set("preselectedVariation", null);
+  state.set("animation", null);
+}
+
+export function resetTrainingSession(state: StoreState<AppState>, ctx: Context): void {
+  const session = state.training.session;
   if (
-    currentSession !== null &&
-    currentSession.repertoireHandle === ctx.repertoireHandle &&
-    currentSession.chapterHandle === ctx.chapterHandle &&
-    state.training.status !== "complete"
+    session === null ||
+    session.repertoireHandle !== ctx.repertoireHandle ||
+    session.chapterHandle !== ctx.chapterHandle
   ) {
     return;
   }
@@ -67,22 +94,9 @@ export function startTrainingSession(
   state.set("training", {
     ...state.training,
     status: "in-progress",
-    variationIndex: firstVariationIndex,
-    variation: emptyNormalizedPgn(),
-    session: createTrainingSessionDraft(ctx, queue),
-  });
-  state.set("selectedMoveId", null);
-  state.set("preselectedVariation", null);
-  state.set("animation", null);
-}
-
-export function resetTrainingSession(state: StoreState<AppState>, _ctx: Context): void {
-  state.set("training", {
-    ...state.training,
-    status: "in-progress",
     variationIndex: 0,
     variation: emptyNormalizedPgn(),
-    session: null,
+    session: createTrainingSessionDraft(ctx, session.lineIds),
   });
   state.set("selectedMoveId", null);
   state.set("preselectedVariation", null);
@@ -104,29 +118,25 @@ export function markTrainingMistake(state: StoreState<AppState>, _ctx: Context):
   });
 }
 
-export function completeTrainingLine(
-  ctx: MutationContext,
-  details: { variationIndex: number },
-): void {
+export function completeTrainingLine(ctx: MutationContext, details: { lineId: string }): void {
   const { state } = ctx;
   const session = state.training.session;
   if (session === null) {
-    state.set("training", {
-      ...state.training,
-      status: "success",
-    });
+    state.set("training", { ...state.training, status: "success" });
     return;
   }
 
-  const result: TrainingLineResult = {
-    variationIndex: details.variationIndex,
+  const result = {
+    lineId: details.lineId,
     mistakeCount: session.currentMistakeCount,
   };
-  const results = [...session.results, result];
-  const nextVariationIndex = session.queue[session.queueCursor + 1];
+  const results = [
+    ...session.results.filter((existingResult) => existingResult.lineId !== details.lineId),
+    result,
+  ];
   state.set("training", {
     ...state.training,
-    status: nextVariationIndex === undefined ? "complete" : "success",
+    status: "success",
     session: {
       ...session,
       results,

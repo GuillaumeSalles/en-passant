@@ -8,8 +8,7 @@ import {
   selectCurrentMove,
   selectFen,
   selectNextMoveIds,
-  selectVariationProgress,
-  getVariationsEnds,
+  getTrainingLines,
   AppState,
   Context,
   EvalMove,
@@ -27,7 +26,7 @@ import {
   TrainingState,
   TrainingSessionSummary,
 } from "@/lib/AppState";
-import { createEffect, createMemo, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, Show } from "solid-js";
 import { Layout } from "@/components/Layout";
 import { MovesTree } from "@/components/MovesTree";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
@@ -36,12 +35,10 @@ import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
 import { delay } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Button } from "@/components/ui/button";
-import { continueTraining } from "@/mutations/continueTraining";
 import {
   completeTrainingLine,
   markTrainingMistake,
-  resetTrainingSession,
-  startTrainingSession,
+  startTrainingLine,
 } from "@/mutations/trainingSession";
 import { useSelector } from "@/lib/useSelector";
 import { useLoadPgn } from "@/lib/useLoadPgn";
@@ -50,7 +47,8 @@ import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { MutationContext, useMutation } from "@/lib/useMutation";
 import { useState } from "@/app/AppStateProvider";
 import { StoreState } from "@/lib/createStore";
-import { repertoirePath } from "@/lib/routes";
+import { repertoirePath, trainingLinePath, trainingPath } from "@/lib/routes";
+import { TrainingLines } from "./TrainingLines";
 
 const FAILURE_DELAY = 1000;
 const RESPONSE_DELAY = 500;
@@ -70,7 +68,11 @@ function addTrainingMoveSilently({ state, route }: MutationContext, move: EvalMo
   moveFromEvalMove(state, route, move);
 }
 
-export function VariationTraining(props: { repertoireHandle: string; chapterHandle: string }) {
+export function VariationTraining(props: {
+  repertoireHandle: string;
+  chapterHandle: string;
+  lineId: string;
+}) {
   useGlobalShortcuts();
   useLoadPgn(
     () => props.repertoireHandle,
@@ -93,32 +95,35 @@ export function VariationTraining(props: { repertoireHandle: string; chapterHand
   const trainingStatus = useSelector((state) => state.training.status);
   const trainingVariationIsEmpty = useSelector(selectTrainingVariationIsEmpty);
   const trainingSessionStats = useSelector(selectTrainingSessionStats);
-  const progress = useSelector(selectVariationProgress);
 
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromEvalMove = useMutation(moveFromEvalMove);
   const onAutoMoveFromEvalMove = useMutation(addTrainingMoveSilently, { context: true });
   const onDeleteMove = useMutation(deleteMove);
   const onUpdateTrainingStatus = useMutation(updateTrainingStatus);
-  const onContinueTraining = useMutation(continueTraining);
-  const onStartTrainingSession = useMutation(startTrainingSession);
+  const onStartTrainingLine = useMutation(startTrainingLine);
   const onMarkTrainingMistake = useMutation(markTrainingMistake);
   const onCompleteTrainingLine = useMutation(completeTrainingLine, { context: true });
-  const onResetTrainingSession = useMutation(resetTrainingSession);
 
-  onCleanup(onResetTrainingSession);
-
-  const variationEnds = createMemo(() => {
+  const lines = createMemo(() => {
     const pgn = chapterPgn();
     if (pgn == null) return [];
-    return getVariationsEnds(pgn);
+    return getTrainingLines(pgn);
+  });
+
+  const activeLineIndex = createMemo(() => lines().findIndex((line) => line.id === props.lineId));
+  const activeLine = createMemo(() => lines()[activeLineIndex()]);
+  const progress = createMemo(() => {
+    const line = activeLine();
+    if (line === undefined || line.plyCount === 0) return 0;
+    return Object.keys(training().variation.moves).length / line.plyCount;
   });
 
   const variation = createMemo(() => {
     const pgn = chapterPgn();
     if (pgn == null) return [];
-    const variationEnd = variationEnds()[training().variationIndex];
-    return variationEnd === undefined ? [] : getVariationMoveIds(pgn, variationEnd);
+    const line = activeLine();
+    return line === undefined ? [] : getVariationMoveIds(pgn, line.terminalMoveId);
   });
 
   const chapterHasMoves = createMemo(() => {
@@ -132,25 +137,17 @@ export function VariationTraining(props: { repertoireHandle: string; chapterHand
     return firstMoveId === undefined ? undefined : pgn?.moves[firstMoveId];
   });
 
+  let startedLineId: string | null = null;
   createEffect(
     () => ({
-      variationCount: variationEnds().length,
-      status: training().status,
-      session: training().session,
-      repertoireHandle: props.repertoireHandle,
-      chapterHandle: props.chapterHandle,
+      line: activeLine(),
+      lineIds: lines().map((line) => line.id),
+      variationIndex: activeLineIndex(),
     }),
-    ({ variationCount, status, session, repertoireHandle, chapterHandle }) => {
-      if (variationCount === 0) return;
-      if (
-        session !== null &&
-        (session.repertoireHandle !== repertoireHandle || session.chapterHandle !== chapterHandle)
-      ) {
-        onStartTrainingSession(variationCount);
-        return;
-      }
-      if (session !== null || status === "complete") return;
-      onStartTrainingSession(variationCount);
+    ({ line, lineIds, variationIndex }) => {
+      if (line === undefined || line.id === startedLineId) return;
+      startedLineId = line.id;
+      onStartTrainingLine({ lineIds, lineId: line.id, variationIndex });
     },
   );
 
@@ -213,7 +210,7 @@ export function VariationTraining(props: { repertoireHandle: string; chapterHand
       const response = responseId === undefined ? undefined : pgn.moves[responseId];
 
       if (response === undefined) {
-        onCompleteTrainingLine({ variationIndex: training().variationIndex });
+        onCompleteTrainingLine({ lineId: props.lineId });
         return;
       }
 
@@ -221,7 +218,7 @@ export function VariationTraining(props: { repertoireHandle: string; chapterHand
       await delay(RESPONSE_DELAY);
       onMoveFromEvalMove(response);
       if (variation()[currentHalfMoveNumber + 3] === undefined) {
-        onCompleteTrainingLine({ variationIndex: training().variationIndex });
+        onCompleteTrainingLine({ lineId: props.lineId });
       }
     } else {
       await delay(FAILURE_DELAY);
@@ -247,89 +244,123 @@ export function VariationTraining(props: { repertoireHandle: string; chapterHand
     return cm.to;
   });
 
+  const nextUntrainedLine = createMemo(() => {
+    const allLines = lines();
+    const trained = new Set(training().session?.results.map((result) => result.lineId) ?? []);
+    if (allLines.length === 0) return undefined;
+    for (let offset = 1; offset <= allLines.length; offset++) {
+      const line = allLines[(activeLineIndex() + offset) % allLines.length];
+      if (line !== undefined && !trained.has(line.id)) return line;
+    }
+    return undefined;
+  });
+
   return (
-    <Show when={chapterPgn() !== undefined} fallback={null}>
-      <Layout
-        title={
-          <div class="min-w-0 truncate text-base">
-            {repertoireName()} · {chapterName()} · training
-          </div>
-        }
-        chessboard={
-          <Chessboard
-            boardOrientation={orientation()}
-            position={currentFen()}
-            canDrag={isAtEndOfLine()}
-            onPieceDrop={onPieceDrop}
-            pieceToAnimate={animation()}
-            arrows={{}}
-            squareHighlights={{}}
-            onHighlightSquare={() => {}}
-            onDrawArrow={() => {}}
-            annotations={(() => {
-              const square = wrongMove();
-              return square === undefined ? {} : { [square]: [{ type: "wrongMove" }] };
-            })()}
+    <Show when={chapterPgn() !== null} fallback={null}>
+      <Show
+        when={activeLine()}
+        fallback={
+          <TrainingLines
+            repertoireHandle={props.repertoireHandle}
+            chapterHandle={props.chapterHandle}
+            missingLine
           />
         }
-        evalBar={null}
-        panelChildren={
-          <>
-            <TrainingSessionStats result={trainingSessionStats()} />
-            <ProgressBar progress={progress()} />
-            <Show when={chapterHasMoves()}>
+      >
+        <Layout
+          title={
+            <div class="min-w-0 truncate text-base">
+              {repertoireName()} · {chapterName()} · training
+            </div>
+          }
+          chessboard={
+            <Chessboard
+              boardOrientation={orientation()}
+              position={currentFen()}
+              canDrag={isAtEndOfLine()}
+              onPieceDrop={onPieceDrop}
+              pieceToAnimate={animation()}
+              arrows={{}}
+              squareHighlights={{}}
+              onHighlightSquare={() => {}}
+              onDrawArrow={() => {}}
+              annotations={(() => {
+                const square = wrongMove();
+                return square === undefined ? {} : { [square]: [{ type: "wrongMove" }] };
+              })()}
+            />
+          }
+          evalBar={null}
+          panelChildren={
+            <>
+              <TrainingSessionStats result={trainingSessionStats()} />
+              <ProgressBar progress={progress()} />
+              <Show when={chapterHasMoves()}>
+                <HorizontalDashedDivider
+                  animationKey="variation-training-instructions-top"
+                  direction="right-to-left"
+                />
+              </Show>
+              <div class="flex items-center justify-between gap-2 px-4 py-2">
+                <Show
+                  when={chapterHasMoves()}
+                  fallback={
+                    <>
+                      <span>Nothing to train</span>
+                      <Button
+                        size="sm"
+                        href={repertoirePath(props.repertoireHandle, props.chapterHandle)}
+                      >
+                        Back to chapter
+                      </Button>
+                    </>
+                  }
+                >
+                  <span>
+                    {getInstruction({
+                      nextMoveIds: nextMoveIds(),
+                      orientation: orientation(),
+                      trainingState: trainingStatus(),
+                    })}
+                  </span>
+                  <Show when={trainingStatus() === "success"}>
+                    <Show
+                      when={nextUntrainedLine()}
+                      fallback={
+                        <Button
+                          size="sm"
+                          href={trainingPath(props.repertoireHandle, props.chapterHandle)}
+                        >
+                          Back to lines
+                        </Button>
+                      }
+                    >
+                      {(nextLine) => (
+                        <Button
+                          size="sm"
+                          href={trainingLinePath(
+                            props.repertoireHandle,
+                            props.chapterHandle,
+                            nextLine().id,
+                          )}
+                        >
+                          Next line
+                        </Button>
+                      )}
+                    </Show>
+                  </Show>
+                </Show>
+              </div>
               <HorizontalDashedDivider
-                animationKey="variation-training-instructions-top"
+                animationKey="variation-training-moves"
                 direction="right-to-left"
               />
-            </Show>
-            <div class="flex items-center justify-between gap-2 px-4 py-2">
-              <Show
-                when={chapterHasMoves()}
-                fallback={
-                  <>
-                    <span>Nothing to train</span>
-                    <Button
-                      size="sm"
-                      href={repertoirePath(props.repertoireHandle, props.chapterHandle)}
-                    >
-                      Back to chapter
-                    </Button>
-                  </>
-                }
-              >
-                <span>
-                  {getInstruction({
-                    nextMoveIds: nextMoveIds(),
-                    orientation: orientation(),
-                    trainingState: trainingStatus(),
-                  })}
-                </span>
-                <Show when={trainingStatus() === "success"}>
-                  <Button size="sm" onClick={() => onContinueTraining(variationEnds().length)}>
-                    Continue
-                  </Button>
-                </Show>
-                <Show when={trainingStatus() === "complete"}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onStartTrainingSession(variationEnds().length)}
-                  >
-                    New session
-                  </Button>
-                </Show>
-              </Show>
-            </div>
-            <HorizontalDashedDivider
-              animationKey="variation-training-moves"
-              direction="right-to-left"
-            />
-            <MovesTree readOnly={false} />
-            <PgnExplorerToolbar />
-          </>
-        }
-      />
+              <MovesTree readOnly={false} />
+              <PgnExplorerToolbar />
+            </>
+          }
+        />
+      </Show>
     </Show>
   );
 }
@@ -351,9 +382,7 @@ function getInstruction({
     return "Try again.";
   } else if (trainingState === "success") {
     return "Good job!";
-  } else if (trainingState === "complete") {
-    return "Session complete.";
-  }
+  } else if (trainingState === "complete") return "Session complete.";
   return "";
 }
 

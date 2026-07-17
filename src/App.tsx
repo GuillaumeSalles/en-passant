@@ -15,6 +15,7 @@ import { NotFound } from "@/app/NotFound";
 import { Repertoire } from "@/components/Repertoire";
 import { RepertoireOverview } from "@/app/repertoires/[repertoireHandle]/RepertoireOverview";
 import { VariationTraining } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/VariationTraining";
+import { TrainingLines } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/TrainingLines";
 import { EnPassantLogo } from "@/components/EnPassantLogo";
 import { AuthButton } from "@/components/AuthButton";
 import { SignupNudge } from "@/components/SignupNudge";
@@ -364,9 +365,29 @@ function TrainRoute() {
     getChapterHandle: () => params.chapterHandle,
   });
   return (
+    <TrainingLines
+      repertoireHandle={params.repertoireHandle}
+      chapterHandle={params.chapterHandle}
+      missingLine={false}
+    />
+  );
+}
+
+function TrainLineRoute() {
+  const params = useParams<{
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  }>();
+  useRedirectMissingRepertoireRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+    getChapterHandle: () => params.chapterHandle,
+  });
+  return (
     <VariationTraining
       repertoireHandle={params.repertoireHandle}
       chapterHandle={params.chapterHandle}
+      lineId={params.lineId}
     />
   );
 }
@@ -421,6 +442,10 @@ export default function App() {
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train`}
         component={TrainRoute}
+      />
+      <Route
+        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`}
+        component={TrainLineRoute}
       />
       <Route path="*" component={NotFound} />
     </Router>

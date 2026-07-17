@@ -120,6 +120,13 @@ async function openRepertoire(page: Page, pgn = defaultPgn) {
   await expectRepertoireReady(page);
 }
 
+async function openFirstTrainingLine(page: Page) {
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
+  await page.locator("[data-training-line]").first().getByRole("link", { name: "Train" }).click();
+  await expect(page.locator("[data-square]")).toHaveCount(64);
+}
+
 async function expectRepertoireReady(page: Page) {
   await expect(page.locator("[data-square]")).toHaveCount(64);
   await expect(page.locator("[data-moves-tree]")).toBeVisible();
@@ -594,8 +601,7 @@ test("black repertoire training starts after the automatic white move", async ({
 
   await recordPlayedSounds(page);
   await seedRepertoire(page, "1. e4 e5 *", [], { ...repertoire, orientation: "black" });
-  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
-  await expect(page.locator("[data-square]")).toHaveCount(64);
+  await openFirstTrainingLine(page);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
   await expect(page.getByText("Black to play.")).toBeVisible();
@@ -603,40 +609,40 @@ test("black repertoire training starts after the automatic white move", async ({
   await dragPiece(page, "e7", "e5");
 
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
-  await expect(page.getByText("Session complete.")).toBeVisible();
+  await expect(page.getByText("Good job!")).toBeVisible();
   expect(consoleMessages).toEqual([]);
 });
 
-test("leaving training clears the old session before newly added lines", async ({ page }) => {
+test("lists stable line URLs and continues through untrained lines", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
-  await page.addInitScript(() => {
-    Math.random = () => 0.9;
-  });
   await recordPlayedSounds(page);
-  await seedRepertoire(page, "1. e4 e5 *");
+  await seedRepertoire(page, "1. e4 (1. d4 d5) e5 *");
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
+  const lines = page.locator("[data-training-line]");
+  await expect(lines).toHaveCount(2);
+  await expect(lines.first().getByRole("link", { name: "Train" })).toHaveAttribute(
+    "href",
+    /\/train\/v1-[A-Za-z0-9_-]+$/,
+  );
+  await expect(page.getByText("0/2 trained")).toBeVisible();
+
+  await lines.first().getByRole("link", { name: "Train" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
 
-  await dragPiece(page, "e2", "e4");
-  await expect(page.getByText("Session complete.")).toBeVisible();
-
-  await page.getByRole("link", { name: "Chapter 1" }).click();
-  await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire\/chapter-1$/);
-  await expect(page.locator("[data-square]")).toHaveCount(64);
   await dragPiece(page, "d2", "d4");
-  await expect(page.locator('[data-san="d4"]')).toBeVisible();
-
-  await page.getByRole("link", { name: "Train" }).click();
-  await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire\/chapter-1\/train$/);
-  await expect(page.locator("[data-square]")).toHaveCount(64);
+  await expect(page.getByText("Try again.")).toBeVisible();
   await dragPiece(page, "e2", "e4");
   await expect(page.getByText("Good job!")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("link", { name: "Next line" }).click();
+  await expect(page.locator("[data-square]")).toHaveCount(64);
   await dragPiece(page, "d2", "d4");
-  await expect(page.getByText("Session complete.")).toBeVisible();
+  await expect(page.getByText("Good job!")).toBeVisible();
+  await page.getByRole("link", { name: "Back to lines" }).click();
+  await expect(page.getByText("2/2 trained")).toBeVisible();
+  await expect(page.getByText("Trained with 1 mistake")).toBeVisible();
+  await expect(page.locator('[data-training-status="trained"]')).toHaveCount(2);
   expect(consoleMessages).toEqual([]);
 });
 
