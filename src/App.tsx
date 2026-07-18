@@ -254,7 +254,7 @@ export function appShellHasRightPanel(pathname: string): boolean {
 }
 
 function BaseLayout() {
-  return <FullWidthLayout />;
+  return <FullWidthLayout reserveRightSlot showMobileHeaderDivider={false} />;
 }
 
 function useRedirectAppRootToFirstChapter() {

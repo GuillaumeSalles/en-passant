@@ -9,7 +9,7 @@ type BreadcrumbTitle = readonly [repertoireName: string, chapterName: string];
 
 const crumbLinkClass = "truncate transition-colors duration-150 ease-emil-out hover:text-blue-500";
 
-export function RepertoireBreadcrumb(props: { showTraining?: boolean }) {
+export function RepertoireBreadcrumb(props: { showTraining: boolean }) {
   const repertoireName = useSelector(getRepertoireName);
   const chapterName = useSelector(getChapterName);
   const ctx = useRouteContext();

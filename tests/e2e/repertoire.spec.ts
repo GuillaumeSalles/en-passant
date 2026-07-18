@@ -391,8 +391,9 @@ test("repertoire page renders without console warnings", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "En passant" })).toBeVisible();
   await expect(page.getByText("Untitled Repertoire").first()).toBeVisible();
   await expect(page.getByText("Chapter 1").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Untitled Repertoire" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Chapter 1" })).toBeVisible();
+  const breadcrumb = page.getByLabel("Breadcrumb");
+  await expect(breadcrumb.getByRole("link", { name: "Untitled Repertoire" })).toBeVisible();
+  await expect(breadcrumb.getByRole("link", { name: "Chapter 1" })).toBeVisible();
   const chapterActions = page.getByRole("button", { name: "Actions for Chapter 1" });
   await expect(chapterActions).toHaveCSS("opacity", "0");
   await page
@@ -543,7 +544,7 @@ test("creates a chapter from the repertoire overview before training", async ({ 
   const consoleMessages = collectUnexpectedConsole(page);
 
   await openRepertoire(page);
-  await page.getByRole("link", { name: "Untitled Repertoire" }).click();
+  await page.getByLabel("Breadcrumb").getByRole("link", { name: "Untitled Repertoire" }).click();
   await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire$/);
 
   const createChapterButton = page.getByRole("button", { name: "Create chapter" });
@@ -553,7 +554,9 @@ test("creates a chapter from the repertoire overview before training", async ({ 
   await createChapterButton.click();
 
   await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire\/chapter-2$/);
-  await expect(page.getByRole("link", { name: "Chapter 2" })).toBeVisible();
+  await expect(
+    page.getByLabel("Breadcrumb").getByRole("link", { name: "Chapter 2" }),
+  ).toBeVisible();
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const openRequest = indexedDB.open("en-passant");

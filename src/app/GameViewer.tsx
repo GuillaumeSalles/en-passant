@@ -74,7 +74,11 @@ function GameViewerMessage(props: { title: string; action?: "signin" | "games" }
   }
 
   return (
-    <FullWidthLayout title={<h1 class="truncate text-base font-medium">Game</h1>}>
+    <FullWidthLayout
+      title={<h1 class="truncate text-base font-medium">Game</h1>}
+      reserveRightSlot
+      showMobileHeaderDivider={false}
+    >
       <div class="p-4">
         <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
           <p>{props.title}</p>

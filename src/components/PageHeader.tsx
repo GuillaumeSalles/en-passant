@@ -5,7 +5,7 @@ import { MobileNavigationTrigger } from "./MobileNavigation";
 export function PageHeader(props: {
   title?: JSX.Element;
   actions?: JSX.Element;
-  reserveRightSlot?: boolean;
+  reserveRightSlot: boolean;
 }) {
   const title = children(() => props.title);
   const actions = children(() => props.actions);

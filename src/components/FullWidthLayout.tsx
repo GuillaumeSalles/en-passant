@@ -9,8 +9,8 @@ export function FullWidthLayout(props: {
   actions?: JSX.Element;
   children?: JSX.Element;
   mainClass?: string;
-  reserveRightSlot?: boolean;
-  showMobileHeaderDivider?: boolean;
+  reserveRightSlot: boolean;
+  showMobileHeaderDivider: boolean;
 }) {
   const content = children(() => props.children);
 
@@ -19,7 +19,7 @@ export function FullWidthLayout(props: {
       <PageHeader
         title={props.title}
         actions={props.actions}
-        reserveRightSlot={props.reserveRightSlot ?? true}
+        reserveRightSlot={props.reserveRightSlot}
       />
       <Show when={props.showMobileHeaderDivider}>
         <HorizontalDashedDivider class="xl:hidden" animation="none" />

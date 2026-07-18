@@ -50,7 +50,11 @@ export function TrainingLines(props: {
   }
 
   return (
-    <FullWidthLayout title={<RepertoireBreadcrumb showTraining />}>
+    <FullWidthLayout
+      title={<RepertoireBreadcrumb showTraining />}
+      reserveRightSlot
+      showMobileHeaderDivider={false}
+    >
       <div class="mx-auto flex w-full max-w-5xl flex-col px-4 py-4">
         <div class="flex items-center justify-between gap-3">
           <div>

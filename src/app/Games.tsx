@@ -252,6 +252,7 @@ export function Games() {
     <FullWidthLayout
       title={<h1 class="motion-page-title truncate text-base font-medium">Games</h1>}
       mainClass="flex flex-col overflow-hidden"
+      reserveRightSlot
       showMobileHeaderDivider
     >
       <div class="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-end lg:justify-between">
