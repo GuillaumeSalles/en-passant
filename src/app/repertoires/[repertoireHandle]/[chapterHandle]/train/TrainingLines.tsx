@@ -10,7 +10,7 @@ import {
   getVariationMoveIds,
   selectOrientation,
 } from "@/lib/AppState";
-import { learningLinePath, trainingLinePath } from "@/lib/routes";
+import { learningLinePath, repertoireMovePath, trainingLinePath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
@@ -157,6 +157,17 @@ export function TrainingLines(props: {
                       </div>
                     </div>
                     <div class="flex flex-none items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        href={repertoireMovePath(
+                          props.repertoireHandle,
+                          props.chapterHandle,
+                          line.terminalMoveId,
+                        )}
+                      >
+                        View
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"

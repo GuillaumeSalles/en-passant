@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, Show } from "solid-js";
+import { createEffect, onCleanup, Show, untrack } from "solid-js";
 import {
   addEvalMoves,
   AppState,
@@ -16,6 +16,7 @@ import {
   selectFen,
   selectNextMoveIds,
   selectOrientation,
+  selectMove,
   selectedMove,
   toPgn,
   updateEvaluation,
@@ -125,7 +126,11 @@ function selectNagAnnotations(
   };
 }
 
-export function Repertoire(props: { repertoireHandle: string; chapterHandle: string }) {
+export function Repertoire(props: {
+  repertoireHandle: string;
+  chapterHandle: string;
+  requestedMoveId: number | null;
+}) {
   useLoadPgn(
     () => props.repertoireHandle,
     () => props.chapterHandle,
@@ -145,11 +150,44 @@ export function Repertoire(props: { repertoireHandle: string; chapterHandle: str
   const onUpdateEvaluation = useMutation(updateEvaluation);
   const onAddEvalMoves = useMutation(addEvalMoves);
   const onMoveFromChessboard = useMutation(moveFromChessboard);
+  const onSelectMove = useMutation(selectMove);
   const onDrawArrow = useMutation(drawArrow);
   const onHighlightSquare = useMutation(highlightSquare);
   const onUpdateNumberOfLines = useMutation(updateNumberOfLines, { context: true });
 
   useGlobalShortcuts();
+
+  let appliedRequestedMoveKey: string | null = null;
+  createEffect(
+    () => {
+      const loadedPgn = pgn();
+      const requestedMoveId = props.requestedMoveId;
+      return {
+        pgnLoaded: loadedPgn !== null,
+        moveExists:
+          loadedPgn !== null &&
+          requestedMoveId !== null &&
+          loadedPgn.moves[requestedMoveId] !== undefined,
+        requestKey:
+          requestedMoveId === null
+            ? null
+            : `${props.repertoireHandle}/${props.chapterHandle}/${requestedMoveId}`,
+        requestedMoveId,
+      };
+    },
+    ({ pgnLoaded, moveExists, requestKey, requestedMoveId }) => {
+      if (requestKey === null || requestedMoveId === null) {
+        appliedRequestedMoveKey = null;
+        return;
+      }
+      if (!pgnLoaded || appliedRequestedMoveKey === requestKey) return;
+
+      appliedRequestedMoveKey = requestKey;
+      if (moveExists) {
+        untrack(() => onSelectMove(requestedMoveId));
+      }
+    },
+  );
 
   const engine = new Engine();
   engine.onEvaluation(onUpdateEvaluation);

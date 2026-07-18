@@ -1,10 +1,28 @@
 import { expect, test } from "vitest";
-import { firstRepertoireChapterPath, learningLinePath } from "./routes";
+import {
+  firstRepertoireChapterPath,
+  learningLinePath,
+  parseMoveId,
+  repertoireMovePath,
+} from "./routes";
 
 test("builds a learning line path", () => {
   expect(learningLinePath("white", "main", "v1-line")).toBe(
     "/app/repertoires/white/main/learn/v1-line",
   );
+});
+
+test("builds a chapter path that selects a move", () => {
+  expect(repertoireMovePath("white", "main", 42)).toBe("/app/repertoires/white/main?moveId=42");
+});
+
+test("parses move ids from query strings", () => {
+  expect(parseMoveId("42")).toBe(42);
+  expect(parseMoveId("0")).toBe(0);
+  expect(parseMoveId(undefined)).toBeNull();
+  expect(parseMoveId("-1")).toBeNull();
+  expect(parseMoveId("1.5")).toBeNull();
+  expect(parseMoveId("move-1")).toBeNull();
 });
 
 test("builds a path for the alphabetically first chapter of the alphabetically first repertoire", () => {

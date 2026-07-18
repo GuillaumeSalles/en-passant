@@ -19,6 +19,20 @@ export function repertoirePath(repertoireHandle: string, chapterHandle: string):
   return `${APP_ROOT}/repertoires/${repertoireHandle}/${chapterHandle}`;
 }
 
+export function repertoireMovePath(
+  repertoireHandle: string,
+  chapterHandle: string,
+  moveId: number,
+): string {
+  return `${repertoirePath(repertoireHandle, chapterHandle)}?moveId=${moveId}`;
+}
+
+export function parseMoveId(value: string | undefined): number | null {
+  if (value === undefined || !/^\d+$/.test(value)) return null;
+  const moveId = Number(value);
+  return Number.isSafeInteger(moveId) ? moveId : null;
+}
+
 export function repertoireOverviewPath(repertoireHandle: string): string {
   return `${APP_ROOT}/repertoires/${repertoireHandle}`;
 }
