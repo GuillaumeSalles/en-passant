@@ -14,7 +14,7 @@ import { trainingLinePath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
-import { ensureTrainingSession, resetTrainingSession } from "@/mutations/trainingSession";
+import { ensureTrainingSession } from "@/mutations/trainingSession";
 
 export function TrainingLines(props: {
   repertoireHandle: string;
@@ -31,7 +31,6 @@ export function TrainingLines(props: {
   const chapterName = useSelector(getChapterName);
   const trainingSession = useSelector((state) => state.training.session);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
-  const onResetTrainingSession = useMutation(resetTrainingSession);
 
   const lines = createMemo(() => {
     const pgn = chapterPgn();
@@ -73,11 +72,6 @@ export function TrainingLines(props: {
                 {results().size}/{lines().length} trained
               </div>
             </div>
-            <Show when={results().size > 0}>
-              <Button variant="outline" size="sm" onClick={() => onResetTrainingSession()}>
-                Restart
-              </Button>
-            </Show>
           </div>
 
           <Show when={props.missingLine}>
