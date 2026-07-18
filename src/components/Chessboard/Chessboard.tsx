@@ -51,6 +51,9 @@ type PieceEntry = {
   piece: FenPiece;
 };
 const MOVE_ANIMATION_DURATION_MS = 400;
+const INTRO_GRID_LINE_STAGGER_MS = 22;
+const INTRO_DELAY_FILE_MS = 26;
+const INTRO_DELAY_RANK_MS = 29;
 
 function pieceKey(square: string, piece: FenPiece): PieceKey {
   return `${square}:${piece}`;
@@ -108,7 +111,7 @@ export function Chessboard(props: ChessboardProps) {
   let pieceEntryCache = new Map<PieceKey, PieceEntry>();
   const constructionGridLines = Array.from({ length: 7 }, (_, index) => ({
     position: (index + 1) * 12.5,
-    delay: `${index * 44}ms`,
+    delay: `${index * INTRO_GRID_LINE_STAGGER_MS}ms`,
   }));
 
   const draggedPieceSourceSquare = createMemo(() => {
@@ -509,5 +512,5 @@ export function Chessboard(props: ChessboardProps) {
 
 function getIntroDelay(square: string, boardOrientation: Orientation) {
   const position = getSquarePosition(square, boardOrientation);
-  return `${position.x * 52 + position.y * 58}ms`;
+  return `${position.x * INTRO_DELAY_FILE_MS + position.y * INTRO_DELAY_RANK_MS}ms`;
 }

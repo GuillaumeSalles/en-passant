@@ -1,6 +1,9 @@
 .Board {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --board-intro-grid-duration: 790ms;
+  --board-intro-line-duration: 440ms;
+  --board-intro-piece-duration: 480ms;
   isolation: isolate;
   touch-action: none;
   user-select: none;
@@ -13,7 +16,7 @@
   inset: 0;
   z-index: 5;
   pointer-events: none;
-  animation: board-intro-grid 1580ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: board-intro-grid var(--board-intro-grid-duration) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .IntroGridLine {
@@ -25,22 +28,24 @@
 }
 
 .IntroGridLineVertical {
-  animation: board-intro-grid-line-vertical 880ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: board-intro-grid-line-vertical var(--board-intro-line-duration)
+    cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--grid-delay);
 }
 
 .IntroGridLineHorizontal {
-  animation: board-intro-grid-line-horizontal 880ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: board-intro-grid-line-horizontal var(--board-intro-line-duration)
+    cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--grid-delay);
 }
 
 .IntroSquare {
-  animation: square-intro 960ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: square-intro var(--board-intro-piece-duration) cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--intro-delay);
 }
 
 .IntroPiece {
-  animation: piece-intro 960ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: piece-intro var(--board-intro-piece-duration) cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--intro-delay);
 }
 
