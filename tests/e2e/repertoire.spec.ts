@@ -1877,7 +1877,7 @@ test("en passant fades the piece on the captured square", async ({ page }) => {
   await expect(page.locator('[data-square="d5"]')).not.toHaveAttribute("data-piece");
 });
 
-test("castling animates the king and rook together", async ({ page }) => {
+test("castling animates the king before the rook", async ({ page }) => {
   await recordPieceAnimations(page);
   await openRepertoire(page, "1. Nf3 Nf6 2. g3 g6 3. Bg2 Bg7 4. O-O *");
 
@@ -1890,7 +1890,10 @@ test("castling animates the king and rook together", async ({ page }) => {
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator('[data-san="O-O"]')).toHaveAttribute("data-selected", "true");
   await expect.poll(() => pieceAnimationCount(page)).toBe(2);
-  await expect(page.locator("[data-moving-piece]")).toHaveCount(2);
+  const movingPieces = page.locator("[data-moving-piece]");
+  await expect(movingPieces).toHaveCount(2);
+  await expect(movingPieces.nth(0)).toHaveCSS("animation-delay", "0s");
+  await expect(movingPieces.nth(1)).toHaveCSS("animation-delay", "0.11s");
 
   await page.waitForTimeout(500);
   await expect(page.locator("[data-moving-piece]")).toHaveCount(0);

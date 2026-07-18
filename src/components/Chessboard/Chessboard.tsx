@@ -51,6 +51,7 @@ type PieceEntry = {
   piece: FenPiece;
 };
 const MOVE_ANIMATION_DURATION_MS = 400;
+const MOVE_ANIMATION_STAGGER_MS = 110;
 const INTRO_GRID_LINE_STAGGER_MS = 22;
 const INTRO_DELAY_FILE_MS = 26;
 const INTRO_DELAY_RANK_MS = 29;
@@ -188,6 +189,7 @@ export function Chessboard(props: ChessboardProps) {
     return animation.movements.map((movement, index) => ({
       ...movement,
       id: `${animation.id}:${index}`,
+      delayMs: index * MOVE_ANIMATION_STAGGER_MS,
     }));
   });
   const activeCaptures = createMemo(() => {

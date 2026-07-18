@@ -10,6 +10,7 @@ export type PieceMovement = {
   piece: FenPiece;
   from: string;
   to: string;
+  delayMs: number;
 };
 
 export function MovingPiece(props: { movement: PieceMovement; boardOrientation: Orientation }) {
@@ -42,6 +43,7 @@ export function MovingPiece(props: { movement: PieceMovement; boardOrientation: 
             "pointer-events": "none",
             "--move-from-x": `${offset().x * 100}%`,
             "--move-from-y": `${offset().y * 100}%`,
+            "animation-delay": `${props.movement.delayMs}ms`,
           },
         }}
       />
