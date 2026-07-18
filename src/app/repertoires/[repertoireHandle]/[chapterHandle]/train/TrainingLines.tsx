@@ -1,15 +1,10 @@
 import { createEffect, createMemo, For, Show } from "solid-js";
 import { MobileNavigationTrigger } from "@/components/MobileNavigation";
 import { Check } from "@/components/Icons";
+import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { Button } from "@/components/ui/button";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
-import {
-  getChapterName,
-  getChapterPgn,
-  getRepertoireName,
-  getTrainingLines,
-  getVariationMoveIds,
-} from "@/lib/AppState";
+import { getChapterPgn, getTrainingLines, getVariationMoveIds } from "@/lib/AppState";
 import { trainingLinePath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
@@ -27,8 +22,6 @@ export function TrainingLines(props: {
   );
 
   const chapterPgn = useSelector(getChapterPgn);
-  const repertoireName = useSelector(getRepertoireName);
-  const chapterName = useSelector(getChapterName);
   const trainingSession = useSelector((state) => state.training.session);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
 
@@ -60,8 +53,8 @@ export function TrainingLines(props: {
     <div class="flex h-full min-w-0 flex-1 flex-col">
       <div class="flex h-[3.25rem] flex-shrink-0 items-center gap-2 px-4">
         <MobileNavigationTrigger class="flex-none" />
-        <div class="min-w-0 truncate text-base">
-          {repertoireName()} · {chapterName()} · training
+        <div class="min-w-0 flex-1">
+          <RepertoireBreadcrumb showTraining />
         </div>
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">

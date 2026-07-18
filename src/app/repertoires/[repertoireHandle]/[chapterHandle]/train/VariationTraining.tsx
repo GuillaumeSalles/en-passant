@@ -12,10 +12,8 @@ import {
   AppState,
   Context,
   EvalMove,
-  moveToEvalMove,
-  getRepertoireName,
-  getChapterName,
   getChapterPgn,
+  moveToEvalMove,
   Orientation,
   selectOrientation,
   selectAnimation,
@@ -35,6 +33,7 @@ import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
 import { delay } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Button } from "@/components/ui/button";
+import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import {
   completeTrainingLine,
   markTrainingMistake,
@@ -84,8 +83,6 @@ export function VariationTraining(props: {
 
   const currentFen = useSelector(selectFen);
   const nextMoveIds = useSelector(selectNextMoveIds);
-  const repertoireName = useSelector(getRepertoireName);
-  const chapterName = useSelector(getChapterName);
   const chapterPgn = useSelector(getChapterPgn);
   const orientation = useSelector(selectOrientation);
   const animation = useSelector(selectAnimation);
@@ -268,11 +265,7 @@ export function VariationTraining(props: {
         }
       >
         <Layout
-          title={
-            <div class="min-w-0 truncate text-base">
-              {repertoireName()} · {chapterName()} · training
-            </div>
-          }
+          title={<RepertoireBreadcrumb showTraining />}
           chessboard={
             <Chessboard
               boardOrientation={orientation()}

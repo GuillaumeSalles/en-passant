@@ -63,11 +63,15 @@ test("shows the title when the repertoire and chapter names are available", () =
 
   renderHeader();
 
-  const repertoireTitle = screen.getByText("Untitled Repertoire");
+  const repertoireTitle = screen.getByRole("link", { name: "Untitled Repertoire" });
   expect(repertoireTitle).not.toBeNull();
+  expect(repertoireTitle.getAttribute("href")).toBe("/app/repertoires/untitled-repertoire");
+  expect(repertoireTitle.classList.contains("transition-colors")).toBe(true);
   expect(repertoireTitle.parentElement?.classList.contains("motion-page-title")).toBe(true);
   expect(repertoireTitle.parentElement?.classList.contains("font-normal")).toBe(true);
-  expect(screen.getByText("Chapter 1")).not.toBeNull();
+  const chapterTitle = screen.getByRole("link", { name: "Chapter 1" });
+  expect(chapterTitle.getAttribute("href")).toBe("/app/repertoires/untitled-repertoire/chapter-1");
+  expect(chapterTitle.classList.contains("transition-colors")).toBe(true);
   expect(screen.getByText("·")).not.toBeNull();
 });
 
