@@ -103,7 +103,9 @@ export function AuthButton(
     const accountKind = consumeRedirectAccountKind();
     refreshAuthSession()
       .then(async (user) => {
-        if (user !== null && accountKind !== null) {
+        // The repertoire loader owns existing-account social callbacks so it can
+        // reset local data and pull remote data as one ordered operation.
+        if (user !== null && accountKind === "new") {
           await finishAuthenticatedAccountFlow(accountKind);
         }
       })

@@ -1,1 +1,2 @@
 {"kind":"cut","id":"pc_d47dc6bce5fc","ts":"2026-07-17T16:10:54.804Z","agent":"agent","text":"The full Playwright suite intermittently redirected the existing Google-account sign-in test to the demo repertoire; an isolated three-run repeat and the next full run passed, so the auth redirect race needs deterministic synchronization.","tags":["tests"],"severity":"minor","cwd":"/Users/guillaume/chess/en-passant"}
+{"kind":"resolve","id":"pc_d47dc6bce5fc","ts":"2026-07-18T18:52:05.871Z","agent":"agent"}

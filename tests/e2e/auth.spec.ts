@@ -409,6 +409,12 @@ test("existing Google account sign in discards local repertoire data and loads s
     localPgn: "1. d4 d5 *",
     dirty: true,
   });
+  const documentRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") {
+      documentRequests.push(request.url());
+    }
+  });
   await completeGoogleSignIn(page, auth, "existing");
 
   await expect(page).toHaveURL(/\/app\/repertoires\/server-repertoire\/server-chapter$/);
@@ -431,6 +437,9 @@ test("existing Google account sign in discards local repertoire data and loads s
   expect(JSON.stringify(uploadedChanges)).not.toContain("auth-pgn");
   expect(JSON.stringify(uploadedChanges)).not.toContain("Local Draft Should Disappear");
   expect(consoleMessages).toEqual([]);
+  expect(documentRequests).not.toContain(
+    "http://localhost:5174/app/repertoires/untitled-repertoire/chapter-1",
+  );
 });
 
 test("loads a backend session without a local signed-in marker", async ({ page }) => {
