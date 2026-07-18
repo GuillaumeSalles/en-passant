@@ -1,10 +1,9 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "@solidjs/router";
-import { MobileNavigationTrigger } from "@/components/MobileNavigation";
+import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import {
   importRecentLichessGames,
@@ -250,113 +249,103 @@ export function Games() {
   }
 
   return (
-    <div class="flex h-full min-w-0 flex-1 flex-col">
-      <div class="flex h-[3.25rem] flex-shrink-0 flex-row">
-        <div class="flex min-w-0 flex-1 items-center gap-2 pl-4 pr-2">
-          <MobileNavigationTrigger class="flex-none" />
-          <h1 class="motion-page-title truncate text-base font-medium">Games</h1>
+    <FullWidthLayout
+      title={<h1 class="motion-page-title truncate text-base font-medium">Games</h1>}
+      mainClass="flex flex-col overflow-hidden"
+      showMobileHeaderDivider
+    >
+      <div class="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-end lg:justify-between">
+        <form class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end" onSubmit={importGames}>
+          <label class="grid min-w-0 gap-1 text-xs text-muted-foreground sm:w-72">
+            <span>Lichess handle</span>
+            <Input
+              value={handle()}
+              placeholder="DrNykterstein"
+              autocomplete="off"
+              onInput={(event) => setHandle(event.currentTarget.value)}
+            />
+          </label>
+          <Button type="submit" disabled={state().status === "loading" || handle().trim() === ""}>
+            <Upload />
+            Import
+          </Button>
+        </form>
+        <div class="grid grid-cols-3 gap-2 sm:flex sm:items-end">
+          <Select
+            label="Time control"
+            value={timeControl()}
+            onInput={(value) => setTimeControl(value)}
+          >
+            <option value="all">All</option>
+            <For each={timeControls()}>
+              {(control) => <option value={control}>{formatSpeed(control)}</option>}
+            </For>
+          </Select>
+          <Select label="Color" value={color()} onInput={(value) => setColor(value as ColorFilter)}>
+            <option value="all">All</option>
+            <option value="white">White</option>
+            <option value="black">Black</option>
+          </Select>
+          <Select
+            label="Date"
+            value={sort()}
+            onInput={(value) => setSort(value === "asc" ? "asc" : "desc")}
+          >
+            <option value="desc">Newest</option>
+            <option value="asc">Oldest</option>
+          </Select>
         </div>
-        <div class="hidden w-[400px] min-w-[400px] max-w-[400px] flex-none xl:block" />
       </div>
-      <HorizontalDashedDivider class="xl:hidden" animation="none" />
-      <main class="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-end lg:justify-between">
-          <form class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end" onSubmit={importGames}>
-            <label class="grid min-w-0 gap-1 text-xs text-muted-foreground sm:w-72">
-              <span>Lichess handle</span>
-              <Input
-                value={handle()}
-                placeholder="DrNykterstein"
-                autocomplete="off"
-                onInput={(event) => setHandle(event.currentTarget.value)}
-              />
-            </label>
-            <Button type="submit" disabled={state().status === "loading" || handle().trim() === ""}>
-              <Upload />
-              Import
+
+      <Show when={state().status === "idle"}>
+        <div class="p-4 text-sm text-muted-foreground">Checking session...</div>
+      </Show>
+      <Show when={state().status === "loading"}>
+        <div class="space-y-2 p-4" aria-label="Loading games">
+          <div class="h-9 animate-pulse rounded-sm bg-muted/50" />
+          <div class="h-9 animate-pulse rounded-sm bg-muted/40" />
+          <div class="h-9 animate-pulse rounded-sm bg-muted/30" />
+        </div>
+      </Show>
+      <Show when={state().status === "signed-out"}>
+        <div class="p-4">
+          <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+            <p>Sign in to import and view games.</p>
+            <Button size="sm" class="mt-3" onClick={openAuthDialog}>
+              Sign in
             </Button>
-          </form>
-          <div class="grid grid-cols-3 gap-2 sm:flex sm:items-end">
-            <Select
-              label="Time control"
-              value={timeControl()}
-              onInput={(value) => setTimeControl(value)}
-            >
-              <option value="all">All</option>
-              <For each={timeControls()}>
-                {(control) => <option value={control}>{formatSpeed(control)}</option>}
-              </For>
-            </Select>
-            <Select
-              label="Color"
-              value={color()}
-              onInput={(value) => setColor(value as ColorFilter)}
-            >
-              <option value="all">All</option>
-              <option value="white">White</option>
-              <option value="black">Black</option>
-            </Select>
-            <Select
-              label="Date"
-              value={sort()}
-              onInput={(value) => setSort(value === "asc" ? "asc" : "desc")}
-            >
-              <option value="desc">Newest</option>
-              <option value="asc">Oldest</option>
-            </Select>
           </div>
         </div>
-
-        <Show when={state().status === "idle"}>
-          <div class="p-4 text-sm text-muted-foreground">Checking session...</div>
-        </Show>
-        <Show when={state().status === "loading"}>
-          <div class="space-y-2 p-4" aria-label="Loading games">
-            <div class="h-9 animate-pulse rounded-sm bg-muted/50" />
-            <div class="h-9 animate-pulse rounded-sm bg-muted/40" />
-            <div class="h-9 animate-pulse rounded-sm bg-muted/30" />
+      </Show>
+      <Show when={state().status === "error"}>
+        <div class="p-4">
+          <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+            <p>{currentErrorMessage()}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              class="mt-3"
+              onClick={() => setRefreshVersion((version) => version + 1)}
+            >
+              <Repeat2 />
+              Retry
+            </Button>
           </div>
-        </Show>
-        <Show when={state().status === "signed-out"}>
-          <div class="p-4">
-            <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-              <p>Sign in to import and view games.</p>
-              <Button size="sm" class="mt-3" onClick={openAuthDialog}>
-                Sign in
-              </Button>
-            </div>
+        </div>
+      </Show>
+      <Show when={state().status === "success"}>
+        <div class="flex min-h-0 flex-1 flex-col">
+          <div class="flex flex-none items-center justify-between px-4 py-2 text-xs text-muted-foreground">
+            <span>
+              {visibleGames().length} of {allGames().length} games
+            </span>
+            <Show when={importCount() !== null}>
+              <span>{importCount()} imported</span>
+            </Show>
           </div>
-        </Show>
-        <Show when={state().status === "error"}>
-          <div class="p-4">
-            <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-              <p>{currentErrorMessage()}</p>
-              <Button
-                size="sm"
-                variant="outline"
-                class="mt-3"
-                onClick={() => setRefreshVersion((version) => version + 1)}
-              >
-                <Repeat2 />
-                Retry
-              </Button>
-            </div>
-          </div>
-        </Show>
-        <Show when={state().status === "success"}>
-          <div class="flex min-h-0 flex-1 flex-col">
-            <div class="flex flex-none items-center justify-between px-4 py-2 text-xs text-muted-foreground">
-              <span>
-                {visibleGames().length} of {allGames().length} games
-              </span>
-              <Show when={importCount() !== null}>
-                <span>{importCount()} imported</span>
-              </Show>
-            </div>
-            <GamesTable games={visibleGames()} />
-          </div>
-        </Show>
-      </main>
-    </div>
+          <GamesTable games={visibleGames()} />
+        </div>
+      </Show>
+    </FullWidthLayout>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/AppState";
 import { Button } from "@/components/ui/button";
 import { Chessboard } from "@/components/Chessboard/Chessboard";
+import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree } from "@/components/MovesTree";
 import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
@@ -73,10 +74,7 @@ function GameViewerMessage(props: { title: string; action?: "signin" | "games" }
   }
 
   return (
-    <div class="flex h-full min-w-0 flex-1 flex-col">
-      <div class="flex h-[3.25rem] flex-shrink-0 items-center px-4">
-        <h1 class="truncate text-base font-medium">Game</h1>
-      </div>
+    <FullWidthLayout title={<h1 class="truncate text-base font-medium">Game</h1>}>
       <div class="p-4">
         <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
           <p>{props.title}</p>
@@ -92,7 +90,7 @@ function GameViewerMessage(props: { title: string; action?: "signin" | "games" }
           </Show>
         </div>
       </div>
-    </div>
+    </FullWidthLayout>
   );
 }
 

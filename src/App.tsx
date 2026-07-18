@@ -28,11 +28,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { MobileNavigationProvider, MobileNavigationTrigger } from "@/components/MobileNavigation";
+import { MobileNavigationProvider } from "@/components/MobileNavigation";
 import { GitHub, Info, X, XLogo } from "@/components/Icons";
 import { getChapterScopeFromData } from "@/lib/AppState";
 import { isSafariBrowser } from "@/lib/browser";
 import { APP_ROOT, firstRepertoireChapterPath } from "@/lib/routes";
+import { FullWidthLayout } from "@/components/FullWidthLayout";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
@@ -253,17 +254,7 @@ export function appShellHasRightPanel(pathname: string): boolean {
 }
 
 function BaseLayout() {
-  return (
-    <div class="flex h-full min-w-0 flex-1 flex-col">
-      <div class="flex h-[3.25rem] flex-shrink-0 flex-row">
-        <div class="flex min-w-0 flex-1 items-center gap-2 pl-4 pr-2">
-          <MobileNavigationTrigger class="flex-none" />
-        </div>
-        <div class="hidden w-[400px] min-w-[400px] max-w-[400px] flex-none xl:block" />
-      </div>
-      <div class="min-h-0 flex-1" />
-    </div>
-  );
+  return <FullWidthLayout />;
 }
 
 function useRedirectAppRootToFirstChapter() {
