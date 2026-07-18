@@ -154,11 +154,7 @@ function AppShell(props: { children?: JSX.Element }) {
   const [isDrawerOpen, setIsDrawerOpen] = createSignal(false);
   const location = useLocation();
 
-  const hasRightPanel = createMemo(
-    () =>
-      new RegExp(`^${APP_ROOT}/repertoires/[^/]+/[^/]+`).test(location.pathname) ||
-      new RegExp(`^${APP_ROOT}/games/[^/]+`).test(location.pathname),
-  );
+  const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
 
   function closeDrawerAfterNavigation(event: MouseEvent) {
     const target = event.target;
@@ -230,6 +226,30 @@ function AppShell(props: { children?: JSX.Element }) {
       </div>
     </MobileNavigationProvider>
   );
+}
+
+export function appShellHasRightPanel(pathname: string): boolean {
+  const appRootSegments = APP_ROOT.split("/").filter(Boolean);
+  const segments = pathname.split("/").filter(Boolean);
+  const isAppRoute = appRootSegments.every((segment, index) => segments[index] === segment);
+  if (!isAppRoute) return false;
+
+  const routeSegments = segments.slice(appRootSegments.length);
+  if (routeSegments[0] === "games") {
+    return routeSegments.length === 2;
+  }
+  if (routeSegments[0] !== "repertoires") {
+    return false;
+  }
+
+  const [, repertoireHandle, chapterHandle, trainSegment, lineId] = routeSegments;
+  if (repertoireHandle === undefined || chapterHandle === undefined) {
+    return false;
+  }
+  if (trainSegment === undefined) {
+    return true;
+  }
+  return trainSegment === "train" && lineId !== undefined && routeSegments.length === 5;
 }
 
 function BaseLayout() {
