@@ -51,7 +51,7 @@ export function TrainingLines(props: {
 
   return (
     <FullWidthLayout
-      title={<RepertoireBreadcrumb showTraining />}
+      title={<RepertoireBreadcrumb showTraining trainingLineId={null} />}
       reserveRightSlot
       showMobileHeaderDivider={false}
     >

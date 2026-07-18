@@ -265,7 +265,7 @@ export function VariationTraining(props: {
         }
       >
         <WorkspaceLayout
-          title={<RepertoireBreadcrumb showTraining />}
+          title={<RepertoireBreadcrumb showTraining trainingLineId={props.lineId} />}
           chessboard={
             <Chessboard
               boardOrientation={orientation()}

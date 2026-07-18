@@ -49,10 +49,10 @@ function Wrapper(props: { children: JSX.Element }) {
   );
 }
 
-function renderBreadcrumb() {
+function renderBreadcrumb(props: { trainingLineId: string | null } = { trainingLineId: null }) {
   render(() => (
     <Wrapper>
-      <RepertoireBreadcrumb showTraining />
+      <RepertoireBreadcrumb showTraining trainingLineId={props.trainingLineId} />
     </Wrapper>
   ));
 }
@@ -69,7 +69,21 @@ test("links the training breadcrumb trail", () => {
   expect(screen.getByRole("link", { name: "Chapter 1" }).getAttribute("href")).toBe(
     "/app/repertoires/untitled-repertoire/chapter-1",
   );
-  expect(screen.getByRole("link", { name: "training" }).getAttribute("href")).toBe(
+  expect(screen.getByRole("link", { name: "Training" }).getAttribute("href")).toBe(
     "/app/repertoires/untitled-repertoire/chapter-1/train",
+  );
+});
+
+test("links the current training line breadcrumb", () => {
+  selectorValues.repertoireName = "Untitled Repertoire";
+  selectorValues.chapterName = "Chapter 1";
+
+  renderBreadcrumb({ trainingLineId: "v1-line" });
+
+  expect(screen.getByRole("link", { name: "Training" }).getAttribute("href")).toBe(
+    "/app/repertoires/untitled-repertoire/chapter-1/train",
+  );
+  expect(screen.getByRole("link", { name: "Line" }).getAttribute("href")).toBe(
+    "/app/repertoires/untitled-repertoire/chapter-1/train/v1-line",
   );
 });
