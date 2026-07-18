@@ -24,7 +24,7 @@ import {
   TrainingState,
   TrainingSessionSummary,
 } from "@/lib/AppState";
-import { createEffect, createMemo, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree } from "@/components/MovesTree";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
@@ -92,6 +92,7 @@ export function VariationTraining(props: {
   const trainingStatus = useSelector((state) => state.training.status);
   const trainingVariationIsEmpty = useSelector(selectTrainingVariationIsEmpty);
   const trainingSessionStats = useSelector(selectTrainingSessionStats);
+  const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
 
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromEvalMove = useMutation(moveFromEvalMove);
@@ -151,11 +152,13 @@ export function VariationTraining(props: {
   createEffect(
     () => {
       const firstMove = firstVariationMove();
+      const currentOrientation = orientation();
       return {
         currentMoveId: currentMove()?.id ?? null,
         firstHalfMoveNumber: firstMove?.halfMoveNumber ?? null,
         move: firstMove === undefined ? null : moveToEvalMove(firstMove),
-        orientation: orientation(),
+        orientation: currentOrientation,
+        boardIntroComplete: currentOrientation === "white" ? true : boardIntroComplete(),
         status: trainingStatus(),
         trainingVariationIsEmpty: trainingVariationIsEmpty(),
       };
@@ -165,11 +168,13 @@ export function VariationTraining(props: {
       firstHalfMoveNumber,
       move,
       orientation,
+      boardIntroComplete,
       status,
       trainingVariationIsEmpty,
     }) => {
       if (
         orientation !== "black" ||
+        !boardIntroComplete ||
         status !== "in-progress" ||
         currentMoveId !== null ||
         !trainingVariationIsEmpty ||
@@ -277,6 +282,7 @@ export function VariationTraining(props: {
               squareHighlights={{}}
               onHighlightSquare={() => {}}
               onDrawArrow={() => {}}
+              onIntroComplete={() => setBoardIntroComplete(true)}
               annotations={(() => {
                 const square = wrongMove();
                 return square === undefined ? {} : { [square]: [{ type: "wrongMove" }] };

@@ -62,6 +62,7 @@ export function LineLearning(props: {
   const selectedMoveId = useSelector(selectSelectedMoveId);
   const [phase, setPhase] = createSignal<LearningPhase>("starting");
   const [wrongSquare, setWrongSquare] = createSignal<string | null>(null);
+  const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
 
   const onStartLearningLine = useMutation(startLearningLine);
   const onPlayLearningMove = useMutation(playLearningMove);
@@ -145,19 +146,29 @@ export function LineLearning(props: {
   }
 
   createEffect(
-    () => ({ line: activeLine(), lineId: props.lineId }),
-    ({ line, lineId }) => {
+    () => {
+      const currentOrientation = orientation();
+      return {
+        boardIntroComplete: currentOrientation === "white" ? true : boardIntroComplete(),
+        line: activeLine(),
+        lineId: props.lineId,
+        orientation: currentOrientation,
+      };
+    },
+    ({ boardIntroComplete, line, lineId, orientation }) => {
       flowVersion += 1;
       const version = flowVersion;
       setWrongSquare(null);
       setPhase("starting");
-      if (line === undefined) return;
+      if (line === undefined || (orientation === "black" && !boardIntroComplete)) return;
 
       untrack(() => {
         onStartLearningLine();
         void (async () => {
-          await delay(INITIAL_DEMONSTRATION_DELAY);
-          if (!isCurrentFlow(version, lineId)) return;
+          if (orientation === "white") {
+            await delay(INITIAL_DEMONSTRATION_DELAY);
+            if (!isCurrentFlow(version, lineId)) return;
+          }
           await advanceLearning(version, lineId, false);
         })();
       });
@@ -229,6 +240,7 @@ export function LineLearning(props: {
               squareHighlights={{}}
               onHighlightSquare={() => {}}
               onDrawArrow={() => {}}
+              onIntroComplete={() => setBoardIntroComplete(true)}
               annotations={
                 wrongSquare() === null ? {} : { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
               }

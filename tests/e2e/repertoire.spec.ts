@@ -14,6 +14,7 @@ declare global {
   interface Window {
     __playedSounds: string[];
     __pieceAnimations: string[];
+    __boardAnimationSequence: string[];
   }
 }
 
@@ -254,6 +255,40 @@ async function resetPieceAnimations(page: Page) {
   await page.evaluate(() => {
     window.__pieceAnimations = [];
   });
+}
+
+async function recordBoardAnimationSequence(page: Page) {
+  await page.addInitScript(() => {
+    window.__boardAnimationSequence = [];
+
+    document.addEventListener(
+      "animationend",
+      (event) => {
+        if (event.target instanceof Element && event.target.matches("[data-square]")) {
+          window.__boardAnimationSequence.push("board-square-end");
+        }
+      },
+      true,
+    );
+    document.addEventListener(
+      "animationstart",
+      (event) => {
+        if (event.target instanceof Element && event.target.matches("[data-moving-piece]")) {
+          window.__boardAnimationSequence.push("move-start");
+        }
+      },
+      true,
+    );
+  });
+}
+
+async function expectFirstMoveAfterBoardIntro(page: Page) {
+  const sequence = await page.evaluate(() => window.__boardAnimationSequence);
+  const firstMoveStart = sequence.indexOf("move-start");
+  const lastBoardSquareEnd = sequence.lastIndexOf("board-square-end");
+
+  expect(lastBoardSquareEnd).toBeGreaterThanOrEqual(0);
+  expect(firstMoveStart).toBeGreaterThan(lastBoardSquareEnd);
 }
 
 async function moveListScrollState(page: Page) {
@@ -603,16 +638,35 @@ test("black repertoire training starts after the automatic white move", async ({
   const consoleMessages = collectUnexpectedConsole(page);
 
   await recordPlayedSounds(page);
+  await recordBoardAnimationSequence(page);
   await seedRepertoire(page, "1. e4 e5 *", [], { ...repertoire, orientation: "black" });
   await openFirstTrainingLine(page);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
   await expect(page.getByText("Black to play.")).toBeVisible();
+  await expectFirstMoveAfterBoardIntro(page);
 
   await dragPiece(page, "e7", "e5");
 
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
   await expect(page.getByText("Good job!")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+test("black repertoire learning waits for the board intro before the first white move", async ({
+  page,
+}) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await recordBoardAnimationSequence(page);
+  await seedRepertoire(page, "1. e4 e5 *", [], { ...repertoire, orientation: "black" });
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
+  await page.locator("[data-training-line]").first().getByRole("link", { name: "Learn" }).click();
+
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expectFirstMoveAfterBoardIntro(page);
   expect(consoleMessages).toEqual([]);
 });
 

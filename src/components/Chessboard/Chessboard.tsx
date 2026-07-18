@@ -14,7 +14,7 @@ import {
   parseFen,
   squares,
 } from "./utils";
-import { createSignal, createMemo, createEffect, onSettled, For } from "solid-js";
+import { createSignal, createMemo, createEffect, onSettled, For, untrack } from "solid-js";
 import styles from "./Chessboard.module.css";
 import { DraggedHoverSquare } from "./DraggedHoverSquare";
 import { DraggedPiece } from "./DraggedPiece";
@@ -40,6 +40,7 @@ type ChessboardProps = {
   canDrag: boolean;
   pieceToAnimate?: BoardAnimation | null;
   annotations: { [square: string]: MoveAnnotationData[] };
+  onIntroComplete?: () => void;
 };
 
 export type { FenPiece };
@@ -348,12 +349,17 @@ export function Chessboard(props: ChessboardProps) {
   );
 
   onSettled(() => {
-    const timeout = window.setTimeout(() => {
+    const introAnimations = boardFrameRef?.getAnimations({ subtree: true }) ?? [];
+    let cancelled = false;
+
+    void Promise.allSettled(introAnimations.map((animation) => animation.finished)).then(() => {
+      if (cancelled) return;
       setIntroActive(false);
-    }, 1850);
+      untrack(() => props.onIntroComplete?.());
+    });
 
     return () => {
-      window.clearTimeout(timeout);
+      cancelled = true;
     };
   });
 
