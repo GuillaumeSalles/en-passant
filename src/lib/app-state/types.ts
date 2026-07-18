@@ -152,7 +152,7 @@ export type AppState = {
 
 export type MutableAppState = StoreState<AppState>;
 
-export type TrainingState = "in-progress" | "alternative" | "failure" | "success" | "complete";
+export type TrainingState = "in-progress" | "failure" | "success" | "complete";
 
 export type TrainingLineResult = {
   lineId: string;

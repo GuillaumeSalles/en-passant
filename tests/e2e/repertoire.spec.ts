@@ -765,6 +765,31 @@ test("labels alternative lines and accepts their moves without counting mistakes
   expect(consoleMessages).toEqual([]);
 });
 
+test("locks training input while grading a move and waiting for the response", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
+  await openFirstTrainingLine(page);
+
+  await dragPiece(page, "g1", "f3");
+  await expect(page.getByText("Checking the move.")).toBeVisible();
+  await dragPiece(page, "e7", "e5");
+  await expect(page.locator('[data-square="e7"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.locator('[data-square="e5"]')).not.toHaveAttribute("data-piece");
+
+  await expect(page.getByText("Try again.")).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText("Waiting for the response.")).toBeVisible();
+  await dragPiece(page, "e7", "e5");
+  await expect(page.locator('[data-square="e7"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.locator('[data-square="e5"]')).not.toHaveAttribute("data-piece");
+
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.getByText("White to play.")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
 test("retrying a failed training move animates the previous opponent move", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
