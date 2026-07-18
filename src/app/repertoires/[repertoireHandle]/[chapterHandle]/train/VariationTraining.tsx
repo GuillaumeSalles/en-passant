@@ -25,7 +25,7 @@ import {
   TrainingSessionSummary,
 } from "@/lib/AppState";
 import { createEffect, createMemo, Show } from "solid-js";
-import { Layout } from "@/components/Layout";
+import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree } from "@/components/MovesTree";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
@@ -264,7 +264,7 @@ export function VariationTraining(props: {
           />
         }
       >
-        <Layout
+        <WorkspaceLayout
           title={<RepertoireBreadcrumb showTraining />}
           chessboard={
             <Chessboard

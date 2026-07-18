@@ -25,7 +25,7 @@ import { EvalBar } from "./EvalBar";
 import { Engine } from "@/lib/engine";
 import { ComputerEvaluation } from "./ComputerEvaluation";
 import { Chessboard } from "./Chessboard/Chessboard";
-import { Layout } from "./Layout";
+import { WorkspaceLayout } from "./WorkspaceLayout";
 import { PgnExplorerToolbar } from "./PgnExplorerToolbar";
 import { useSquareHighlights } from "./useSquareHighlights";
 import { VariationSelector } from "./VariationSelector";
@@ -202,7 +202,7 @@ export function Repertoire(props: { repertoireHandle: string; chapterHandle: str
   const squareHighlights = useSquareHighlights();
 
   return (
-    <Layout
+    <WorkspaceLayout
       title={<RepertoireHeader />}
       chessboard={
         <Chessboard

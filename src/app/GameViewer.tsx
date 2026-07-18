@@ -10,7 +10,7 @@ import {
 } from "@/lib/AppState";
 import { Button } from "@/components/ui/button";
 import { Chessboard } from "@/components/Chessboard/Chessboard";
-import { Layout } from "@/components/Layout";
+import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree } from "@/components/MovesTree";
 import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
 import { useSquareHighlights } from "@/components/useSquareHighlights";
@@ -183,7 +183,7 @@ export function GameViewer(props: { gameId: string }) {
       }
     >
       {(currentGame) => (
-        <Layout
+        <WorkspaceLayout
           title={<GameViewerTitle game={currentGame()} />}
           chessboard={
             <Chessboard
