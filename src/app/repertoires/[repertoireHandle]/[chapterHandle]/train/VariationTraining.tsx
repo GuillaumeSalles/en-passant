@@ -24,7 +24,7 @@ import {
   TrainingState,
   TrainingSessionSummary,
 } from "@/lib/AppState";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree } from "@/components/MovesTree";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
@@ -36,7 +36,9 @@ import { Button } from "@/components/ui/button";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import {
   completeTrainingLine,
+  completeTrainingReplayMove,
   markTrainingMistake,
+  prepareTrainingReplayMove,
   startTrainingLine,
 } from "@/mutations/trainingSession";
 import { useSelector } from "@/lib/useSelector";
@@ -51,6 +53,7 @@ import { TrainingLines } from "./TrainingLines";
 
 const FAILURE_DELAY = 1000;
 const RESPONSE_DELAY = 500;
+const REPLAY_RESET_DELAY = 500;
 
 function updateTrainingStatus(
   state: StoreState<AppState>,
@@ -90,6 +93,7 @@ export function VariationTraining(props: {
   const selectedMoveId = useSelector(selectSelectedMoveId);
   const currentMove = useSelector(selectCurrentMove);
   const trainingStatus = useSelector((state) => state.training.status);
+  const replayMoveIds = useSelector((state) => state.training.session?.replayMoveIds ?? null);
   const trainingVariationIsEmpty = useSelector(selectTrainingVariationIsEmpty);
   const trainingSessionStats = useSelector(selectTrainingSessionStats);
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
@@ -101,7 +105,11 @@ export function VariationTraining(props: {
   const onUpdateTrainingStatus = useMutation(updateTrainingStatus);
   const onStartTrainingLine = useMutation(startTrainingLine);
   const onMarkTrainingMistake = useMutation(markTrainingMistake);
+  const onPrepareTrainingReplayMove = useMutation(prepareTrainingReplayMove);
   const onCompleteTrainingLine = useMutation(completeTrainingLine, { context: true });
+  const onCompleteTrainingReplayMove = useMutation(completeTrainingReplayMove, {
+    context: true,
+  });
 
   const lines = createMemo(() => {
     const pgn = chapterPgn();
@@ -124,6 +132,9 @@ export function VariationTraining(props: {
     return line === undefined ? [] : getVariationMoveIds(pgn, line.terminalMoveId);
   });
 
+  const replayMoveId = createMemo(() => replayMoveIds()?.[0]);
+  const isReplayingFailedMove = createMemo(() => replayMoveId() !== undefined);
+
   const chapterHasMoves = createMemo(() => {
     const pgn = chapterPgn();
     return pgn !== null && Object.keys(pgn.moves).length > 0;
@@ -134,6 +145,20 @@ export function VariationTraining(props: {
     const firstMoveId = variation()[0];
     return firstMoveId === undefined ? undefined : pgn?.moves[firstMoveId];
   });
+
+  const prepareReplayMove = (targetMoveId: number) => {
+    const pgn = chapterPgn();
+    if (pgn === null) return;
+    const variationMoveIds = variation();
+    const replayMoveIndex = variationMoveIds.indexOf(targetMoveId);
+    if (replayMoveIndex < 0) return;
+    const precedingMoves = variationMoveIds
+      .slice(0, replayMoveIndex)
+      .map((moveId) => pgn.moves[moveId])
+      .filter((move) => move !== undefined)
+      .map(moveToEvalMove);
+    onPrepareTrainingReplayMove({ animateLastMove: true, precedingMoves });
+  };
 
   let startedLineId: string | null = null;
   createEffect(
@@ -146,6 +171,28 @@ export function VariationTraining(props: {
       if (line === undefined || line.id === startedLineId) return;
       startedLineId = line.id;
       onStartTrainingLine({ lineIds, lineId: line.id, variationIndex });
+    },
+  );
+
+  let replayPreparationRequest = 0;
+  createEffect(
+    () => {
+      const queueKey = replayMoveIds()?.join(",") ?? "";
+      const pgn = chapterPgn();
+      const variationKey = variation().join(",");
+      return pgn === null || queueKey === "" ? "" : `${queueKey}:${variationKey}`;
+    },
+    (replayPreparationKey) => {
+      const requestId = ++replayPreparationRequest;
+      if (replayPreparationKey === "") return;
+
+      void delay(REPLAY_RESET_DELAY).then(() => {
+        if (requestId !== replayPreparationRequest) return;
+        const targetMoveId = untrack(replayMoveId);
+        if (targetMoveId !== undefined) {
+          untrack(() => prepareReplayMove(targetMoveId));
+        }
+      });
     },
   );
 
@@ -199,7 +246,7 @@ export function VariationTraining(props: {
 
     const cm = currentMove();
     const currentHalfMoveNumber = cm ? cm.halfMoveNumber : -1;
-    const nextMoveId = variation()[currentHalfMoveNumber + 1];
+    const nextMoveId = replayMoveId() ?? variation()[currentHalfMoveNumber + 1];
     const nextMove = nextMoveId === undefined ? undefined : pgn.moves[nextMoveId];
     if (nextMove === undefined) {
       return;
@@ -208,11 +255,16 @@ export function VariationTraining(props: {
     onMoveFromChessboard(sourceSquare, targetSquare, piece);
 
     if (sourceSquare === nextMove.from && targetSquare === nextMove.to) {
+      if (isReplayingFailedMove()) {
+        onCompleteTrainingReplayMove({ lineId: props.lineId });
+        return;
+      }
+
       const responseId = variation()[currentHalfMoveNumber + 2];
       const response = responseId === undefined ? undefined : pgn.moves[responseId];
 
       if (response === undefined) {
-        onCompleteTrainingLine({ lineId: props.lineId });
+        onCompleteTrainingLine({ lineId: props.lineId, completedMoveId: nextMove.id });
         return;
       }
 
@@ -220,7 +272,7 @@ export function VariationTraining(props: {
       await delay(RESPONSE_DELAY);
       onMoveFromEvalMove(response);
       if (variation()[currentHalfMoveNumber + 3] === undefined) {
-        onCompleteTrainingLine({ lineId: props.lineId });
+        onCompleteTrainingLine({ lineId: props.lineId, completedMoveId: nextMove.id });
       }
     } else {
       await delay(FAILURE_DELAY);
@@ -228,7 +280,7 @@ export function VariationTraining(props: {
       if (moveId !== null) {
         onDeleteMove(moveId);
       }
-      onMarkTrainingMistake();
+      onMarkTrainingMistake({ moveId: nextMove.id });
     }
   };
 
@@ -319,6 +371,7 @@ export function VariationTraining(props: {
                     {getInstruction({
                       nextMoveIds: nextMoveIds(),
                       orientation: orientation(),
+                      replayingFailedMove: isReplayingFailedMove(),
                       trainingState: trainingStatus(),
                     })}
                   </span>
@@ -367,16 +420,20 @@ export function VariationTraining(props: {
 function getInstruction({
   nextMoveIds,
   orientation,
+  replayingFailedMove,
   trainingState,
 }: {
   nextMoveIds: number[];
   orientation: Orientation;
+  replayingFailedMove: boolean;
   trainingState: TrainingState;
 }): string {
   if (nextMoveIds.length > 0) {
     return "Go to the end of the line to continue the drill.";
   } else if (trainingState === "in-progress") {
-    return `${orientation === "black" ? "Black" : "White"} to play.`;
+    return replayingFailedMove
+      ? "Replay the failed move."
+      : `${orientation === "black" ? "Black" : "White"} to play.`;
   } else if (trainingState === "failure") {
     return "Try again.";
   } else if (trainingState === "success") {

@@ -1,6 +1,15 @@
-import { AppState, Context, emptyNormalizedPgn, TrainingSessionDraft } from "@/lib/AppState";
+import {
+  AppState,
+  Context,
+  emptyNormalizedPgn,
+  EvalMove,
+  moveFromEvalMove,
+  TrainingSessionDraft,
+} from "@/lib/AppState";
 import { StoreState } from "@/lib/createStore";
 import { MutationContext } from "@/lib/useMutation";
+
+export const FAILED_MOVE_SUCCESS_REPETITIONS = 3;
 
 function createTrainingSessionDraft(ctx: Context, lineIds: string[]): TrainingSessionDraft {
   return {
@@ -9,6 +18,8 @@ function createTrainingSessionDraft(ctx: Context, lineIds: string[]): TrainingSe
     lineIds,
     activeLineId: null,
     currentMistakeCount: 0,
+    failedMoveIds: [],
+    replayMoveIds: [],
     results: [],
   };
 }
@@ -43,6 +54,14 @@ export function ensureTrainingSession(
           currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
             ? currentSession.activeLineId
             : null,
+        failedMoveIds:
+          currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
+            ? currentSession.failedMoveIds
+            : [],
+        replayMoveIds:
+          currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
+            ? currentSession.replayMoveIds
+            : [],
         results,
       },
     });
@@ -74,6 +93,8 @@ export function startTrainingLine(
       ...session,
       activeLineId: details.lineId,
       currentMistakeCount: 0,
+      failedMoveIds: [],
+      replayMoveIds: [],
     },
   });
   state.set("selectedMoveId", null);
@@ -103,7 +124,11 @@ export function resetTrainingSession(state: StoreState<AppState>, ctx: Context):
   state.set("animation", null);
 }
 
-export function markTrainingMistake(state: StoreState<AppState>, _ctx: Context): void {
+export function markTrainingMistake(
+  state: StoreState<AppState>,
+  _ctx: Context,
+  details: { moveId: number },
+): void {
   const session = state.training.session;
   state.set("training", {
     ...state.training,
@@ -114,24 +139,39 @@ export function markTrainingMistake(state: StoreState<AppState>, _ctx: Context):
         : {
             ...session,
             currentMistakeCount: session.currentMistakeCount + 1,
+            failedMoveIds: session.failedMoveIds.includes(details.moveId)
+              ? session.failedMoveIds
+              : [...session.failedMoveIds, details.moveId],
           },
   });
 }
 
-export function completeTrainingLine(ctx: MutationContext, details: { lineId: string }): void {
-  const { state } = ctx;
-  const session = state.training.session;
-  if (session === null) {
-    state.set("training", { ...state.training, status: "success" });
-    return;
+export function createFailedMoveReplayQueue(
+  failedMoveIds: number[],
+  completedMoveId: number,
+): number[] {
+  const replayMoveIds = Array.from(
+    { length: FAILED_MOVE_SUCCESS_REPETITIONS },
+    () => failedMoveIds,
+  ).flat();
+  if (failedMoveIds.includes(completedMoveId)) {
+    const lastCompletedMoveIndex = replayMoveIds.lastIndexOf(completedMoveId);
+    replayMoveIds.splice(lastCompletedMoveIndex, 1);
   }
+  return replayMoveIds;
+}
 
+function finishTrainingLine(
+  state: StoreState<AppState>,
+  session: TrainingSessionDraft,
+  lineId: string,
+): void {
   const result = {
-    lineId: details.lineId,
+    lineId,
     mistakeCount: session.currentMistakeCount,
   };
   const results = [
-    ...session.results.filter((existingResult) => existingResult.lineId !== details.lineId),
+    ...session.results.filter((existingResult) => existingResult.lineId !== lineId),
     result,
   ];
   state.set("training", {
@@ -141,6 +181,80 @@ export function completeTrainingLine(ctx: MutationContext, details: { lineId: st
       ...session,
       results,
       currentMistakeCount: 0,
+      failedMoveIds: [],
+      replayMoveIds: [],
+    },
+  });
+}
+
+export function completeTrainingLine(
+  ctx: MutationContext,
+  details: { lineId: string; completedMoveId: number },
+): void {
+  const { state } = ctx;
+  const session = state.training.session;
+  if (session === null) {
+    state.set("training", { ...state.training, status: "success" });
+    return;
+  }
+
+  const replayMoveIds = createFailedMoveReplayQueue(session.failedMoveIds, details.completedMoveId);
+  if (replayMoveIds.length === 0) {
+    finishTrainingLine(state, session, details.lineId);
+    return;
+  }
+
+  state.set("training", {
+    ...state.training,
+    status: "in-progress",
+    session: {
+      ...session,
+      replayMoveIds,
+    },
+  });
+}
+
+export function prepareTrainingReplayMove(
+  state: StoreState<AppState>,
+  ctx: Context,
+  details: { animateLastMove: boolean; precedingMoves: EvalMove[] },
+): void {
+  state.set("training", {
+    ...state.training,
+    variation: emptyNormalizedPgn(),
+  });
+  state.set("selectedMoveId", null);
+  state.set("animation", null);
+  for (const [index, move] of details.precedingMoves.entries()) {
+    moveFromEvalMove(
+      state,
+      ctx,
+      move,
+      details.animateLastMove === true && index === details.precedingMoves.length - 1,
+    );
+  }
+}
+
+export function completeTrainingReplayMove(
+  ctx: MutationContext,
+  details: { lineId: string },
+): void {
+  const { state } = ctx;
+  const session = state.training.session;
+  if (session === null || session.replayMoveIds.length === 0) return;
+
+  const replayMoveIds = session.replayMoveIds.slice(1);
+  if (replayMoveIds.length === 0) {
+    finishTrainingLine(state, { ...session, replayMoveIds }, details.lineId);
+    return;
+  }
+
+  state.set("training", {
+    ...state.training,
+    status: "in-progress",
+    session: {
+      ...session,
+      replayMoveIds,
     },
   });
 }

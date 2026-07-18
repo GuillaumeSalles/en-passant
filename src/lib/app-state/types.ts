@@ -165,6 +165,8 @@ export type TrainingSessionDraft = {
   lineIds: string[];
   activeLineId: string | null;
   currentMistakeCount: number;
+  failedMoveIds: number[];
+  replayMoveIds: number[];
   results: TrainingLineResult[];
 };
 

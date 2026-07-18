@@ -699,6 +699,12 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await dragPiece(page, "d2", "d4");
   await expect(page.getByText("Try again.")).toBeVisible();
   await dragPiece(page, "e2", "e4");
+  await expect(page.getByText("Replay the failed move.")).toBeVisible();
+  await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText("Replay the failed move.")).toBeVisible();
+  await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
+  await dragPiece(page, "e2", "e4");
   await expect(page.getByText("Good job!")).toBeVisible();
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
@@ -709,6 +715,31 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();
   await expect(page.getByText("Trained with 1 mistake")).toBeVisible();
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(2);
+  expect(consoleMessages).toEqual([]);
+});
+
+test("retrying a failed training move animates the previous opponent move", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPieceAnimations(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 Nc6 *");
+  await openFirstTrainingLine(page);
+
+  await dragPiece(page, "e2", "e4");
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+
+  await dragPiece(page, "b1", "c3");
+  await expect(page.getByText("Try again.")).toBeVisible();
+
+  await resetPieceAnimations(page);
+  await dragPiece(page, "g1", "f3");
+  await expect(page.locator('[data-square="f3"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.locator('[data-square="c6"]')).toHaveAttribute("data-piece", "n");
+  await expect(page.getByText("Replay the failed move.")).toBeVisible();
+  await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.locator('[data-square="b8"]')).toHaveAttribute("data-piece", "n");
+  await expect.poll(() => pieceAnimationCount(page)).toBe(2);
   expect(consoleMessages).toEqual([]);
 });
 
