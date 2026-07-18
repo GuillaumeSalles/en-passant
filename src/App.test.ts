@@ -12,6 +12,12 @@ describe("appShellHasRightPanel", () => {
     );
   });
 
+  it("keeps the right panel for individual learning lines", () => {
+    expect(appShellHasRightPanel("/app/repertoires/white-repertoire/chapter-1/learn/v1-line")).toBe(
+      true,
+    );
+  });
+
   it("keeps the right panel for chapter and game detail pages", () => {
     expect(appShellHasRightPanel("/app/repertoires/black-repertoire/chapter-3")).toBe(true);
     expect(appShellHasRightPanel("/app/games/game-1")).toBe(true);

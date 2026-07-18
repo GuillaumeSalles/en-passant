@@ -69,6 +69,7 @@ export {
   arrowDown,
   arrowUp,
   back,
+  copyMoveLearningDetails,
   deleteMove,
   flipBoard,
   forward,

@@ -217,7 +217,9 @@ function CommentAfter(props: {
       fallback={
         <div
           class={readOnly() ? "text-blue-300" : "cursor-text text-blue-300"}
-          onClick={() => onSelectMove(props.moveId)}
+          onClick={() => {
+            if (!readOnly()) onSelectMove(props.moveId);
+          }}
           onDblClick={() => startEditing(props.comment)}
         >
           {props.comment}
@@ -459,17 +461,21 @@ function MoveComponent(props: {
       >
         <div
           role="button"
+          aria-disabled={readOnly() ? "true" : undefined}
           aria-label={`Move ${move()?.san ?? props.moveId}`}
           data-move-id={props.moveId}
           data-san={move()?.san}
           data-selected={isSelected() ? "true" : undefined}
           aria-current={isSelected() ? "true" : undefined}
           class={cn(
-            "inline-flex cursor-pointer items-baseline gap-0.5 hover:text-blue-500",
+            "inline-flex items-baseline gap-0.5",
+            readOnly() ? "cursor-default" : "cursor-pointer hover:text-blue-500",
             isSelected() ? "text-blue-500" : "",
             props.class,
           )}
-          onClick={() => onSelectMove(props.moveId)}
+          onClick={() => {
+            if (!readOnly()) onSelectMove(props.moveId);
+          }}
           ref={(el) => {
             moveRef = el;
           }}

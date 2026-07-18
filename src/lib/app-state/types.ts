@@ -142,6 +142,9 @@ export type AppState = {
     variation: NormalizedPgn;
     session: TrainingSessionDraft | null;
   };
+  learning: {
+    learnedLineKeys: string[];
+  };
   preselectedVariation: number | null;
   highlights: Highlights;
   animation: BoardAnimation | null;

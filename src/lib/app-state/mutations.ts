@@ -552,6 +552,27 @@ export function updateMoveCommentBefore(
   });
 }
 
+export function copyMoveLearningDetails(
+  state: MutableAppState,
+  ctx: Context,
+  sourceMove: Move,
+): void {
+  const pgn = getPgn(state, ctx);
+  const selectedMoveId = selectSelectedMoveId(state, ctx);
+  if (pgn === null || selectedMoveId === null) return;
+
+  const revealedMove = pgn.moves[selectedMoveId];
+  if (revealedMove === undefined) return;
+
+  setPgnMove(pgn, {
+    ...revealedMove,
+    nags: [...sourceMove.nags],
+    commentBefore: sourceMove.commentBefore,
+    commentAfter: sourceMove.commentAfter,
+    metadata: [...sourceMove.metadata],
+  });
+}
+
 export function setNagOnSelectedMove(state: MutableAppState, ctx: Context, nag: number): void {
   const pgn = getPgn(state, ctx);
   const selectedMoveId = selectSelectedMoveId(state, ctx);

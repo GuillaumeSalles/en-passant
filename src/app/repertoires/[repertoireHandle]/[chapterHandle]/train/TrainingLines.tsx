@@ -5,11 +5,12 @@ import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { Button } from "@/components/ui/button";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { getChapterPgn, getTrainingLines, getVariationMoveIds } from "@/lib/AppState";
-import { trainingLinePath } from "@/lib/routes";
+import { learningLinePath, trainingLinePath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { ensureTrainingSession } from "@/mutations/trainingSession";
+import { learningLineKey } from "@/mutations/learningSession";
 
 export function TrainingLines(props: {
   repertoireHandle: string;
@@ -32,6 +33,15 @@ export function TrainingLines(props: {
   const lineIds = createMemo(() => lines().map((line) => line.id));
   const results = createMemo(
     () => new Map(trainingSession()?.results.map((result) => [result.lineId, result]) ?? []),
+  );
+  const learnedLineKeys = useSelector((state) => state.learning.learnedLineKeys);
+  const learnedLines = createMemo(
+    () =>
+      new Set(
+        learnedLineKeys().filter((key) =>
+          key.startsWith(`${props.repertoireHandle}/${props.chapterHandle}/`),
+        ),
+      ),
   );
   const firstUntrainedLine = createMemo(() => lines().find((line) => !results().has(line.id)));
 
@@ -88,6 +98,17 @@ export function TrainingLines(props: {
           >
             {(line, index) => {
               const result = () => results().get(line.id);
+              const isLearned = () =>
+                learnedLines().has(
+                  learningLineKey(
+                    {
+                      type: "variation-training",
+                      repertoireHandle: props.repertoireHandle,
+                      chapterHandle: props.chapterHandle,
+                    },
+                    line.id,
+                  ),
+                );
               return (
                 <>
                   <Show when={index() > 0}>
@@ -97,6 +118,7 @@ export function TrainingLines(props: {
                     class="flex min-w-0 items-center justify-between gap-3 p-3"
                     data-training-line={line.id}
                     data-training-status={result() === undefined ? "untrained" : "trained"}
+                    data-learning-status={isLearned() ? "learned" : "unlearned"}
                   >
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
@@ -111,19 +133,41 @@ export function TrainingLines(props: {
                             </span>
                           )}
                         </Show>
+                        <Show when={isLearned()}>
+                          <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Check size={14} />
+                            Learned
+                          </span>
+                        </Show>
                       </div>
                       <div class="mt-1 truncate text-sm text-muted-foreground">
                         {lineLabel(line.terminalMoveId)}
                       </div>
                     </div>
-                    <Button
-                      class="flex-none"
-                      size="sm"
-                      variant={result() === undefined ? "default" : "outline"}
-                      href={trainingLinePath(props.repertoireHandle, props.chapterHandle, line.id)}
-                    >
-                      {result() === undefined ? "Train" : "Train again"}
-                    </Button>
+                    <div class="flex flex-none items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        href={learningLinePath(
+                          props.repertoireHandle,
+                          props.chapterHandle,
+                          line.id,
+                        )}
+                      >
+                        {isLearned() ? "Learn again" : "Learn"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={result() === undefined ? "default" : "outline"}
+                        href={trainingLinePath(
+                          props.repertoireHandle,
+                          props.chapterHandle,
+                          line.id,
+                        )}
+                      >
+                        {result() === undefined ? "Train" : "Train again"}
+                      </Button>
+                    </div>
                   </div>
                 </>
               );

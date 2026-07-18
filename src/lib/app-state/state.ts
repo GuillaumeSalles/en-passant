@@ -54,6 +54,9 @@ export function emptyState(): AppState {
       variation: emptyNormalizedPgn(),
       session: null,
     },
+    learning: {
+      learnedLineKeys: [],
+    },
     highlights: {
       squares: {},
       arrows: {},

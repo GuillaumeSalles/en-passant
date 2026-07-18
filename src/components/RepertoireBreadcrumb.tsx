@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
 import { getChapterName, getRepertoireName } from "@/lib/AppState";
 import {
+  learningLinePath,
   repertoireOverviewPath,
   repertoirePath,
   trainingLinePath,
@@ -17,6 +18,7 @@ const crumbLinkClass = "truncate transition-colors duration-150 ease-emil-out ho
 export function RepertoireBreadcrumb(props: {
   showTraining: boolean;
   trainingLineId: string | null;
+  learningLineId?: string | null;
 }) {
   const repertoireName = useSelector(getRepertoireName);
   const chapterName = useSelector(getChapterName);
@@ -67,6 +69,19 @@ export function RepertoireBreadcrumb(props: {
                   href={trainingLinePath(ctx().repertoireHandle, ctx().chapterHandle, lineId())}
                 >
                   Line
+                </A>
+              </>
+            )}
+          </Show>
+          <Show when={props.learningLineId}>
+            {(lineId) => (
+              <>
+                <span>·</span>
+                <A
+                  class={crumbLinkClass}
+                  href={learningLinePath(ctx().repertoireHandle, ctx().chapterHandle, lineId())}
+                >
+                  Learn line
                 </A>
               </>
             )}

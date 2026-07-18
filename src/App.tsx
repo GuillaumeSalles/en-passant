@@ -16,6 +16,7 @@ import { Repertoire } from "@/components/Repertoire";
 import { RepertoireOverview } from "@/app/repertoires/[repertoireHandle]/RepertoireOverview";
 import { VariationTraining } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/VariationTraining";
 import { TrainingLines } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/TrainingLines";
+import { LineLearning } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/learn/LineLearning";
 import { EnPassantLogo } from "@/components/EnPassantLogo";
 import { AuthButton } from "@/components/AuthButton";
 import { SignupNudge } from "@/components/SignupNudge";
@@ -243,14 +244,16 @@ export function appShellHasRightPanel(pathname: string): boolean {
     return false;
   }
 
-  const [, repertoireHandle, chapterHandle, trainSegment, lineId] = routeSegments;
+  const [, repertoireHandle, chapterHandle, modeSegment, lineId] = routeSegments;
   if (repertoireHandle === undefined || chapterHandle === undefined) {
     return false;
   }
-  if (trainSegment === undefined) {
+  if (modeSegment === undefined) {
     return true;
   }
-  return trainSegment === "train" && lineId !== undefined && routeSegments.length === 5;
+  return (
+    ["train", "learn"].includes(modeSegment) && lineId !== undefined && routeSegments.length === 5
+  );
 }
 
 function BaseLayout() {
@@ -403,6 +406,25 @@ function TrainLineRoute() {
   );
 }
 
+function LearnLineRoute() {
+  const params = useParams<{
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  }>();
+  useRedirectMissingRepertoireRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+    getChapterHandle: () => params.chapterHandle,
+  });
+  return (
+    <LineLearning
+      repertoireHandle={params.repertoireHandle}
+      chapterHandle={params.chapterHandle}
+      lineId={params.lineId}
+    />
+  );
+}
+
 function GameRoute() {
   const params = useParams<{ gameId: string }>();
   return <GameViewer gameId={params.gameId} />;
@@ -457,6 +479,10 @@ export default function App() {
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`}
         component={TrainLineRoute}
+      />
+      <Route
+        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/learn/:lineId`}
+        component={LearnLineRoute}
       />
       <Route path="*" component={NotFound} />
     </Router>

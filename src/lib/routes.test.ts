@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { firstRepertoireChapterPath } from "./routes";
+import { firstRepertoireChapterPath, learningLinePath } from "./routes";
+
+test("builds a learning line path", () => {
+  expect(learningLinePath("white", "main", "v1-line")).toBe(
+    "/app/repertoires/white/main/learn/v1-line",
+  );
+});
 
 test("builds a path for the alphabetically first chapter of the alphabetically first repertoire", () => {
   expect(

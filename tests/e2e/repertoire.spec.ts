@@ -658,6 +658,45 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   expect(consoleMessages).toEqual([]);
 });
 
+test("learns a line with demonstrations, responses, and progressive comments", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(
+    page,
+    "1. e4 {Take the center.} e5 {Black challenges the center.} 2. Nf3 {Develop with tempo.} *",
+  );
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const firstLine = page.locator("[data-training-line]").first();
+
+  await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveAttribute(
+    "href",
+    /\/learn\/v1-[A-Za-z0-9_-]+$/,
+  );
+  await firstLine.getByRole("link", { name: "Learn" }).click();
+  await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
+
+  await expect(page.getByText("Watch this move.")).toBeVisible();
+  await expect(page.locator('[data-moving-piece="true"]')).toBeVisible();
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+
+  expect(consoleMessages).toEqual([]);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.getByText("Take the center.")).toBeVisible();
+  await expect(page.getByText("Black challenges the center.")).toBeVisible();
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await dragPiece(page, "g1", "f3");
+
+  await expect(page.getByText("Line learned.")).toBeVisible();
+  await expect(page.getByText("Develop with tempo.")).toBeVisible();
+  await page.getByRole("link", { name: "Back to lines" }).click();
+  await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
+  await expect(page.getByText("Learned")).toBeVisible();
+  await expect(firstLine.getByRole("link", { name: "Learn again" })).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
 test("unknown routes render a 404 page", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
