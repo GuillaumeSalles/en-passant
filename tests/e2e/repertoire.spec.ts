@@ -718,6 +718,25 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   expect(consoleMessages).toEqual([]);
 });
 
+test("opens a chapter at the terminal move of a line", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await seedRepertoire(page, "1. e4 e5 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+
+  const line = page.locator("[data-training-line]").first();
+  await expect(line.getByRole("link", { name: "View" })).toHaveAttribute(
+    "href",
+    "/app/repertoires/untitled-repertoire/chapter-1?moveId=1",
+  );
+  await line.getByRole("link", { name: "View" }).click();
+
+  await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire\/chapter-1\?moveId=1$/);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  expect(consoleMessages).toEqual([]);
+});
+
 test("labels alternative lines and accepts their moves without counting mistakes", async ({
   page,
 }) => {
@@ -787,6 +806,22 @@ test("locks training input while grading a move and waiting for the response", a
 
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
   await expect(page.getByText("White to play.")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+test("does not allow adding move comments during training", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 *");
+  await openFirstTrainingLine(page);
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText("Good job!")).toBeVisible();
+
+  await page.keyboard.press("c");
+  await expect(page.getByLabel("Move comment")).toHaveCount(0);
+  await page.keyboard.press("Shift+C");
+  await expect(page.getByLabel("Move comment")).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
 

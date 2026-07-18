@@ -48,11 +48,17 @@ import {
 } from "solid-js";
 
 type MovesTreeReadOnly = () => boolean;
+type MovesTreeCanComment = () => boolean;
 
 const MovesTreeReadOnlyContext = createContext<MovesTreeReadOnly>(() => false);
+const MovesTreeCanCommentContext = createContext<MovesTreeCanComment>(() => true);
 
 function useMovesTreeReadOnly(): MovesTreeReadOnly {
   return useContext(MovesTreeReadOnlyContext);
+}
+
+function useMovesTreeCanComment(): MovesTreeCanComment {
+  return useContext(MovesTreeCanCommentContext);
 }
 
 function isMoveListBesideBoard() {
@@ -65,6 +71,7 @@ export function MovesTree(props: { readOnly: boolean }) {
   const selectedMove = useSelector(selectSelectedMoveId);
   const preselectedVariation = useSelector(selectPreselectedVariation);
   const readOnly = () => isReadOnly;
+  const canComment = useSelector((_state, ctx) => ctx.type === "repertoire-builder" && !readOnly());
   const [commentEditorRequest, setCommentEditorRequest] = createSignal<CommentEditorRequest | null>(
     null,
   );
@@ -73,7 +80,7 @@ export function MovesTree(props: { readOnly: boolean }) {
   const moveRows = createMemo(() => buildMoveRows(moves(), rootMoveIds(), commentEditorRequest()));
 
   function requestComment(moveId: number, placement: CommentPlacement) {
-    if (readOnly()) {
+    if (!untrack(canComment)) {
       return;
     }
 
@@ -96,34 +103,36 @@ export function MovesTree(props: { readOnly: boolean }) {
 
   return (
     <MovesTreeReadOnlyContext value={readOnly}>
-      <div data-moves-tree class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto py-2 text-xs">
-        <For each={moveRows()}>
-          {(row) => (
-            <Switch>
-              <Match when={row.type === "main" && row}>
-                {(mainRow) => (
-                  <MainMovesRow
-                    row={mainRow()}
-                    selectedMoveId={highlightedMove()}
-                    onComment={requestComment}
-                    onCommentEditDone={() => setCommentEditorRequest(null)}
-                  />
-                )}
-              </Match>
-              <Match when={row.type === "variation" && row}>
-                {(variationRow) => (
-                  <VariationMovesRow
-                    row={variationRow()}
-                    selectedMoveId={highlightedMove()}
-                    onComment={requestComment}
-                    onCommentEditDone={() => setCommentEditorRequest(null)}
-                  />
-                )}
-              </Match>
-            </Switch>
-          )}
-        </For>
-      </div>
+      <MovesTreeCanCommentContext value={canComment}>
+        <div data-moves-tree class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto py-2 text-xs">
+          <For each={moveRows()}>
+            {(row) => (
+              <Switch>
+                <Match when={row.type === "main" && row}>
+                  {(mainRow) => (
+                    <MainMovesRow
+                      row={mainRow()}
+                      selectedMoveId={highlightedMove()}
+                      onComment={requestComment}
+                      onCommentEditDone={() => setCommentEditorRequest(null)}
+                    />
+                  )}
+                </Match>
+                <Match when={row.type === "variation" && row}>
+                  {(variationRow) => (
+                    <VariationMovesRow
+                      row={variationRow()}
+                      selectedMoveId={highlightedMove()}
+                      onComment={requestComment}
+                      onCommentEditDone={() => setCommentEditorRequest(null)}
+                    />
+                  )}
+                </Match>
+              </Switch>
+            )}
+          </For>
+        </div>
+      </MovesTreeCanCommentContext>
     </MovesTreeReadOnlyContext>
   );
 }
@@ -140,6 +149,7 @@ function CommentAfter(props: {
   onEditDone: () => void;
 }) {
   const readOnly = useMovesTreeReadOnly();
+  const canComment = useMovesTreeCanComment();
   const onSelectMove = useMutation(selectMove);
   const onUpdateMoveCommentAfter = useMutation(updateMoveCommentAfter);
   const onUpdateMoveCommentBefore = useMutation(updateMoveCommentBefore);
@@ -165,7 +175,7 @@ function CommentAfter(props: {
   );
 
   function commit() {
-    if (readOnly()) {
+    if (!untrack(canComment)) {
       return;
     }
 
@@ -201,7 +211,7 @@ function CommentAfter(props: {
   }
 
   function startEditing(comment: string) {
-    if (readOnly()) {
+    if (!untrack(canComment)) {
       return;
     }
 
@@ -216,7 +226,7 @@ function CommentAfter(props: {
       when={isEditing()}
       fallback={
         <div
-          class={readOnly() ? "text-blue-300" : "cursor-text text-blue-300"}
+          class={canComment() ? "cursor-text text-blue-300" : "text-blue-300"}
           onClick={() => {
             if (!readOnly()) onSelectMove(props.moveId);
           }}
