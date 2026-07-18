@@ -9,6 +9,7 @@ import {
   selectFen,
   selectNextMoveIds,
   getTrainingLines,
+  isAlternativeTrainingMove,
   AppState,
   Context,
   EvalMove,
@@ -114,7 +115,7 @@ export function VariationTraining(props: {
   const lines = createMemo(() => {
     const pgn = chapterPgn();
     if (pgn == null) return [];
-    return getTrainingLines(pgn);
+    return getTrainingLines(pgn, orientation());
   });
 
   const activeLineIndex = createMemo(() => lines().findIndex((line) => line.id === props.lineId));
@@ -252,6 +253,7 @@ export function VariationTraining(props: {
       return;
     }
 
+    onUpdateTrainingStatus("in-progress");
     onMoveFromChessboard(sourceSquare, targetSquare, piece);
 
     if (sourceSquare === nextMove.from && targetSquare === nextMove.to) {
@@ -274,6 +276,15 @@ export function VariationTraining(props: {
       if (variation()[currentHalfMoveNumber + 3] === undefined) {
         onCompleteTrainingLine({ lineId: props.lineId, completedMoveId: nextMove.id });
       }
+    } else if (
+      isAlternativeTrainingMove(pgn, nextMove.id, orientation(), sourceSquare, targetSquare)
+    ) {
+      onUpdateTrainingStatus("alternative");
+      await delay(FAILURE_DELAY);
+      const moveId = selectedMoveId();
+      if (moveId !== null) {
+        onDeleteMove(moveId);
+      }
     } else {
       await delay(FAILURE_DELAY);
       const moveId = selectedMoveId();
@@ -284,7 +295,7 @@ export function VariationTraining(props: {
     }
   };
 
-  const wrongMove = createMemo(() => {
+  const moveFeedback = createMemo(() => {
     const pgn = chapterPgn();
     if (pgn == null) return undefined;
     const cm = currentMove();
@@ -295,7 +306,10 @@ export function VariationTraining(props: {
     if (variationMove.from === cm.from && variationMove.to === cm.to) {
       return undefined;
     }
-    return cm.to;
+    return {
+      square: cm.to,
+      type: trainingStatus() === "alternative" ? "alternativeMove" : "wrongMove",
+    } as const;
   });
 
   const nextUntrainedLine = createMemo(() => {
@@ -336,8 +350,10 @@ export function VariationTraining(props: {
               onDrawArrow={() => {}}
               onIntroComplete={() => setBoardIntroComplete(true)}
               annotations={(() => {
-                const square = wrongMove();
-                return square === undefined ? {} : { [square]: [{ type: "wrongMove" }] };
+                const feedback = moveFeedback();
+                return feedback === undefined
+                  ? {}
+                  : { [feedback.square]: [{ type: feedback.type }] };
               })()}
             />
           }
@@ -434,6 +450,8 @@ function getInstruction({
     return replayingFailedMove
       ? "Replay the failed move."
       : `${orientation === "black" ? "Black" : "White"} to play.`;
+  } else if (trainingState === "alternative") {
+    return "That move belongs to an alternative line. Find another one.";
   } else if (trainingState === "failure") {
     return "Try again.";
   } else if (trainingState === "success") {

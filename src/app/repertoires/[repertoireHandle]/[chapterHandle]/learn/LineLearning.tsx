@@ -73,7 +73,7 @@ export function LineLearning(props: {
 
   const lines = createMemo(() => {
     const pgn = chapterPgn();
-    return pgn === null ? [] : getTrainingLines(pgn);
+    return pgn === null ? [] : getTrainingLines(pgn, orientation());
   });
   const activeLine = createMemo(() => lines().find((line) => line.id === props.lineId));
   const variation = createMemo(() => {

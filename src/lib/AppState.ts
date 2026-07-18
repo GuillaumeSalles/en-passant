@@ -26,7 +26,12 @@ export type {
   TrainingSessionDraft,
   TrainingState,
 } from "./app-state/types";
-export { getTrainingLines, trainingLineId, type TrainingLine } from "./app-state/trainingLines";
+export {
+  getTrainingLines,
+  isAlternativeTrainingMove,
+  trainingLineId,
+  type TrainingLine,
+} from "./app-state/trainingLines";
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";
 export {

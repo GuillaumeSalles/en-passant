@@ -696,7 +696,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await page.getByRole("link", { name: "Train all" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
 
-  await dragPiece(page, "d2", "d4");
+  await dragPiece(page, "g1", "f3");
   await expect(page.getByText("Try again.")).toBeVisible();
   await dragPiece(page, "e2", "e4");
   await expect(page.getByText("Replay the failed move.")).toBeVisible();
@@ -715,6 +715,53 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();
   await expect(page.getByText("Trained with 1 mistake")).toBeVisible();
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(2);
+  expect(consoleMessages).toEqual([]);
+});
+
+test("labels alternative lines and accepts their moves without counting mistakes", async ({
+  page,
+}) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 (1. d4 d5) e5 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+
+  const lines = page.locator("[data-training-line]");
+  await expect(lines).toHaveCount(2);
+  await expect(lines.first()).toHaveAttribute("data-alternative-line", "false");
+  await expect(lines.nth(1)).toHaveAttribute("data-alternative-line", "true");
+  await expect(lines.nth(1).getByText("Alternative", { exact: true })).toBeVisible();
+
+  await lines.first().getByRole("link", { name: "Train" }).click();
+  await dragPiece(page, "d2", "d4");
+  await expect(
+    page.getByText("That move belongs to an alternative line. Find another one."),
+  ).toBeVisible();
+  await expect(page.locator('[data-annotation="alternativeMove"]')).toHaveAttribute(
+    "data-annotation-square",
+    "d4",
+  );
+  await expect(page.locator('[data-square="d2"]')).toHaveAttribute("data-piece", "P");
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText("Good job!")).toBeVisible();
+
+  await page.getByRole("link", { name: "Next line" }).click();
+  await dragPiece(page, "e2", "e4");
+  await expect(
+    page.getByText("That move belongs to an alternative line. Find another one."),
+  ).toBeVisible();
+  await expect(page.locator('[data-annotation="alternativeMove"]')).toHaveAttribute(
+    "data-annotation-square",
+    "e4",
+  );
+  await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
+  await dragPiece(page, "d2", "d4");
+  await expect(page.getByText("Good job!")).toBeVisible();
+
+  await page.getByRole("link", { name: "Back to lines" }).click();
+  await expect(page.getByText("Trained", { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/Trained with/)).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
 

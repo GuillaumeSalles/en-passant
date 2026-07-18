@@ -1,9 +1,10 @@
-import type { Move, NormalizedPgn } from "./types";
+import type { Move, NormalizedPgn, Orientation } from "./types";
 
 export type TrainingLine = {
   id: string;
   terminalMoveId: number;
   plyCount: number;
+  isAlternative: boolean;
 };
 
 const BASE64_URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -50,11 +51,34 @@ export function trainingLineId(moves: readonly Move[]): string {
   return `v1-${encodeBytes(bytes)}`;
 }
 
-export function getTrainingLines(pgn: NormalizedPgn): TrainingLine[] {
+function isUserMove(move: Move, orientation: Orientation): boolean {
+  return (move.halfMoveNumber % 2 === 0 ? "white" : "black") === orientation;
+}
+
+export function isAlternativeTrainingMove(
+  pgn: NormalizedPgn,
+  expectedMoveId: number,
+  orientation: Orientation,
+  from: string,
+  to: string,
+): boolean {
+  const expectedMove = pgn.moves[expectedMoveId];
+  if (expectedMove === undefined || !isUserMove(expectedMove, orientation)) return false;
+
+  const siblingIds =
+    expectedMove.prev === null ? pgn.rootMoveIds : (pgn.moves[expectedMove.prev]?.next ?? []);
+  return siblingIds.some((moveId) => {
+    if (moveId === expectedMoveId) return false;
+    const move = pgn.moves[moveId];
+    return move?.from === from && move.to === to;
+  });
+}
+
+export function getTrainingLines(pgn: NormalizedPgn, orientation: Orientation): TrainingLine[] {
   const lines: TrainingLine[] = [];
   const path: Move[] = [];
 
-  function visit(moveId: number): void {
+  function visit(moveId: number, isAlternative: boolean): void {
     const move = pgn.moves[moveId];
     if (move === undefined) return;
 
@@ -64,13 +88,23 @@ export function getTrainingLines(pgn: NormalizedPgn): TrainingLine[] {
         id: trainingLineId(path),
         terminalMoveId: move.id,
         plyCount: path.length,
+        isAlternative,
       });
     } else {
-      for (const childId of move.next) visit(childId);
+      move.next.forEach((childId, index) => {
+        const child = pgn.moves[childId];
+        visit(
+          childId,
+          isAlternative || (index > 0 && child !== undefined && isUserMove(child, orientation)),
+        );
+      });
     }
     path.pop();
   }
 
-  for (const rootMoveId of pgn.rootMoveIds) visit(rootMoveId);
+  pgn.rootMoveIds.forEach((rootMoveId, index) => {
+    const move = pgn.moves[rootMoveId];
+    visit(rootMoveId, index > 0 && move !== undefined && isUserMove(move, orientation));
+  });
   return lines;
 }

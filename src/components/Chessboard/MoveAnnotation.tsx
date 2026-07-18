@@ -6,6 +6,7 @@ const size = 4;
 
 export type MoveAnnotationData =
   | { type: "wrongMove" }
+  | { type: "alternativeMove" }
   | { type: "nag"; glyph: string; meaning: string };
 
 function nagClass(glyph: string): string {
@@ -42,9 +43,10 @@ export function MoveAnnotation(props: {
     return props.annotation.glyph.length > 1 ? "2.2cqw" : "2.8cqw";
   });
   const annotationClass = createMemo(() => {
-    if (props.annotation.type !== "nag") {
+    if (props.annotation.type === "wrongMove") {
       return "bg-[oklch(63.7%_0.237_25.331)]";
     }
+    if (props.annotation.type === "alternativeMove") return "bg-yellow-500";
 
     return `font-extrabold leading-none text-white ${nagClass(props.annotation.glyph)}`;
   });
@@ -61,8 +63,20 @@ export function MoveAnnotation(props: {
       data-annotation-meaning={
         props.annotation.type === "nag" ? props.annotation.meaning : undefined
       }
-      title={props.annotation.type === "nag" ? props.annotation.meaning : undefined}
-      aria-label={props.annotation.type === "nag" ? props.annotation.meaning : undefined}
+      title={
+        props.annotation.type === "nag"
+          ? props.annotation.meaning
+          : props.annotation.type === "alternativeMove"
+            ? "Alternative move"
+            : "Wrong move"
+      }
+      aria-label={
+        props.annotation.type === "nag"
+          ? props.annotation.meaning
+          : props.annotation.type === "alternativeMove"
+            ? "Alternative move"
+            : "Wrong move"
+      }
       style={{
         left: `${position().x * 12.5 + 12.5 - size * (0.75 + props.index * 1.1)}%`,
         top: `${position().y * 12.5 - size * 0.25}%`,

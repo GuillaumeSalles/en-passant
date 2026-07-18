@@ -4,7 +4,12 @@ import { Check } from "@/components/Icons";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { Button } from "@/components/ui/button";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
-import { getChapterPgn, getTrainingLines, getVariationMoveIds } from "@/lib/AppState";
+import {
+  getChapterPgn,
+  getTrainingLines,
+  getVariationMoveIds,
+  selectOrientation,
+} from "@/lib/AppState";
 import { learningLinePath, trainingLinePath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
@@ -23,12 +28,13 @@ export function TrainingLines(props: {
   );
 
   const chapterPgn = useSelector(getChapterPgn);
+  const orientation = useSelector(selectOrientation);
   const trainingSession = useSelector((state) => state.training.session);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
 
   const lines = createMemo(() => {
     const pgn = chapterPgn();
-    return pgn === null ? [] : getTrainingLines(pgn);
+    return pgn === null ? [] : getTrainingLines(pgn, orientation());
   });
   const lineIds = createMemo(() => lines().map((line) => line.id));
   const results = createMemo(
@@ -119,10 +125,16 @@ export function TrainingLines(props: {
                     data-training-line={line.id}
                     data-training-status={result() === undefined ? "untrained" : "trained"}
                     data-learning-status={isLearned() ? "learned" : "unlearned"}
+                    data-alternative-line={line.isAlternative ? "true" : "false"}
                   >
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
                         <span class="font-medium">Line {index() + 1}</span>
+                        <Show when={line.isAlternative}>
+                          <span class="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Alternative
+                          </span>
+                        </Show>
                         <Show when={result()}>
                           {(trainedResult) => (
                             <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
