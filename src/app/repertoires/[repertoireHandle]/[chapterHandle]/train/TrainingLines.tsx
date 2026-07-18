@@ -40,6 +40,7 @@ export function TrainingLines(props: {
   const results = createMemo(
     () => new Map(trainingSession()?.results.map((result) => [result.lineId, result]) ?? []),
   );
+  const firstUntrainedLine = createMemo(() => lines().find((line) => !results().has(line.id)));
 
   createEffect(
     () => lineIds(),
@@ -72,6 +73,16 @@ export function TrainingLines(props: {
                 {results().size}/{lines().length} trained
               </div>
             </div>
+            <Show when={firstUntrainedLine()}>
+              {(line) => (
+                <Button
+                  size="sm"
+                  href={trainingLinePath(props.repertoireHandle, props.chapterHandle, line().id)}
+                >
+                  Train all
+                </Button>
+              )}
+            </Show>
           </div>
 
           <Show when={props.missingLine}>

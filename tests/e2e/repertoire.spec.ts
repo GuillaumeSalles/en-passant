@@ -626,9 +626,17 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
     "href",
     /\/train\/v1-[A-Za-z0-9_-]+$/,
   );
+  const firstLineHref = await lines
+    .first()
+    .getByRole("link", { name: "Train" })
+    .getAttribute("href");
+  await expect(page.getByRole("link", { name: "Train all" })).toHaveAttribute(
+    "href",
+    firstLineHref ?? "",
+  );
   await expect(page.getByText("0/2 trained")).toBeVisible();
 
-  await lines.first().getByRole("link", { name: "Train" }).click();
+  await page.getByRole("link", { name: "Train all" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
 
   await dragPiece(page, "d2", "d4");
@@ -641,6 +649,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByText("Good job!")).toBeVisible();
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.getByText("2/2 trained")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();
   await expect(page.getByText("Trained with 1 mistake")).toBeVisible();
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(2);
   expect(consoleMessages).toEqual([]);
