@@ -92,6 +92,6 @@ export function selectTrainingSessionStats(
     tried,
     clean: tried - mistakes,
     mistakes,
-    total: session.queue.length,
+    total: session.lineIds.length,
   };
 }

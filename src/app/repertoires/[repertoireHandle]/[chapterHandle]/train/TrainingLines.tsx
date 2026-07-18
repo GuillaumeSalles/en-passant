@@ -1,0 +1,140 @@
+import { createEffect, createMemo, For, Show } from "solid-js";
+import { MobileNavigationTrigger } from "@/components/MobileNavigation";
+import { Check } from "@/components/Icons";
+import { Button } from "@/components/ui/button";
+import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
+import {
+  getChapterName,
+  getChapterPgn,
+  getRepertoireName,
+  getTrainingLines,
+  getVariationMoveIds,
+} from "@/lib/AppState";
+import { trainingLinePath } from "@/lib/routes";
+import { useLoadPgn } from "@/lib/useLoadPgn";
+import { useMutation } from "@/lib/useMutation";
+import { useSelector } from "@/lib/useSelector";
+import { ensureTrainingSession } from "@/mutations/trainingSession";
+
+export function TrainingLines(props: {
+  repertoireHandle: string;
+  chapterHandle: string;
+  missingLine: boolean;
+}) {
+  useLoadPgn(
+    () => props.repertoireHandle,
+    () => props.chapterHandle,
+  );
+
+  const chapterPgn = useSelector(getChapterPgn);
+  const repertoireName = useSelector(getRepertoireName);
+  const chapterName = useSelector(getChapterName);
+  const trainingSession = useSelector((state) => state.training.session);
+  const onEnsureTrainingSession = useMutation(ensureTrainingSession);
+
+  const lines = createMemo(() => {
+    const pgn = chapterPgn();
+    return pgn === null ? [] : getTrainingLines(pgn);
+  });
+  const lineIds = createMemo(() => lines().map((line) => line.id));
+  const results = createMemo(
+    () => new Map(trainingSession()?.results.map((result) => [result.lineId, result]) ?? []),
+  );
+
+  createEffect(
+    () => lineIds(),
+    (ids) => onEnsureTrainingSession(ids),
+  );
+
+  function lineLabel(terminalMoveId: number): string {
+    const pgn = chapterPgn();
+    if (pgn === null) return "";
+    return getVariationMoveIds(pgn, terminalMoveId)
+      .map((moveId) => pgn.moves[moveId]?.san)
+      .filter((san) => san !== undefined)
+      .join(" ");
+  }
+
+  return (
+    <div class="flex h-full min-w-0 flex-1 flex-col">
+      <div class="flex h-[3.25rem] flex-shrink-0 items-center gap-2 px-4">
+        <MobileNavigationTrigger class="flex-none" />
+        <div class="min-w-0 truncate text-base">
+          {repertoireName()} · {chapterName()} · training
+        </div>
+      </div>
+      <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div class="mx-auto flex w-full max-w-5xl flex-col px-4 py-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h1 class="text-lg font-medium">Lines</h1>
+              <div class="text-sm text-muted-foreground">
+                {results().size}/{lines().length} trained
+              </div>
+            </div>
+          </div>
+
+          <Show when={props.missingLine}>
+            <div class="mt-4 rounded-md border border-border bg-card px-3 py-2 text-sm">
+              This line no longer exists in the chapter.
+            </div>
+          </Show>
+
+          <div class="mt-4 overflow-hidden rounded-md border border-border bg-background">
+            <For
+              each={lines()}
+              fallback={<div class="p-3 text-sm text-muted-foreground">Nothing to train</div>}
+            >
+              {(line, index) => {
+                const result = () => results().get(line.id);
+                return (
+                  <>
+                    <Show when={index() > 0}>
+                      <HorizontalDashedDivider animation="none" />
+                    </Show>
+                    <div
+                      class="flex min-w-0 items-center justify-between gap-3 p-3"
+                      data-training-line={line.id}
+                      data-training-status={result() === undefined ? "untrained" : "trained"}
+                    >
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">Line {index() + 1}</span>
+                          <Show when={result()}>
+                            {(trainedResult) => (
+                              <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                <Check size={14} />
+                                {trainedResult().mistakeCount === 0
+                                  ? "Trained"
+                                  : `Trained with ${trainedResult().mistakeCount} mistake${trainedResult().mistakeCount === 1 ? "" : "s"}`}
+                              </span>
+                            )}
+                          </Show>
+                        </div>
+                        <div class="mt-1 truncate text-sm text-muted-foreground">
+                          {lineLabel(line.terminalMoveId)}
+                        </div>
+                      </div>
+                      <Button
+                        class="flex-none"
+                        size="sm"
+                        variant={result() === undefined ? "default" : "outline"}
+                        href={trainingLinePath(
+                          props.repertoireHandle,
+                          props.chapterHandle,
+                          line.id,
+                        )}
+                      >
+                        {result() === undefined ? "Train" : "Train again"}
+                      </Button>
+                    </div>
+                  </>
+                );
+              }}
+            </For>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

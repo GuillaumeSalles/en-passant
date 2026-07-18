@@ -16,7 +16,8 @@ export function useRouteContext(): Accessor<Context> {
     if (segments.at(-2) === "games") {
       return { type: "imported-game", gameId, repertoireHandle: "", chapterHandle: "" };
     }
-    if (segments.at(-1) === "train") {
+    const repertoiresSegment = segments.indexOf("repertoires");
+    if (repertoiresSegment >= 0 && segments[repertoiresSegment + 3] === "train") {
       return { type: "variation-training", repertoireHandle: rh, chapterHandle: ch };
     }
     return { type: "repertoire-builder", repertoireHandle: rh, chapterHandle: ch };

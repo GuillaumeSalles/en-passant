@@ -61,6 +61,14 @@ export function trainingPath(repertoireHandle: string, chapterHandle: string): s
   return `${repertoirePath(repertoireHandle, chapterHandle)}/train`;
 }
 
+export function trainingLinePath(
+  repertoireHandle: string,
+  chapterHandle: string,
+  lineId: string,
+): string {
+  return `${trainingPath(repertoireHandle, chapterHandle)}/${lineId}`;
+}
+
 export function routePath(ctx: Context, repertoireHandle: string, chapterHandle: string): string {
   if (ctx.type === "variation-training") {
     return trainingPath(repertoireHandle, chapterHandle);

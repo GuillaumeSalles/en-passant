@@ -15,6 +15,7 @@ import { NotFound } from "@/app/NotFound";
 import { Repertoire } from "@/components/Repertoire";
 import { RepertoireOverview } from "@/app/repertoires/[repertoireHandle]/RepertoireOverview";
 import { VariationTraining } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/VariationTraining";
+import { TrainingLines } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/TrainingLines";
 import { EnPassantLogo } from "@/components/EnPassantLogo";
 import { AuthButton } from "@/components/AuthButton";
 import { SignupNudge } from "@/components/SignupNudge";
@@ -153,11 +154,7 @@ function AppShell(props: { children?: JSX.Element }) {
   const [isDrawerOpen, setIsDrawerOpen] = createSignal(false);
   const location = useLocation();
 
-  const hasRightPanel = createMemo(
-    () =>
-      new RegExp(`^${APP_ROOT}/repertoires/[^/]+/[^/]+`).test(location.pathname) ||
-      new RegExp(`^${APP_ROOT}/games/[^/]+`).test(location.pathname),
-  );
+  const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
 
   function closeDrawerAfterNavigation(event: MouseEvent) {
     const target = event.target;
@@ -229,6 +226,30 @@ function AppShell(props: { children?: JSX.Element }) {
       </div>
     </MobileNavigationProvider>
   );
+}
+
+export function appShellHasRightPanel(pathname: string): boolean {
+  const appRootSegments = APP_ROOT.split("/").filter(Boolean);
+  const segments = pathname.split("/").filter(Boolean);
+  const isAppRoute = appRootSegments.every((segment, index) => segments[index] === segment);
+  if (!isAppRoute) return false;
+
+  const routeSegments = segments.slice(appRootSegments.length);
+  if (routeSegments[0] === "games") {
+    return routeSegments.length === 2;
+  }
+  if (routeSegments[0] !== "repertoires") {
+    return false;
+  }
+
+  const [, repertoireHandle, chapterHandle, trainSegment, lineId] = routeSegments;
+  if (repertoireHandle === undefined || chapterHandle === undefined) {
+    return false;
+  }
+  if (trainSegment === undefined) {
+    return true;
+  }
+  return trainSegment === "train" && lineId !== undefined && routeSegments.length === 5;
 }
 
 function BaseLayout() {
@@ -364,9 +385,29 @@ function TrainRoute() {
     getChapterHandle: () => params.chapterHandle,
   });
   return (
+    <TrainingLines
+      repertoireHandle={params.repertoireHandle}
+      chapterHandle={params.chapterHandle}
+      missingLine={false}
+    />
+  );
+}
+
+function TrainLineRoute() {
+  const params = useParams<{
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  }>();
+  useRedirectMissingRepertoireRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+    getChapterHandle: () => params.chapterHandle,
+  });
+  return (
     <VariationTraining
       repertoireHandle={params.repertoireHandle}
       chapterHandle={params.chapterHandle}
+      lineId={params.lineId}
     />
   );
 }
@@ -421,6 +462,10 @@ export default function App() {
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train`}
         component={TrainRoute}
+      />
+      <Route
+        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`}
+        component={TrainLineRoute}
       />
       <Route path="*" component={NotFound} />
     </Router>
