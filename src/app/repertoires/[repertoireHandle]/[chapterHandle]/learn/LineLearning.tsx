@@ -34,13 +34,21 @@ import {
 } from "@/mutations/learningSession";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { TrainingLines } from "../train/TrainingLines";
+import { useVariationTrainingFlow } from "../train/useVariationTrainingFlow";
 
 const INITIAL_DEMONSTRATION_DELAY = 650;
 const MOVE_RESPONSE_DELAY = 400;
 const MOVE_DEMONSTRATION_DURATION = 700;
 const WRONG_MOVE_DELAY = 700;
 
-type LearningPhase = "starting" | "opponent" | "preview" | "repeat" | "wrong" | "complete";
+type LearningPhase =
+  | "starting"
+  | "opponent"
+  | "preview"
+  | "repeat"
+  | "wrong"
+  | "reinforcement"
+  | "complete";
 
 export function LineLearning(props: {
   repertoireHandle: string;
@@ -70,6 +78,14 @@ export function LineLearning(props: {
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onDeleteMove = useMutation(deleteMove);
   const onMarkLineLearned = useMutation(markLineLearned);
+  const reinforcement = useVariationTrainingFlow(props, {
+    enabled: () => phase() === "reinforcement",
+    repetitions: 2,
+    onLineComplete: () => {
+      onMarkLineLearned(props.lineId);
+      setPhase("complete");
+    },
+  });
 
   const lines = createMemo(() => {
     const pgn = chapterPgn();
@@ -106,8 +122,7 @@ export function LineLearning(props: {
     const sourceMove = sourceMoveId === undefined ? undefined : pgn?.moves[sourceMoveId];
 
     if (sourceMove === undefined) {
-      onMarkLineLearned(lineId);
-      setPhase("complete");
+      setPhase("reinforcement");
       return;
     }
 
@@ -233,25 +248,38 @@ export function LineLearning(props: {
             <Chessboard
               boardOrientation={orientation()}
               position={currentFen()}
-              canDrag={phase() === "repeat"}
-              onPieceDrop={onPieceDrop}
+              canDrag={phase() === "reinforcement" ? reinforcement.canDrag() : phase() === "repeat"}
+              onPieceDrop={phase() === "reinforcement" ? reinforcement.onPieceDrop : onPieceDrop}
               pieceToAnimate={animation()}
               arrows={{}}
               squareHighlights={{}}
               onHighlightSquare={() => {}}
               onDrawArrow={() => {}}
-              onIntroComplete={() => setBoardIntroComplete(true)}
+              onIntroComplete={() => {
+                setBoardIntroComplete(true);
+                reinforcement.onIntroComplete();
+              }}
               annotations={
-                wrongSquare() === null ? {} : { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
+                phase() === "reinforcement"
+                  ? reinforcement.annotations()
+                  : wrongSquare() === null
+                    ? {}
+                    : { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
               }
             />
           }
           evalBar={null}
           panelChildren={
             <>
-              <ProgressBar progress={progress()} />
+              <ProgressBar
+                progress={phase() === "reinforcement" ? reinforcement.progress() : progress()}
+              />
               <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-sm">
-                <span aria-live="polite">{learningInstruction(phase(), orientation())}</span>
+                <span aria-live="polite">
+                  {phase() === "reinforcement"
+                    ? `Practice ${reinforcement.completedRepetitions() + 1} of 2: ${reinforcement.instruction()}`
+                    : learningInstruction(phase(), orientation())}
+                </span>
                 <Show when={phase() === "complete"}>
                   <Button
                     size="sm"

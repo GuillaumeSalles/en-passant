@@ -38,7 +38,11 @@ describe("training session", () => {
       lineId: "line-a",
       variationIndex: 0,
     });
-    completeTrainingLine(context, { lineId: "line-a", completedMoveId: 4 });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
 
     ensureTrainingSession(context.state, context.route, ["line-a", "line-c"]);
 
@@ -56,11 +60,15 @@ describe("training session", () => {
       variationIndex: 0,
     });
     markTrainingMistake(context.state, context.route, { moveId: 2 });
-    completeTrainingLine(context, { lineId: "line-a", completedMoveId: 4 });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
 
-    completeTrainingReplayMove(context, { lineId: "line-a" });
-    completeTrainingReplayMove(context, { lineId: "line-a" });
-    completeTrainingReplayMove(context, { lineId: "line-a" });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
 
     expect(context.state.training.status).toBe("success");
     expect(context.state.training.session?.results).toEqual([
@@ -76,19 +84,62 @@ describe("training session", () => {
       variationIndex: 0,
     });
     markTrainingMistake(context.state, context.route, { moveId: 2 });
-    completeTrainingLine(context, { lineId: "line-a", completedMoveId: 4 });
-    completeTrainingReplayMove(context, { lineId: "line-a" });
-    completeTrainingReplayMove(context, { lineId: "line-a" });
-    completeTrainingReplayMove(context, { lineId: "line-a" });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
     startTrainingLine(context.state, context.route, {
       lineIds: ["line-a"],
       lineId: "line-a",
       variationIndex: 0,
     });
-    completeTrainingLine(context, { lineId: "line-a", completedMoveId: 4 });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
 
     expect(context.state.training.session?.results).toEqual([
       { lineId: "line-a", mistakeCount: 0 },
+    ]);
+  });
+
+  test("can defer a result while repeating the entire line", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    markTrainingMistake(context.state, context.route, { moveId: 2 });
+
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: false,
+    });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: false });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: false });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: false });
+
+    expect(context.state.training.session).toMatchObject({
+      currentMistakeCount: 1,
+      failedMoveIds: [],
+      replayMoveIds: [],
+      results: [],
+    });
+
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
+    expect(context.state.training.session?.results).toEqual([
+      { lineId: "line-a", mistakeCount: 1 },
     ]);
   });
 
@@ -99,7 +150,11 @@ describe("training session", () => {
       lineId: "line-a",
       variationIndex: 0,
     });
-    completeTrainingLine(context, { lineId: "line-a", completedMoveId: 4 });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
 
     resetTrainingSession(context.state, context.route);
 

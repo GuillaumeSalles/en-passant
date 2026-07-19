@@ -32,7 +32,14 @@ import {
   prepareTrainingReplayMove,
   startTrainingLine,
 } from "@/mutations/trainingSession";
-import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  untrack,
+  type Accessor,
+} from "solid-js";
 import { type MutationContext, useMutation } from "@/lib/useMutation";
 import { useRouteContext } from "@/lib/useRouteContext";
 import { useSelector } from "@/lib/useSelector";
@@ -69,11 +76,18 @@ function selectTrainingMoveSilently(
   state.set("preselectedVariation", null);
 }
 
-export function useVariationTrainingFlow(props: {
-  repertoireHandle: string;
-  chapterHandle: string;
-  lineId: string;
-}) {
+export function useVariationTrainingFlow(
+  props: {
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  },
+  options: {
+    enabled?: Accessor<boolean>;
+    repetitions?: number;
+    onLineComplete?: () => void;
+  } = {},
+) {
   const state = useState();
   const ctx = useRouteContext();
 
@@ -90,6 +104,9 @@ export function useVariationTrainingFlow(props: {
   const trainingSessionStats = useSelector(selectTrainingSessionStats);
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
   const [phase, setPhase] = createSignal<VariationTrainingPhase>({ type: "initializing" });
+  const [completedRepetitions, setCompletedRepetitions] = createSignal(0);
+  const isEnabled = () => options.enabled?.() ?? true;
+  const repetitions = () => Math.max(1, options.repetitions ?? 1);
 
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromEvalMove = useMutation(moveFromEvalMove);
@@ -164,19 +181,55 @@ export function useVariationTrainingFlow(props: {
     }
   }
 
+  function beginNextRepetition(): void {
+    onPrepareTrainingReplayMove({ animateLastMove: false, precedingMoves: [] });
+    if (orientation() === "white") {
+      setPhase({ type: "awaiting-line-move", notice: null });
+    } else {
+      setPhase({ type: "initializing" });
+    }
+  }
+
+  function finishRepetition(): void {
+    const completed = completedRepetitions() + 1;
+    setCompletedRepetitions(completed);
+    if (completed >= repetitions()) {
+      setPhase({ type: "line-complete" });
+      options.onLineComplete?.();
+    } else {
+      beginNextRepetition();
+    }
+  }
+
+  function completeLineAttempt(completedMoveId: number): void {
+    const finishesLine = completedRepetitions() + 1 >= repetitions();
+    onCompleteTrainingLine({
+      lineId: props.lineId,
+      completedMoveId,
+      finishLine: finishesLine,
+    });
+    if ((state.training.session?.replayMoveIds.length ?? 0) > 0) {
+      setPhase({ type: "preparing-replay" });
+    } else {
+      finishRepetition();
+    }
+  }
+
   let startedScopeKey = "";
   createEffect(
     () => ({
       key: scopeKey(),
       line: activeLine(),
       lineIds: lines().map((line) => line.id),
+      enabled: isEnabled(),
       orientation: orientation(),
       variationIndex: activeLineIndex(),
     }),
-    ({ key, line, lineIds, orientation, variationIndex }) => {
-      if (line === undefined || key === startedScopeKey) return;
+    ({ key, line, lineIds, enabled, orientation, variationIndex }) => {
+      if (!enabled || line === undefined || key === startedScopeKey) return;
       startedScopeKey = key;
       beginFlowStep();
+      setCompletedRepetitions(0);
       setPhase({ type: "initializing" });
       onStartTrainingLine({ lineIds, lineId: line.id, variationIndex });
       if (orientation === "white") setPhase({ type: "awaiting-line-move", notice: null });
@@ -186,13 +239,15 @@ export function useVariationTrainingFlow(props: {
   createEffect(
     () => ({
       boardIntroComplete: boardIntroComplete(),
+      enabled: isEnabled(),
       firstMove: firstVariationMove(),
       orientation: orientation(),
       phase: phase(),
       trainingVariationIsEmpty: trainingVariationIsEmpty(),
     }),
-    ({ boardIntroComplete, firstMove, orientation, phase, trainingVariationIsEmpty }) => {
+    ({ boardIntroComplete, enabled, firstMove, orientation, phase, trainingVariationIsEmpty }) => {
       if (
+        !enabled ||
         phase.type !== "initializing" ||
         orientation !== "black" ||
         !boardIntroComplete ||
@@ -208,12 +263,13 @@ export function useVariationTrainingFlow(props: {
 
   createEffect(
     () => ({
+      enabled: isEnabled(),
       key: scopeKey(),
       queueKey: replayMoveIds()?.join(",") ?? "",
       targetMoveId: replayMoveId(),
     }),
-    ({ key, queueKey, targetMoveId }) => {
-      if (queueKey === "") return;
+    ({ enabled, key, queueKey, targetMoveId }) => {
+      if (!enabled || queueKey === "") return;
       if (targetMoveId === undefined) return;
       const version = beginFlowStep();
       setPhase({ type: "preparing-replay" });
@@ -285,16 +341,20 @@ export function useVariationTrainingFlow(props: {
     }
 
     if (activePhase.type === "awaiting-replay-move") {
-      onCompleteTrainingReplayMove({ lineId: props.lineId });
-      setPhaseAfterLineCompletion();
+      const finishesLine = completedRepetitions() + 1 >= repetitions();
+      onCompleteTrainingReplayMove({ lineId: props.lineId, finishLine: finishesLine });
+      if ((state.training.session?.replayMoveIds.length ?? 0) > 0) {
+        setPhaseAfterLineCompletion();
+      } else {
+        finishRepetition();
+      }
       return;
     }
 
     const responseId = variation()[currentHalfMoveNumber + 2];
     const response = responseId === undefined ? undefined : pgn.moves[responseId];
     if (response === undefined) {
-      onCompleteTrainingLine({ lineId: props.lineId, completedMoveId: expectedMove.id });
-      setPhaseAfterLineCompletion();
+      completeLineAttempt(expectedMove.id);
       return;
     }
 
@@ -305,8 +365,7 @@ export function useVariationTrainingFlow(props: {
     }
     onMoveFromEvalMove(response);
     if (variation()[currentHalfMoveNumber + 3] === undefined) {
-      onCompleteTrainingLine({ lineId: props.lineId, completedMoveId: expectedMove.id });
-      setPhaseAfterLineCompletion();
+      completeLineAttempt(expectedMove.id);
     } else {
       setPhase({ type: "awaiting-line-move", notice: null });
     }
@@ -342,6 +401,7 @@ export function useVariationTrainingFlow(props: {
     canDrag,
     chapterHasMoves,
     chapterPgn,
+    completedRepetitions,
     currentFen,
     instruction,
     isLineComplete: () => phase().type === "line-complete",

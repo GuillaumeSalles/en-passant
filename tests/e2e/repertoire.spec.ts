@@ -880,10 +880,21 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page.getByText("Now repeat the move.")).toBeVisible();
   await dragPiece(page, "g1", "f3");
 
+  await expect(page.getByText(/Practice 1 of 2:/)).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText(/Practice 1 of 2: White to play\./)).toBeVisible();
+  await dragPiece(page, "g1", "f3");
+
+  await expect(page.getByText(/Practice 2 of 2:/)).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText(/Practice 2 of 2: White to play\./)).toBeVisible();
+  await dragPiece(page, "g1", "f3");
+
   await expect(page.getByText("Line learned.")).toBeVisible();
-  await expect(page.getByText("Develop with tempo.")).toBeVisible();
+  await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
+  await expect(page.locator('[data-training-status="trained"]')).toHaveCount(1);
   await expect(page.getByText("Learned")).toBeVisible();
   await expect(firstLine.getByRole("link", { name: "Learn again" })).toBeVisible();
   expect(consoleMessages).toEqual([]);

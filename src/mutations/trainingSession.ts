@@ -187,9 +187,31 @@ function finishTrainingLine(
   });
 }
 
+function finishTrainingLineAttempt(
+  state: StoreState<AppState>,
+  session: TrainingSessionDraft,
+  lineId: string,
+  finishLine: boolean,
+): void {
+  if (finishLine) {
+    finishTrainingLine(state, session, lineId);
+    return;
+  }
+
+  state.set("training", {
+    ...state.training,
+    status: "in-progress",
+    session: {
+      ...session,
+      failedMoveIds: [],
+      replayMoveIds: [],
+    },
+  });
+}
+
 export function completeTrainingLine(
   ctx: MutationContext,
-  details: { lineId: string; completedMoveId: number },
+  details: { lineId: string; completedMoveId: number; finishLine: boolean },
 ): void {
   const { state } = ctx;
   const session = state.training.session;
@@ -200,7 +222,7 @@ export function completeTrainingLine(
 
   const replayMoveIds = createFailedMoveReplayQueue(session.failedMoveIds, details.completedMoveId);
   if (replayMoveIds.length === 0) {
-    finishTrainingLine(state, session, details.lineId);
+    finishTrainingLineAttempt(state, session, details.lineId, details.finishLine);
     return;
   }
 
@@ -237,7 +259,7 @@ export function prepareTrainingReplayMove(
 
 export function completeTrainingReplayMove(
   ctx: MutationContext,
-  details: { lineId: string },
+  details: { lineId: string; finishLine: boolean },
 ): void {
   const { state } = ctx;
   const session = state.training.session;
@@ -245,7 +267,12 @@ export function completeTrainingReplayMove(
 
   const replayMoveIds = session.replayMoveIds.slice(1);
   if (replayMoveIds.length === 0) {
-    finishTrainingLine(state, { ...session, replayMoveIds }, details.lineId);
+    finishTrainingLineAttempt(
+      state,
+      { ...session, replayMoveIds },
+      details.lineId,
+      details.finishLine,
+    );
     return;
   }
 
