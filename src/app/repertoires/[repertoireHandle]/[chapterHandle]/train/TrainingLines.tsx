@@ -1,8 +1,15 @@
+import { A } from "@solidjs/router";
 import { createEffect, createMemo, For, Show } from "solid-js";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
-import { Check } from "@/components/Icons";
+import { Check, Ellipsis } from "@/components/Icons";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import {
   getChapterPgn,
@@ -49,7 +56,20 @@ export function TrainingLines(props: {
         ),
       ),
   );
-  const firstUntrainedLine = createMemo(() => lines().find((line) => !results().has(line.id)));
+  const isLineLearned = (lineId: string) =>
+    learnedLines().has(
+      learningLineKey(
+        {
+          type: "variation-training",
+          repertoireHandle: props.repertoireHandle,
+          chapterHandle: props.chapterHandle,
+        },
+        lineId,
+      ),
+    );
+  const firstUntrainedLine = createMemo(() =>
+    lines().find((line) => isLineLearned(line.id) && !results().has(line.id)),
+  );
 
   createEffect(
     () => lineIds(),
@@ -104,17 +124,7 @@ export function TrainingLines(props: {
           >
             {(line, index) => {
               const result = () => results().get(line.id);
-              const isLearned = () =>
-                learnedLines().has(
-                  learningLineKey(
-                    {
-                      type: "variation-training",
-                      repertoireHandle: props.repertoireHandle,
-                      chapterHandle: props.chapterHandle,
-                    },
-                    line.id,
-                  ),
-                );
+              const isLearned = () => isLineLearned(line.id);
               return (
                 <>
                   <Show when={index() > 0}>
@@ -168,28 +178,57 @@ export function TrainingLines(props: {
                       >
                         View
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        href={learningLinePath(
-                          props.repertoireHandle,
-                          props.chapterHandle,
-                          line.id,
-                        )}
+                      <Show
+                        when={isLearned()}
+                        fallback={
+                          <Button
+                            size="sm"
+                            href={learningLinePath(
+                              props.repertoireHandle,
+                              props.chapterHandle,
+                              line.id,
+                            )}
+                          >
+                            Learn
+                          </Button>
+                        }
                       >
-                        {isLearned() ? "Learn again" : "Learn"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={result() === undefined ? "default" : "outline"}
-                        href={trainingLinePath(
-                          props.repertoireHandle,
-                          props.chapterHandle,
-                          line.id,
-                        )}
-                      >
-                        {result() === undefined ? "Train" : "Train again"}
-                      </Button>
+                        <Button
+                          size="sm"
+                          href={trainingLinePath(
+                            props.repertoireHandle,
+                            props.chapterHandle,
+                            line.id,
+                          )}
+                        >
+                          Train
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger>
+                            <Button
+                              size="sm-icon"
+                              variant="outline"
+                              aria-label={`More actions for line ${index() + 1}`}
+                            >
+                              <Ellipsis />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <A
+                                class="w-full"
+                                href={learningLinePath(
+                                  props.repertoireHandle,
+                                  props.chapterHandle,
+                                  line.id,
+                                )}
+                              >
+                                Learn again
+                              </A>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </Show>
                     </div>
                   </div>
                 </>

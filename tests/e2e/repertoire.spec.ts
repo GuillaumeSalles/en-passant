@@ -124,7 +124,13 @@ async function openRepertoire(page: Page, pgn = defaultPgn) {
 async function openFirstTrainingLine(page: Page) {
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
   await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
-  await page.locator("[data-training-line]").first().getByRole("link", { name: "Train" }).click();
+  const learnHref = await page
+    .locator("[data-training-line]")
+    .first()
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  if (learnHref === null) throw new Error("Expected the first line to have a learning URL");
+  await page.goto(learnHref.replace("/learn/", "/train/"));
   await expect(page.locator("[data-square]")).toHaveCount(64);
 }
 
@@ -679,21 +685,20 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
   const lines = page.locator("[data-training-line]");
   await expect(lines).toHaveCount(2);
-  await expect(lines.first().getByRole("link", { name: "Train" })).toHaveAttribute(
+  await expect(lines.first().getByRole("link", { name: "Learn" })).toHaveAttribute(
     "href",
-    /\/train\/v1-[A-Za-z0-9_-]+$/,
+    /\/learn\/v1-[A-Za-z0-9_-]+$/,
   );
-  const firstLineHref = await lines
+  await expect(lines.first().getByRole("link", { name: "Train" })).toHaveCount(0);
+  const firstLearnHref = await lines
     .first()
-    .getByRole("link", { name: "Train" })
+    .getByRole("link", { name: "Learn" })
     .getAttribute("href");
-  await expect(page.getByRole("link", { name: "Train all" })).toHaveAttribute(
-    "href",
-    firstLineHref ?? "",
-  );
+  if (firstLearnHref === null) throw new Error("Expected the first line to have a learning URL");
+  await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();
   await expect(page.getByText("0/2 trained")).toBeVisible();
 
-  await page.getByRole("link", { name: "Train all" }).click();
+  await page.goto(firstLearnHref.replace("/learn/", "/train/"));
   await expect(page.locator("[data-square]")).toHaveCount(64);
 
   await dragPiece(page, "g1", "f3");
@@ -752,7 +757,9 @@ test("labels alternative lines and accepts their moves without counting mistakes
   await expect(lines.nth(1)).toHaveAttribute("data-alternative-line", "true");
   await expect(lines.nth(1).getByText("Alternative", { exact: true })).toBeVisible();
 
-  await lines.first().getByRole("link", { name: "Train" }).click();
+  const learnHref = await lines.first().getByRole("link", { name: "Learn" }).getAttribute("href");
+  if (learnHref === null) throw new Error("Expected the first line to have a learning URL");
+  await page.goto(learnHref.replace("/learn/", "/train/"));
   await dragPiece(page, "d2", "d4");
   await expect(
     page.getByText("That move belongs to an alternative line. Find another one."),
@@ -896,7 +903,10 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(1);
   await expect(page.getByText("Learned")).toBeVisible();
-  await expect(firstLine.getByRole("link", { name: "Learn again" })).toBeVisible();
+  await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveCount(0);
+  await expect(firstLine.getByRole("link", { name: "Train" })).toBeVisible();
+  await firstLine.getByRole("button", { name: "More actions for line 1" }).click();
+  await expect(page.getByRole("link", { name: "Learn again" })).toBeVisible();
   expect(consoleMessages).toEqual([]);
 });
 
