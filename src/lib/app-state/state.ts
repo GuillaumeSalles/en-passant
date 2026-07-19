@@ -53,6 +53,7 @@ export function emptyState(): AppState {
       variationIndex: 0,
       variation: emptyNormalizedPgn(),
       session: null,
+      reviews: {},
     },
     learning: {
       learnedLineKeys: [],

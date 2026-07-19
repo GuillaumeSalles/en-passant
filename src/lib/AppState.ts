@@ -23,6 +23,7 @@ export type {
   SquareHighlightKind,
   SquareHighlights,
   TrainingLineResult,
+  TrainingLineReview,
   TrainingSessionDraft,
   TrainingState,
 } from "./app-state/types";
@@ -32,6 +33,13 @@ export {
   trainingLineId,
   type TrainingLine,
 } from "./app-state/trainingLines";
+export {
+  DEFAULT_TRAINING_INTERVALS_MS,
+  initialTrainingReview,
+  isTrainingReviewDue,
+  nextTrainingReview,
+  prioritizeDueTrainingLines,
+} from "./app-state/spacedRepetition";
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";
 export {

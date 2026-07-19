@@ -3,11 +3,14 @@ import {
   Context,
   emptyNormalizedPgn,
   EvalMove,
+  initialTrainingReview,
   moveFromEvalMove,
+  nextTrainingReview,
   TrainingSessionDraft,
 } from "@/lib/AppState";
 import { StoreState } from "@/lib/createStore";
 import { MutationContext } from "@/lib/useMutation";
+import { learningLineKey } from "@/mutations/learningSession";
 
 export const FAILED_MOVE_SUCCESS_REPETITIONS = 3;
 
@@ -163,6 +166,7 @@ export function createFailedMoveReplayQueue(
 
 function finishTrainingLine(
   state: StoreState<AppState>,
+  ctx: Context,
   session: TrainingSessionDraft,
   lineId: string,
 ): void {
@@ -174,9 +178,22 @@ function finishTrainingLine(
     ...session.results.filter((existingResult) => existingResult.lineId !== lineId),
     result,
   ];
+  const key = learningLineKey(ctx, lineId);
+  const isLearned = state.learning.learnedLineKeys.includes(key);
+  const currentReview = state.training.reviews[key];
+  const review =
+    currentReview === undefined
+      ? initialTrainingReview(Date.now())
+      : nextTrainingReview(currentReview, result.mistakeCount === 0, Date.now());
   state.set("training", {
     ...state.training,
     status: "success",
+    reviews: isLearned
+      ? {
+          ...state.training.reviews,
+          [key]: review,
+        }
+      : state.training.reviews,
     session: {
       ...session,
       results,
@@ -189,12 +206,13 @@ function finishTrainingLine(
 
 function finishTrainingLineAttempt(
   state: StoreState<AppState>,
+  ctx: Context,
   session: TrainingSessionDraft,
   lineId: string,
   finishLine: boolean,
 ): void {
   if (finishLine) {
-    finishTrainingLine(state, session, lineId);
+    finishTrainingLine(state, ctx, session, lineId);
     return;
   }
 
@@ -222,7 +240,7 @@ export function completeTrainingLine(
 
   const replayMoveIds = createFailedMoveReplayQueue(session.failedMoveIds, details.completedMoveId);
   if (replayMoveIds.length === 0) {
-    finishTrainingLineAttempt(state, session, details.lineId, details.finishLine);
+    finishTrainingLineAttempt(state, ctx.route, session, details.lineId, details.finishLine);
     return;
   }
 
@@ -269,6 +287,7 @@ export function completeTrainingReplayMove(
   if (replayMoveIds.length === 0) {
     finishTrainingLineAttempt(
       state,
+      ctx.route,
       { ...session, replayMoveIds },
       details.lineId,
       details.finishLine,

@@ -1,7 +1,7 @@
 import { A } from "@solidjs/router";
-import { createEffect, createMemo, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
-import { Check, Ellipsis } from "@/components/Icons";
+import { Ellipsis } from "@/components/Icons";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,8 @@ import {
   getChapterPgn,
   getTrainingLines,
   getVariationMoveIds,
+  isTrainingReviewDue,
+  prioritizeDueTrainingLines,
   selectOrientation,
 } from "@/lib/AppState";
 import { learningLinePath, repertoireMovePath, trainingLinePath } from "@/lib/routes";
@@ -37,12 +39,31 @@ export function TrainingLines(props: {
   const chapterPgn = useSelector(getChapterPgn);
   const orientation = useSelector(selectOrientation);
   const trainingSession = useSelector((state) => state.training.session);
+  const reviews = useSelector((state) => state.training.reviews);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
+  const [now, setNow] = createSignal(Date.now());
 
-  const lines = createMemo(() => {
+  const sourceLines = createMemo(() => {
     const pgn = chapterPgn();
     return pgn === null ? [] : getTrainingLines(pgn, orientation());
   });
+  const reviewKey = (lineId: string) =>
+    learningLineKey(
+      {
+        type: "variation-training",
+        repertoireHandle: props.repertoireHandle,
+        chapterHandle: props.chapterHandle,
+      },
+      lineId,
+    );
+  const reviewForLine = (lineId: string) => reviews()[reviewKey(lineId)];
+  const lines = createMemo(() =>
+    prioritizeDueTrainingLines(
+      sourceLines(),
+      Object.fromEntries(sourceLines().map((line) => [line.id, reviewForLine(line.id)])),
+      now(),
+    ),
+  );
   const lineIds = createMemo(() => lines().map((line) => line.id));
   const results = createMemo(
     () => new Map(trainingSession()?.results.map((result) => [result.lineId, result]) ?? []),
@@ -56,20 +77,29 @@ export function TrainingLines(props: {
         ),
       ),
   );
-  const isLineLearned = (lineId: string) =>
-    learnedLines().has(
-      learningLineKey(
-        {
-          type: "variation-training",
-          repertoireHandle: props.repertoireHandle,
-          chapterHandle: props.chapterHandle,
-        },
-        lineId,
-      ),
-    );
-  const firstUntrainedLine = createMemo(() =>
-    lines().find((line) => isLineLearned(line.id) && !results().has(line.id)),
+  const isLineLearned = (lineId: string) => learnedLines().has(reviewKey(lineId));
+  const isLineDue = (lineId: string) => isTrainingReviewDue(reviewForLine(lineId), now());
+  const firstDueLine = createMemo(() =>
+    lines().find((line) => isLineLearned(line.id) && isLineDue(line.id)),
   );
+
+  let dueTimer: ReturnType<typeof setTimeout> | undefined;
+  createEffect(
+    () => ({ now: now(), dueTimes: Object.values(reviews()).map((review) => review.dueAt) }),
+    ({ dueTimes }) => {
+      if (dueTimer !== undefined) clearTimeout(dueTimer);
+      const currentTime = Date.now();
+      const nextDueAt = dueTimes.filter((dueAt) => dueAt > currentTime).sort((a, b) => a - b)[0];
+      if (nextDueAt === undefined) return;
+      dueTimer = setTimeout(
+        () => setNow(Date.now()),
+        Math.min(nextDueAt - currentTime + 1, 2_147_483_647),
+      );
+    },
+  );
+  onCleanup(() => {
+    if (dueTimer !== undefined) clearTimeout(dueTimer);
+  });
 
   createEffect(
     () => lineIds(),
@@ -99,7 +129,7 @@ export function TrainingLines(props: {
               {results().size}/{lines().length} trained
             </div>
           </div>
-          <Show when={firstUntrainedLine()}>
+          <Show when={firstDueLine()}>
             {(line) => (
               <Button
                 size="sm"
@@ -125,6 +155,7 @@ export function TrainingLines(props: {
             {(line, index) => {
               const result = () => results().get(line.id);
               const isLearned = () => isLineLearned(line.id);
+              const isDue = () => isLineDue(line.id);
               return (
                 <>
                   <Show when={index() > 0}>
@@ -133,7 +164,9 @@ export function TrainingLines(props: {
                   <div
                     class="flex min-w-0 items-center justify-between gap-3 p-3"
                     data-training-line={line.id}
-                    data-training-status={result() === undefined ? "untrained" : "trained"}
+                    data-training-status={
+                      isDue() ? "due" : result() === undefined ? "untrained" : "trained"
+                    }
                     data-learning-status={isLearned() ? "learned" : "unlearned"}
                     data-alternative-line={line.isAlternative ? "true" : "false"}
                   >
@@ -145,20 +178,9 @@ export function TrainingLines(props: {
                             Alternative
                           </span>
                         </Show>
-                        <Show when={result()}>
-                          {(trainedResult) => (
-                            <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <Check size={14} />
-                              {trainedResult().mistakeCount === 0
-                                ? "Trained"
-                                : `Trained with ${trainedResult().mistakeCount} mistake${trainedResult().mistakeCount === 1 ? "" : "s"}`}
-                            </span>
-                          )}
-                        </Show>
-                        <Show when={isLearned()}>
-                          <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Check size={14} />
-                            Learned
+                        <Show when={isDue()}>
+                          <span class="inline-flex items-center text-xs font-medium text-amber-600 dark:text-amber-400">
+                            Due
                           </span>
                         </Show>
                       </div>

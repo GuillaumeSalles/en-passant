@@ -8,6 +8,7 @@ import {
   Move,
   moveFromChessboard,
   moveFromEvalMove,
+  initialTrainingReview,
 } from "@/lib/AppState";
 import { StoreState } from "@/lib/createStore";
 import type { MutationResult } from "@/lib/useMutation";
@@ -54,8 +55,16 @@ export function removeLearningPreview(
 
 export function markLineLearned(state: StoreState<AppState>, ctx: Context, lineId: string): void {
   const key = learningLineKey(ctx, lineId);
-  if (state.learning.learnedLineKeys.includes(key)) return;
-  state.set("learning", {
-    learnedLineKeys: [...state.learning.learnedLineKeys, key],
+  if (!state.learning.learnedLineKeys.includes(key)) {
+    state.set("learning", {
+      learnedLineKeys: [...state.learning.learnedLineKeys, key],
+    });
+  }
+  state.set("training", {
+    ...state.training,
+    reviews: {
+      ...state.training.reviews,
+      [key]: initialTrainingReview(Date.now()),
+    },
   });
 }

@@ -9,9 +9,11 @@ import {
   getVariationMoveIds,
   isAlternativeTrainingMove,
   isMoveValid,
+  isTrainingReviewDue,
   moveFromChessboard,
   moveFromEvalMove,
   moveToEvalMove,
+  prioritizeDueTrainingLines,
   selectAnimation,
   selectCurrentMove,
   selectFen,
@@ -32,6 +34,7 @@ import {
   prepareTrainingReplayMove,
   startTrainingLine,
 } from "@/mutations/trainingSession";
+import { learningLineKey } from "@/mutations/learningSession";
 import {
   createEffect,
   createMemo,
@@ -97,6 +100,8 @@ export function useVariationTrainingFlow(
   const orientation = useSelector(selectOrientation);
   const animation = useSelector(selectAnimation);
   const training = useSelector(selectTraining);
+  const reviews = useSelector((state) => state.training.reviews);
+  const learnedLineKeys = useSelector((state) => state.learning.learnedLineKeys);
   const selectedMoveId = useSelector(selectSelectedMoveId);
   const currentMove = useSelector(selectCurrentMove);
   const replayMoveIds = useSelector((state) => state.training.session?.replayMoveIds ?? null);
@@ -124,7 +129,15 @@ export function useVariationTrainingFlow(
 
   const lines = createMemo(() => {
     const pgn = chapterPgn();
-    return pgn === null ? [] : getTrainingLines(pgn, orientation());
+    if (pgn === null) return [];
+    const sourceLines = getTrainingLines(pgn, orientation());
+    return prioritizeDueTrainingLines(
+      sourceLines,
+      Object.fromEntries(
+        sourceLines.map((line) => [line.id, reviews()[learningLineKey(ctx(), line.id)]]),
+      ),
+      Date.now(),
+    );
   });
   const activeLineIndex = createMemo(() => lines().findIndex((line) => line.id === props.lineId));
   const activeLine = createMemo(() => lines()[activeLineIndex()]);
@@ -377,7 +390,14 @@ export function useVariationTrainingFlow(
     if (allLines.length === 0) return undefined;
     for (let offset = 1; offset <= allLines.length; offset++) {
       const line = allLines[(activeLineIndex() + offset) % allLines.length];
-      if (line !== undefined && !trained.has(line.id)) return line;
+      if (line === undefined) continue;
+      const key = learningLineKey(ctx(), line.id);
+      const needsTraining = learnedLineKeys().includes(key)
+        ? isTrainingReviewDue(reviews()[key], Date.now())
+        : !trained.has(line.id);
+      if (needsTraining) {
+        return line;
+      }
     }
     return undefined;
   });

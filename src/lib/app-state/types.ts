@@ -141,6 +141,7 @@ export type AppState = {
     variationIndex: number;
     variation: NormalizedPgn;
     session: TrainingSessionDraft | null;
+    reviews: Record<string, TrainingLineReview>;
   };
   learning: {
     learnedLineKeys: string[];
@@ -157,6 +158,11 @@ export type TrainingState = "in-progress" | "failure" | "success" | "complete";
 export type TrainingLineResult = {
   lineId: string;
   mistakeCount: number;
+};
+
+export type TrainingLineReview = {
+  intervalIndex: number;
+  dueAt: number;
 };
 
 export type TrainingSessionDraft = {

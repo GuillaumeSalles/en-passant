@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   completeTrainingLine,
   completeTrainingReplayMove,
@@ -11,6 +11,9 @@ import {
 } from "@/mutations/trainingSession";
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
+import { learningLineKey, markLineLearned } from "@/mutations/learningSession";
+
+afterEach(() => vi.useRealTimers());
 
 const repertoire = repertoireStub({ id: "rep-1", handle: "white" });
 const chapter = chapterStub({ id: "chapter-1", repertoireId: repertoire.id, handle: "main" });
@@ -74,6 +77,64 @@ describe("training session", () => {
     expect(context.state.training.session?.results).toEqual([
       { lineId: "line-a", mistakeCount: 1 },
     ]);
+  });
+
+  test("advances a learned line after a clean review", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const context = createTrainingContext();
+    const key = learningLineKey(context.route, "line-a");
+    markLineLearned(context.state, context.route, "line-a");
+    vi.setSystemTime(3_601_000);
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
+
+    expect(context.state.training.reviews[key]).toEqual({
+      intervalIndex: 1,
+      dueAt: 90_001_000,
+    });
+  });
+
+  test("resets a learned line to one hour after a review with a mistake", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const context = createTrainingContext();
+    const key = learningLineKey(context.route, "line-a");
+    markLineLearned(context.state, context.route, "line-a");
+    context.state.set("training", {
+      ...context.state.training,
+      reviews: {
+        [key]: { intervalIndex: 4, dueAt: 1_000 },
+      },
+    });
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    markTrainingMistake(context.state, context.route, { moveId: 2 });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      completedMoveId: 4,
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+
+    expect(context.state.training.reviews[key]).toEqual({
+      intervalIndex: 0,
+      dueAt: 3_601_000,
+    });
   });
 
   test("retraining a line replaces its previous result", () => {

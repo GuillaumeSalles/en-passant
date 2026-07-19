@@ -7,7 +7,9 @@ import {
   startLearningLine,
 } from "@/mutations/learningSession";
 import { createMutationContext } from "@/tests/mocks";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+
+afterEach(() => vi.useRealTimers());
 
 function createLearningContext() {
   return createMutationContext(
@@ -66,6 +68,8 @@ describe("learning session", () => {
   });
 
   test("records learned lines once for the current chapter", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
     const context = createLearningContext();
     const key = learningLineKey(context.route, "v1-line");
 
@@ -73,5 +77,9 @@ describe("learning session", () => {
     markLineLearned(context.state, context.route, "v1-line");
 
     expect(context.state.learning.learnedLineKeys).toEqual([key]);
+    expect(context.state.training.reviews[key]).toEqual({
+      intervalIndex: 0,
+      dueAt: 3_601_000,
+    });
   });
 });

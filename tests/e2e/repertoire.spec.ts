@@ -718,7 +718,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.getByText("2/2 trained")).toBeVisible();
   await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();
-  await expect(page.getByText("Trained with 1 mistake")).toBeVisible();
+  await expect(page.getByText("Trained with 1 mistake")).toHaveCount(0);
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(2);
   expect(consoleMessages).toEqual([]);
 });
@@ -902,7 +902,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(1);
-  await expect(page.getByText("Learned")).toBeVisible();
+  await expect(page.getByText("Learned", { exact: true })).toHaveCount(0);
   await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveCount(0);
   await expect(firstLine.getByRole("link", { name: "Train" })).toBeVisible();
   await firstLine.getByRole("button", { name: "More actions for line 1" }).click();
