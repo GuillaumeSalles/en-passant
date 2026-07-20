@@ -776,11 +776,13 @@ test("opens a chapter at the terminal move of a line", async ({ page }) => {
   const line = page.locator("[data-training-line]").first();
   await expect(line.getByRole("link", { name: "View" })).toHaveAttribute(
     "href",
-    "/app/repertoires/untitled-repertoire/chapter-1?moveId=1",
+    "/app/repertoires/untitled-repertoire/chapter-1?selectedPositionKey=rnbqkbnr%2Fpppp1ppp%2F8%2F4p3%2F4P3%2F8%2FPPPP1PPP%2FRNBQKBNR%20w%20KQkq%20-",
   );
   await line.getByRole("link", { name: "View" }).click();
 
-  await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire\/chapter-1\?moveId=1$/);
+  await expect(page).toHaveURL(
+    /\/app\/repertoires\/untitled-repertoire\/chapter-1\?selectedPositionKey=rnbqkbnr%2Fpppp1ppp%2F8%2F4p3%2F4P3%2F8%2FPPPP1PPP%2FRNBQKBNR%20w%20KQkq%20-$/,
+  );
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
   expect(consoleMessages).toEqual([]);

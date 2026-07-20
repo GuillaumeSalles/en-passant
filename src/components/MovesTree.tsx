@@ -33,6 +33,8 @@ import {
 } from "@/lib/app-state/moveRows";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
+import { Book } from "./Icons";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import {
   createEffect,
   createContext,
@@ -50,8 +52,15 @@ import {
 type MovesTreeReadOnly = () => boolean;
 type MovesTreeCanComment = () => boolean;
 
+export type MoveIndicator = {
+  label: string;
+};
+
+type MoveIndicators = Readonly<Record<number, MoveIndicator>>;
+
 const MovesTreeReadOnlyContext = createContext<MovesTreeReadOnly>(() => false);
 const MovesTreeCanCommentContext = createContext<MovesTreeCanComment>(() => true);
+const MovesTreeIndicatorsContext = createContext<() => MoveIndicators>(() => ({}));
 
 function useMovesTreeReadOnly(): MovesTreeReadOnly {
   return useContext(MovesTreeReadOnlyContext);
@@ -65,7 +74,7 @@ function isMoveListBesideBoard() {
   return window.matchMedia(`(min-width: ${SIDE_PANEL_BREAKPOINT})`).matches;
 }
 
-export function MovesTree(props: { readOnly: boolean }) {
+export function MovesTree(props: { readOnly: boolean; moveIndicators?: MoveIndicators }) {
   const isReadOnly = untrack(() => props.readOnly);
   const moves = useSelector((state, ctx) => getPgn(state, ctx)?.moves ?? {});
   const selectedMove = useSelector(selectSelectedMoveId);
@@ -102,38 +111,43 @@ export function MovesTree(props: { readOnly: boolean }) {
   }
 
   return (
-    <MovesTreeReadOnlyContext value={readOnly}>
-      <MovesTreeCanCommentContext value={canComment}>
-        <div data-moves-tree class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto py-2 text-xs">
-          <For each={moveRows()}>
-            {(row) => (
-              <Switch>
-                <Match when={row.type === "main" && row}>
-                  {(mainRow) => (
-                    <MainMovesRow
-                      row={mainRow()}
-                      selectedMoveId={highlightedMove()}
-                      onComment={requestComment}
-                      onCommentEditDone={() => setCommentEditorRequest(null)}
-                    />
-                  )}
-                </Match>
-                <Match when={row.type === "variation" && row}>
-                  {(variationRow) => (
-                    <VariationMovesRow
-                      row={variationRow()}
-                      selectedMoveId={highlightedMove()}
-                      onComment={requestComment}
-                      onCommentEditDone={() => setCommentEditorRequest(null)}
-                    />
-                  )}
-                </Match>
-              </Switch>
-            )}
-          </For>
-        </div>
-      </MovesTreeCanCommentContext>
-    </MovesTreeReadOnlyContext>
+    <MovesTreeIndicatorsContext value={() => props.moveIndicators ?? {}}>
+      <MovesTreeReadOnlyContext value={readOnly}>
+        <MovesTreeCanCommentContext value={canComment}>
+          <div
+            data-moves-tree
+            class="w-xs flex min-h-0 flex-1 flex-col overflow-y-auto py-2 text-xs"
+          >
+            <For each={moveRows()}>
+              {(row) => (
+                <Switch>
+                  <Match when={row.type === "main" && row}>
+                    {(mainRow) => (
+                      <MainMovesRow
+                        row={mainRow()}
+                        selectedMoveId={highlightedMove()}
+                        onComment={requestComment}
+                        onCommentEditDone={() => setCommentEditorRequest(null)}
+                      />
+                    )}
+                  </Match>
+                  <Match when={row.type === "variation" && row}>
+                    {(variationRow) => (
+                      <VariationMovesRow
+                        row={variationRow()}
+                        selectedMoveId={highlightedMove()}
+                        onComment={requestComment}
+                        onCommentEditDone={() => setCommentEditorRequest(null)}
+                      />
+                    )}
+                  </Match>
+                </Switch>
+              )}
+            </For>
+          </div>
+        </MovesTreeCanCommentContext>
+      </MovesTreeReadOnlyContext>
+    </MovesTreeIndicatorsContext>
   );
 }
 
@@ -148,7 +162,6 @@ function CommentAfter(props: {
   placement: CommentPlacement;
   onEditDone: () => void;
 }) {
-  const readOnly = useMovesTreeReadOnly();
   const canComment = useMovesTreeCanComment();
   const onSelectMove = useMutation(selectMove);
   const onUpdateMoveCommentAfter = useMutation(updateMoveCommentAfter);
@@ -227,9 +240,7 @@ function CommentAfter(props: {
       fallback={
         <div
           class={canComment() ? "cursor-text text-blue-300" : "text-blue-300"}
-          onClick={() => {
-            if (!readOnly()) onSelectMove(props.moveId);
-          }}
+          onClick={() => onSelectMove(props.moveId)}
           onDblClick={() => startEditing(props.comment)}
         >
           {props.comment}
@@ -439,11 +450,13 @@ function MoveComponent(props: {
   onComment: (moveId: number, placement: CommentPlacement) => void;
 }) {
   const readOnly = useMovesTreeReadOnly();
+  const moveIndicators = useContext(MovesTreeIndicatorsContext);
   const canEditMoves = useSelector(
     (_state, ctx) => ctx.type === "repertoire-builder" && !readOnly(),
   );
   const move = useSelector((state, ctx) => selectMoveById(state, ctx, props.moveId));
   const isSelected = createMemo(() => props.isSelected());
+  const indicator = createMemo(() => moveIndicators()[props.moveId]);
 
   const onMoveVariationUp = useMutation(moveVariationUp);
   const onMoveVariationDown = useMutation(moveVariationDown);
@@ -471,20 +484,21 @@ function MoveComponent(props: {
       >
         <div
           role="button"
-          aria-disabled={readOnly() ? "true" : undefined}
           aria-label={`Move ${move()?.san ?? props.moveId}`}
           data-move-id={props.moveId}
           data-san={move()?.san}
           data-selected={isSelected() ? "true" : undefined}
           aria-current={isSelected() ? "true" : undefined}
           class={cn(
-            "inline-flex items-baseline gap-0.5",
-            readOnly() ? "cursor-default" : "cursor-pointer hover:text-blue-500",
+            "inline-flex cursor-pointer items-baseline gap-0.5 hover:text-blue-500",
             isSelected() ? "text-blue-500" : "",
             props.class,
           )}
-          onClick={() => {
-            if (!readOnly()) onSelectMove(props.moveId);
+          onClick={(event) => {
+            if (event.target instanceof Element && event.target.closest("a,button")) {
+              return;
+            }
+            onSelectMove(props.moveId);
           }}
           ref={(el) => {
             moveRef = el;
@@ -504,6 +518,25 @@ function MoveComponent(props: {
                 </span>
               )}
             </For>
+            <Show when={indicator()}>
+              {(currentIndicator) => (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span
+                        data-move-indicator="repertoire"
+                        aria-label={currentIndicator().label}
+                        tabindex="0"
+                        class="inline-flex self-center text-amber-500"
+                      >
+                        <Book size={11} strokeWidth={2.5} />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{currentIndicator().label}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </Show>
           </span>
         </div>
       </ContextMenuTrigger>

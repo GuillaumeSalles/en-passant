@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import {
   firstRepertoireChapterPath,
   learningLinePath,
-  parseMoveId,
+  parseSelectedPositionKey,
   repertoireMovePath,
 } from "./routes";
 
@@ -13,16 +13,20 @@ test("builds a learning line path", () => {
 });
 
 test("builds a chapter path that selects a move", () => {
-  expect(repertoireMovePath("white", "main", 42)).toBe("/app/repertoires/white/main?moveId=42");
+  expect(
+    repertoireMovePath("white", "main", "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -"),
+  ).toBe(
+    "/app/repertoires/white/main?selectedPositionKey=rnbqkbnr%2Fpppp1ppp%2F8%2F4p3%2F4P3%2F8%2FPPPP1PPP%2FRNBQKBNR%20w%20KQkq%20-",
+  );
 });
 
-test("parses move ids from query strings", () => {
-  expect(parseMoveId("42")).toBe(42);
-  expect(parseMoveId("0")).toBe(0);
-  expect(parseMoveId(undefined)).toBeNull();
-  expect(parseMoveId("-1")).toBeNull();
-  expect(parseMoveId("1.5")).toBeNull();
-  expect(parseMoveId("move-1")).toBeNull();
+test("parses selected position keys from query strings", () => {
+  const key = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -";
+  expect(parseSelectedPositionKey(key)).toBe(key);
+  expect(parseSelectedPositionKey(undefined)).toBeNull();
+  expect(parseSelectedPositionKey("")).toBeNull();
+  expect(parseSelectedPositionKey(`${key} 0 1`)).toBeNull();
+  expect(parseSelectedPositionKey("not-a-position")).toBeNull();
 });
 
 test("builds a path for the alphabetically first chapter of the alphabetically first repertoire", () => {

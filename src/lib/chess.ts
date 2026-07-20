@@ -158,6 +158,16 @@ export function fen(position: ChessPosition): string {
   ].join(" ");
 }
 
+export function positionKey(position: ChessPosition): string {
+  const [placement, turn, castling] = fen(position).split(" ");
+  const enPassant =
+    position.enPassant !== null &&
+    legalMoves(position).some((move) => move.enPassantCapture !== null)
+      ? position.enPassant
+      : "-";
+  return `${placement} ${turn} ${castling} ${enPassant}`;
+}
+
 export function applySan(position: ChessPosition, san: string): AppliedMove {
   const normalizedSan = normalizeSan(san);
   const move = legalMoves(position).find(

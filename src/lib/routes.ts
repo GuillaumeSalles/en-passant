@@ -1,4 +1,5 @@
 import type { Context } from "./AppState";
+import { createChessPosition, positionKey } from "./chess";
 
 export const APP_ROOT = "/app";
 
@@ -22,15 +23,18 @@ export function repertoirePath(repertoireHandle: string, chapterHandle: string):
 export function repertoireMovePath(
   repertoireHandle: string,
   chapterHandle: string,
-  moveId: number,
+  selectedPositionKey: string,
 ): string {
-  return `${repertoirePath(repertoireHandle, chapterHandle)}?moveId=${moveId}`;
+  return `${repertoirePath(repertoireHandle, chapterHandle)}?selectedPositionKey=${encodeURIComponent(selectedPositionKey)}`;
 }
 
-export function parseMoveId(value: string | undefined): number | null {
-  if (value === undefined || !/^\d+$/.test(value)) return null;
-  const moveId = Number(value);
-  return Number.isSafeInteger(moveId) ? moveId : null;
+export function parseSelectedPositionKey(value: string | undefined): string | null {
+  if (value === undefined || value.length === 0 || value.length > 100) return null;
+  try {
+    return positionKey(createChessPosition(`${value} 0 1`)) === value ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 export function repertoireOverviewPath(repertoireHandle: string): string {

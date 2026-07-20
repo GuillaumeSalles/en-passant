@@ -1,4 +1,10 @@
-import { applySan, clonePosition, createChessPosition, fen as positionToFen } from "@/lib/chess";
+import {
+  applySan,
+  clonePosition,
+  createChessPosition,
+  fen as positionToFen,
+  positionKey,
+} from "@/lib/chess";
 import { parsePgnMoves, parsePgnTags, type ParsedPgnMove } from "@/lib/pgn-parser";
 import { normalizeNags } from "./nags";
 import {
@@ -32,6 +38,24 @@ export function getVariationsEnds(normalizedPgn: NormalizedPgn): number[] {
   }
 
   return ends;
+}
+
+export function findMoveIdByPositionKey(
+  normalizedPgn: NormalizedPgn,
+  expectedPositionKey: string,
+): number | null {
+  for (let moveId = 0; moveId < normalizedPgn.moveIdCounter; moveId++) {
+    const move = normalizedPgn.moves[moveId];
+    if (move !== undefined && positionKey(createChessPosition(move.fen)) === expectedPositionKey) {
+      return moveId;
+    }
+  }
+  return null;
+}
+
+export function movePositionKey(normalizedPgn: NormalizedPgn, moveId: number): string | null {
+  const move = normalizedPgn.moves[moveId];
+  return move === undefined ? null : positionKey(createChessPosition(move.fen));
 }
 
 export function normalizePgn(pgn: string): NormalizedPgn {
