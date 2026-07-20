@@ -184,7 +184,17 @@ export function createRepertoireSyncQueue({
 const repertoireSyncQueue = createRepertoireSyncQueue({
   isSignedIn,
   getSyncRequest: getRepertoireSyncRequest,
-  pushSyncRequest: syncRemoteChanges,
+  pushSyncRequest: async (syncRequest) => {
+    await syncRemoteChanges(syncRequest);
+    const remaining = await getRepertoireSyncRequest();
+    if (
+      remaining.changes.repertoires.length > 0 ||
+      remaining.changes.chapters.length > 0 ||
+      remaining.changes.pgns.length > 0
+    ) {
+      queueMicrotask(queueRepertoireSync);
+    }
+  },
 });
 
 export function queueRepertoireSync(): void {

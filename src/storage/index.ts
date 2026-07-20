@@ -1,6 +1,7 @@
 import { NewSerializedRepertoire, SerializedChapter } from "@/lib/AppState";
 import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
+import { pgnMutationsBetween, type PgnMutation } from "./pgnMutations";
 
 const DB_NAME = "en-passant";
 const DB_VERSION = 1;
@@ -33,12 +34,21 @@ export type SyncedPgn = {
   pgn: string;
 } & SyncMetadata;
 
+export type PgnMutationChange = {
+  id: string;
+  mutations: PgnMutation[];
+} & SyncMetadata;
+
 export type StoredRepertoire = NewSerializedRepertoire & LocalSyncMetadata;
 export type StoredChapter = SerializedChapter & LocalSyncMetadata;
-export type StoredPgn = {
+type StoredPgnBase = {
   id: string;
   pgn: string;
-} & LocalSyncMetadata;
+} & SyncMetadata;
+
+export type StoredPgn =
+  | (StoredPgnBase & { pendingMutations: PgnMutation[]; metadataDirty: boolean })
+  | (StoredPgnBase & { dirty: boolean });
 
 export type RepertoireSyncChanges = {
   repertoires: SyncedRepertoire[];
@@ -48,12 +58,21 @@ export type RepertoireSyncChanges = {
 
 export type RepertoireSyncRequest = {
   since: string | null;
-  changes: RepertoireSyncChanges;
+  changes: {
+    repertoires: SyncedRepertoire[];
+    chapters: SyncedChapter[];
+    pgns: PgnMutationChange[];
+  };
 };
 
 export type RepertoireSyncResponse = {
   cursor: string;
   changes: RepertoireSyncChanges;
+  acknowledgedPgn: {
+    id: string;
+    updatedAt: string;
+    deletedAt?: string | null;
+  } | null;
 };
 
 function nowIso(): string {
@@ -120,7 +139,8 @@ function cleanChapter(chapter: SyncedChapter): StoredChapter {
 function cleanPgn(pgn: SyncedPgn): StoredPgn {
   return {
     ...pgn,
-    dirty: false,
+    pendingMutations: [],
+    metadataDirty: false,
   };
 }
 
@@ -147,10 +167,10 @@ function toSyncedChapter(chapter: StoredChapter): SyncedChapter {
   };
 }
 
-function toSyncedPgn(pgn: StoredPgn): SyncedPgn {
+function toPgnMutationChange(pgn: StoredPgn): PgnMutationChange {
   return {
     id: pgn.id,
-    pgn: pgn.pgn,
+    mutations: pgn.deletedAt == null ? pendingMutationsFor(pgn) : [],
     updatedAt: pgn.updatedAt,
     deletedAt: pgn.deletedAt ?? null,
   };
@@ -279,11 +299,24 @@ function put<T>(store: IDBObjectStore, key: string, value: T): Promise<void> {
 
 export async function savePgn(id: string, pgn: string): Promise<void> {
   const db = await init();
+  const readTransaction = db.transaction([PGNS_STORE_NAME], "readonly");
+  const existing = await get<StoredPgn>(readTransaction.objectStore(PGNS_STORE_NAME), id);
+  const mutations = pgnMutationsBetween(existing?.pgn, pgn);
+  if (mutations.length === 0) return;
   const transaction = db.transaction([PGNS_STORE_NAME], "readwrite");
-  const store = transaction.objectStore(PGNS_STORE_NAME);
   await waitForTransaction(
     transaction,
-    put(store, id, { id, pgn, updatedAt: nowIso(), deletedAt: null, dirty: true }),
+    put(transaction.objectStore(PGNS_STORE_NAME), id, {
+      id,
+      pgn,
+      pendingMutations: [
+        ...(existing === undefined ? [] : pendingMutationsFor(existing)),
+        ...mutations,
+      ],
+      metadataDirty: existing === undefined ? true : isPgnMetadataDirty(existing),
+      updatedAt: nowIso(),
+      deletedAt: null,
+    } satisfies StoredPgn),
   );
 }
 
@@ -336,10 +369,11 @@ export async function createRepertoireAndChapter(
       put(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
+        pendingMutations: pgnMutationsBetween(undefined, pgn),
+        metadataDirty: true,
         updatedAt,
         deletedAt: null,
-        dirty: true,
-      }),
+      } satisfies StoredPgn),
     ]),
   );
 }
@@ -382,12 +416,11 @@ export async function deleteChapter(chapterId: string, pgnId: string): Promise<v
   if (pgn !== undefined) {
     requests.push(
       put(pgnStore, pgnId, {
-        id: pgnId,
-        pgn: pgn.pgn,
+        ...pgn,
         updatedAt: deletedAt,
         deletedAt,
-        dirty: true,
-      }),
+        metadataDirty: true,
+      } satisfies StoredPgn),
     );
   }
   await waitForTransaction(writeTransaction, Promise.all(requests));
@@ -446,10 +479,11 @@ export async function createChapter(chapter: SerializedChapter, pgn: string): Pr
       put(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
+        pendingMutations: pgnMutationsBetween(undefined, pgn),
+        metadataDirty: true,
         updatedAt,
         deletedAt: null,
-        dirty: true,
-      }),
+      } satisfies StoredPgn),
     ]),
   );
 }
@@ -524,9 +558,22 @@ export async function getRepertoireSyncRequest(): Promise<RepertoireSyncRequest>
     changes: {
       repertoires: rawRepertoires.filter((repertoire) => repertoire.dirty).map(toSyncedRepertoire),
       chapters: rawChapters.filter((chapter) => chapter.dirty).map(toSyncedChapter),
-      pgns: rawPgns.filter((pgn) => pgn.dirty).map(toSyncedPgn),
+      pgns: rawPgns.filter(isPgnDirty).slice(0, 1).map(toPgnMutationChange),
     },
   };
+}
+
+function isPgnDirty(pgn: StoredPgn): boolean {
+  return isPgnMetadataDirty(pgn) || pendingMutationsFor(pgn).length > 0;
+}
+
+function isPgnMetadataDirty(pgn: StoredPgn): boolean {
+  return "metadataDirty" in pgn ? pgn.metadataDirty : pgn.dirty;
+}
+
+function pendingMutationsFor(pgn: StoredPgn): PgnMutation[] {
+  if ("pendingMutations" in pgn) return pgn.pendingMutations;
+  return pgn.dirty && pgn.deletedAt == null ? [{ type: "replacePgn", pgn: pgn.pgn }] : [];
 }
 
 function shouldApplySyncedChange<T extends { id: string; updatedAt: string }>(
@@ -576,9 +623,14 @@ export async function applyRepertoireSyncResponse(
     chapters: response.changes.chapters.filter((chapter) =>
       shouldApplySyncedChange(chapterById.get(chapter.id), sentChapterUpdatedAt),
     ),
-    pgns: response.changes.pgns.filter((pgn) =>
-      shouldApplySyncedChange(pgnById.get(pgn.id), sentPgnUpdatedAt),
-    ),
+    pgns: response.changes.pgns.filter((pgn) => {
+      const existing = pgnById.get(pgn.id);
+      return (
+        existing === undefined ||
+        !isPgnDirty(existing) ||
+        sentPgnUpdatedAt.get(pgn.id) === existing.updatedAt
+      );
+    }),
   };
 
   const writeTransaction = db.transaction(
@@ -588,6 +640,34 @@ export async function applyRepertoireSyncResponse(
   const writeRepertoireStore = writeTransaction.objectStore(REPERTOIRE_STORE_NAME);
   const writeChapterStore = writeTransaction.objectStore(CHAPTERS_STORE_NAME);
   const writePgnStore = writeTransaction.objectStore(PGNS_STORE_NAME);
+  const acknowledgmentWrites: Promise<void>[] = [];
+  if (response.acknowledgedPgn !== null) {
+    const acknowledgment = response.acknowledgedPgn;
+    const existing = pgnById.get(acknowledgment.id);
+    const sent = request.changes.pgns.find((pgn) => pgn.id === acknowledgment.id);
+    if (existing === undefined || sent === undefined) {
+      throw new Error("The server acknowledged an unknown PGN mutation");
+    }
+    const existingMutations = pendingMutationsFor(existing);
+    const sentPrefix = existingMutations.slice(0, sent.mutations.length);
+    const prefixMatches = JSON.stringify(sentPrefix) === JSON.stringify(sent.mutations);
+    const remainingMutations = prefixMatches
+      ? existingMutations.slice(sent.mutations.length)
+      : existingMutations;
+    const acknowledgedRemainingMutations = sent.deletedAt == null ? remainingMutations : [];
+    acknowledgmentWrites.push(
+      put(writePgnStore, acknowledgment.id, {
+        ...existing,
+        pendingMutations: acknowledgedRemainingMutations,
+        metadataDirty: existing.deletedAt === sent.deletedAt ? false : isPgnMetadataDirty(existing),
+        updatedAt:
+          acknowledgedRemainingMutations.length === 0
+            ? acknowledgment.updatedAt
+            : existing.updatedAt,
+        deletedAt: acknowledgment.deletedAt ?? null,
+      } satisfies StoredPgn),
+    );
+  }
 
   await waitForTransaction(
     writeTransaction,
@@ -599,6 +679,7 @@ export async function applyRepertoireSyncResponse(
         put(writeChapterStore, chapter.id, cleanChapter(chapter)),
       ),
       ...appliedChanges.pgns.map((pgn) => put(writePgnStore, pgn.id, cleanPgn(pgn))),
+      ...acknowledgmentWrites,
     ]),
   );
   setLastSyncedAt(response.cursor);

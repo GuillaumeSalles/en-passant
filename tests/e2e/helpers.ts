@@ -37,6 +37,30 @@ type SyncChanges = {
   pgns: unknown[];
 };
 
+export function acceptedSyncChanges(body: unknown): SyncChanges {
+  const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : emptyChanges();
+  return {
+    repertoires: Array.isArray(changes["repertoires"]) ? changes["repertoires"] : [],
+    chapters: Array.isArray(changes["chapters"]) ? changes["chapters"] : [],
+    pgns: [],
+  };
+}
+
+export function acceptedPgnAcknowledgment(body: unknown): unknown {
+  const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : null;
+  const mutation = changes !== null && Array.isArray(changes["pgns"]) ? changes["pgns"][0] : null;
+  if (!isRecord(mutation)) return null;
+  return {
+    id: mutation["id"],
+    updatedAt: "2026-06-26T00:00:01.000Z",
+    deletedAt: mutation["deletedAt"] ?? null,
+  };
+}
+
+export function pgnSnapshot(id: string, pgn: string, updatedAt: string) {
+  return { id, pgn, updatedAt, deletedAt: null };
+}
+
 export type MockAuthSession = {
   signIn: () => void;
   signOut: () => void;
@@ -118,10 +142,10 @@ export async function mockSignedInUser(
   await page.route("**/api/sync", async (route) => {
     onSync?.();
     const body = route.request().postDataJSON() as unknown;
-    const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : emptyChanges();
     const responseBody = syncResponseForRequest?.(body) ?? {
       cursor: "2026-06-26T00:00:01.000Z",
-      changes,
+      changes: acceptedSyncChanges(body),
+      acknowledgedPgn: acceptedPgnAcknowledgment(body),
     };
     await route.fulfill({
       status: isSignedIn ? 200 : 401,
@@ -170,8 +194,22 @@ export async function seedIndexedDb(
     chapters: ChapterRecord[];
     pgns: PgnRecord[];
     clearLocalStorage?: boolean;
+    legacyPgnShape?: boolean;
   },
 ): Promise<void> {
+  const preparedRecords = {
+    ...records,
+    pgns: records.legacyPgnShape
+      ? records.pgns
+      : records.pgns.map((record) => ({
+          id: record.id,
+          pgn: record.pgn,
+          pendingMutations: record.dirty ? [{ type: "replacePgn", pgn: record.pgn }] : [],
+          metadataDirty: record.dirty,
+          updatedAt: record.updatedAt,
+          deletedAt: record.deletedAt,
+        })),
+  };
   await gotoStorageOrigin(page);
   await page.evaluate(
     async ({ records }) => {
@@ -184,7 +222,7 @@ export async function seedIndexedDb(
         });
       const openSeedDatabase = () =>
         new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant");
+          const openRequest = indexedDB.open("en-passant", 1);
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onupgradeneeded = () => {
             const db = openRequest.result;
@@ -220,7 +258,7 @@ export async function seedIndexedDb(
         }
       });
     },
-    { records },
+    { records: preparedRecords },
   );
 }
 
