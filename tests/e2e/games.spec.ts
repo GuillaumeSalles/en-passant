@@ -54,12 +54,17 @@ test("shows the latest repertoire move on an imported game", async ({ page }) =>
     "href",
     "/app/repertoires/white/italian?selectedPositionKey=r1bqkbnr%2Fpppp1ppp%2F2n5%2F4p3%2F4P3%2F5N2%2FPPPP1PPP%2FRNBQKB1R%20w%20KQkq%20-",
   );
-  await expect(indicator).toHaveAttribute("aria-label", "Last repertoire move");
-  await indicator.click();
-  await expect(page.getByRole("link", { name: "Open repertoire move" })).toHaveAttribute(
-    "href",
-    "/app/repertoires/white/italian?selectedPositionKey=r1bqkbnr%2Fpppp1ppp%2F2n5%2F4p3%2F4P3%2F5N2%2FPPPP1PPP%2FRNBQKB1R%20w%20KQkq%20-",
+  await expect(indicator).toHaveAttribute(
+    "aria-label",
+    "Latest position found in one of your repertoires",
   );
+  await expect(indicator).toHaveClass(/self-center/);
+  await expect(indicator).toHaveClass(/text-amber-500/);
+  await indicator.hover();
+  await expect(page.getByRole("tooltip")).toHaveText(
+    "Latest position found in one of your repertoires",
+  );
+  await expect(page.getByRole("tooltip")).toBeVisible();
   await expect(move).not.toHaveAttribute("aria-current", "true");
 
   await page.reload();

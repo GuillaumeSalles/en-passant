@@ -195,9 +195,7 @@ export function GameViewer(props: { gameId: string }) {
 
     return {
       [gameMoveId]: {
-        label: "Last repertoire move",
-        description: coverage.description,
-        href: coverage.href,
+        label: "Latest position found in one of your repertoires",
       },
     };
   });

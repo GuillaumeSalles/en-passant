@@ -34,14 +34,7 @@ import {
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { Book } from "./Icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { A } from "@solidjs/router";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import {
   createEffect,
   createContext,
@@ -61,8 +54,6 @@ type MovesTreeCanComment = () => boolean;
 
 export type MoveIndicator = {
   label: string;
-  description: string;
-  href: string;
 };
 
 type MoveIndicators = Readonly<Record<number, MoveIndicator>>;
@@ -529,28 +520,21 @@ function MoveComponent(props: {
             </For>
             <Show when={indicator()}>
               {(currentIndicator) => (
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <button
-                      type="button"
-                      data-move-indicator="repertoire"
-                      aria-label={currentIndicator().label}
-                      class="inline-flex text-blue-500"
-                    >
-                      <Book size={11} strokeWidth={2.5} />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="top" align="center" class="w-max max-w-64">
-                    <DropdownMenuLabel class="text-xs font-normal text-muted-foreground">
-                      {currentIndicator().description}
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem class="text-xs">
-                      <A href={currentIndicator().href} class="w-full font-semibold">
-                        Open repertoire move
-                      </A>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span
+                        data-move-indicator="repertoire"
+                        aria-label={currentIndicator().label}
+                        tabindex="0"
+                        class="inline-flex self-center text-amber-500"
+                      >
+                        <Book size={11} strokeWidth={2.5} />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{currentIndicator().label}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </Show>
           </span>
