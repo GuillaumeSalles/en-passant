@@ -1,5 +1,15 @@
+import { createChessPosition, positionKey } from "./chess";
+
 export type LichessGameColor = "white" | "black";
 export type LichessGameSort = "asc" | "desc";
+
+export type LatestRepertoireMove = {
+  ply: number;
+  positionKey: string;
+  san: string;
+  repertoire: { handle: string; name: string };
+  chapter: { handle: string; name: string };
+};
 
 export type StoredLichessGame = {
   id: string;
@@ -26,6 +36,7 @@ export type StoredLichessGame = {
   } | null;
   pgn: string;
   importedAt: string;
+  latestRepertoireMove: LatestRepertoireMove | null;
 };
 
 export type LichessGamesResult =
@@ -84,6 +95,46 @@ function nullableColor(value: unknown): LichessGameColor | null | undefined {
   return parseColor(value) ?? undefined;
 }
 
+function parseNamedHandle(value: unknown): { handle: string; name: string } | null {
+  if (!isRecord(value)) return null;
+  const handle = value["handle"];
+  const name = value["name"];
+  return typeof handle === "string" && typeof name === "string" ? { handle, name } : null;
+}
+
+function parseLatestRepertoireMove(value: unknown): LatestRepertoireMove | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isRecord(value)) return undefined;
+
+  const ply = value["ply"];
+  const matchedPositionKey = value["positionKey"];
+  const san = value["san"];
+  const repertoire = parseNamedHandle(value["repertoire"]);
+  const chapter = parseNamedHandle(value["chapter"]);
+  if (
+    !isNumber(ply) ||
+    !Number.isInteger(ply) ||
+    ply < 1 ||
+    typeof matchedPositionKey !== "string" ||
+    !isPositionKey(matchedPositionKey) ||
+    typeof san !== "string" ||
+    repertoire === null ||
+    chapter === null
+  ) {
+    return undefined;
+  }
+
+  return { ply, positionKey: matchedPositionKey, san, repertoire, chapter };
+}
+
+function isPositionKey(value: string): boolean {
+  try {
+    return positionKey(createChessPosition(`${value} 0 1`)) === value;
+  } catch {
+    return false;
+  }
+}
+
 function parseGame(value: unknown): StoredLichessGame | null {
   if (!isRecord(value)) {
     return null;
@@ -109,6 +160,7 @@ function parseGame(value: unknown): StoredLichessGame | null {
   const lastMoveAt = nullableNumber(value["lastMoveAt"]);
   const pgn = value["pgn"];
   const importedAt = value["importedAt"];
+  const latestRepertoireMove = parseLatestRepertoireMove(value["latestRepertoireMove"]);
 
   if (
     typeof id !== "string" ||
@@ -130,7 +182,8 @@ function parseGame(value: unknown): StoredLichessGame | null {
     !isNumber(createdAt) ||
     lastMoveAt === undefined ||
     typeof pgn !== "string" ||
-    typeof importedAt !== "string"
+    typeof importedAt !== "string" ||
+    latestRepertoireMove === undefined
   ) {
     return null;
   }
@@ -157,6 +210,7 @@ function parseGame(value: unknown): StoredLichessGame | null {
     opening: parseOpening(value["opening"]),
     pgn,
     importedAt,
+    latestRepertoireMove,
   };
 }
 

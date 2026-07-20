@@ -16,6 +16,7 @@ import {
   getTrainingLines,
   getVariationMoveIds,
   isTrainingReviewDue,
+  movePositionKey,
   prioritizeDueTrainingLines,
   selectOrientation,
 } from "@/lib/AppState";
@@ -115,6 +116,11 @@ export function TrainingLines(props: {
       .join(" ");
   }
 
+  function linePositionKey(terminalMoveId: number): string {
+    const pgn = chapterPgn();
+    return pgn === null ? "" : (movePositionKey(pgn, terminalMoveId) ?? "");
+  }
+
   return (
     <FullWidthLayout
       title={<RepertoireBreadcrumb showTraining trainingLineId={null} />}
@@ -195,7 +201,7 @@ export function TrainingLines(props: {
                         href={repertoireMovePath(
                           props.repertoireHandle,
                           props.chapterHandle,
-                          line.terminalMoveId,
+                          linePositionKey(line.terminalMoveId),
                         )}
                       >
                         View

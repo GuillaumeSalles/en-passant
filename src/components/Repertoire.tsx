@@ -6,6 +6,7 @@ import {
   Arrows,
   Context,
   Eval,
+  findMoveIdByPositionKey,
   getPgn,
   getNagGlyph,
   getNagMeaning,
@@ -126,7 +127,7 @@ function selectNagAnnotations(
 export function Repertoire(props: {
   repertoireHandle: string;
   chapterHandle: string;
-  requestedMoveId: number | null;
+  requestedPositionKey: string | null;
 }) {
   useLoadPgn(
     () => props.repertoireHandle,
@@ -153,34 +154,34 @@ export function Repertoire(props: {
 
   useGlobalShortcuts();
 
-  let appliedRequestedMoveKey: string | null = null;
+  let appliedRequestedPositionKey: string | null = null;
   createEffect(
     () => {
       const loadedPgn = pgn();
-      const requestedMoveId = props.requestedMoveId;
+      const requestedPositionKey = props.requestedPositionKey;
+      const resolvedMoveId =
+        loadedPgn === null || requestedPositionKey === null
+          ? null
+          : findMoveIdByPositionKey(loadedPgn, requestedPositionKey);
       return {
         pgnLoaded: loadedPgn !== null,
-        moveExists:
-          loadedPgn !== null &&
-          requestedMoveId !== null &&
-          loadedPgn.moves[requestedMoveId] !== undefined,
         requestKey:
-          requestedMoveId === null
+          requestedPositionKey === null
             ? null
-            : `${props.repertoireHandle}/${props.chapterHandle}/${requestedMoveId}`,
-        requestedMoveId,
+            : `${props.repertoireHandle}/${props.chapterHandle}/${requestedPositionKey}`,
+        resolvedMoveId,
       };
     },
-    ({ pgnLoaded, moveExists, requestKey, requestedMoveId }) => {
-      if (requestKey === null || requestedMoveId === null) {
-        appliedRequestedMoveKey = null;
+    ({ pgnLoaded, requestKey, resolvedMoveId }) => {
+      if (requestKey === null) {
+        appliedRequestedPositionKey = null;
         return;
       }
-      if (!pgnLoaded || appliedRequestedMoveKey === requestKey) return;
+      if (!pgnLoaded || appliedRequestedPositionKey === requestKey) return;
 
-      appliedRequestedMoveKey = requestKey;
-      if (moveExists) {
-        untrack(() => onSelectMove(requestedMoveId));
+      appliedRequestedPositionKey = requestKey;
+      if (resolvedMoveId !== null) {
+        untrack(() => onSelectMove(resolvedMoveId));
       }
     },
   );

@@ -23,7 +23,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function useGlobalShortcuts() {
+export function useGlobalShortcuts(options: { allowEditing: boolean } = { allowEditing: true }) {
+  const allowEditing = options.allowEditing;
   const onBack = useMutation(back);
   const onForward = useMutation(forward);
   const onArrowUp = useMutation(arrowUp);
@@ -51,10 +52,10 @@ export function useGlobalShortcuts() {
       onSpacebar();
     } else if (key === "f") {
       onFlipBoard();
-    } else if (!e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
+    } else if (allowEditing && !e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
       e.preventDefault();
       onSetNagOnSelectedMove(Number(e.key));
-    } else if (key === "c") {
+    } else if (allowEditing && key === "c") {
       e.preventDefault();
       dispatchCommentShortcut(e.shiftKey ? "before" : "after");
     }

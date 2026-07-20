@@ -33,7 +33,7 @@ import { MobileNavigationProvider } from "@/components/MobileNavigation";
 import { GitHub, Info, X, XLogo } from "@/components/Icons";
 import { getChapterScopeFromData } from "@/lib/AppState";
 import { isSafariBrowser } from "@/lib/browser";
-import { APP_ROOT, firstRepertoireChapterPath, parseMoveId } from "@/lib/routes";
+import { APP_ROOT, firstRepertoireChapterPath, parseSelectedPositionKey } from "@/lib/routes";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
@@ -372,8 +372,10 @@ function RepertoireRoute() {
     <Repertoire
       repertoireHandle={params.repertoireHandle}
       chapterHandle={params.chapterHandle}
-      requestedMoveId={parseMoveId(
-        typeof location.query["moveId"] === "string" ? location.query["moveId"] : undefined,
+      requestedPositionKey={parseSelectedPositionKey(
+        typeof location.query["selectedPositionKey"] === "string"
+          ? location.query["selectedPositionKey"]
+          : undefined,
       )}
     />
   );

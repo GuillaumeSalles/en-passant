@@ -46,10 +46,12 @@ export {
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";
 export {
+  findMoveIdByPositionKey,
   formatMoveTimeSpent,
   getMoveNumber,
   getVariationsEnds,
   isMoveWhite,
+  movePositionKey,
   normalizePgn,
   toPgn,
 } from "./app-state/pgnTree";
