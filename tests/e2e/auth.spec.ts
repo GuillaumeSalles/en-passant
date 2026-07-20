@@ -270,7 +270,6 @@ test("existing account sign in discards local repertoire data and loads server d
     return {
       cursor: "2026-06-26T00:00:02.000Z",
       changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
-      acknowledgedPgn: null,
     };
   });
   await page.route("**/api/auth/email-otp/send-verification-otp", async (route) => {

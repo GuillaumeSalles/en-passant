@@ -68,7 +68,7 @@ export type RepertoireSyncRequest = {
 export type RepertoireSyncResponse = {
   cursor: string;
   changes: RepertoireSyncChanges;
-  acknowledgedPgn: {
+  acknowledgedPgn?: {
     id: string;
     updatedAt: string;
     deletedAt?: string | null;
@@ -641,7 +641,7 @@ export async function applyRepertoireSyncResponse(
   const writeChapterStore = writeTransaction.objectStore(CHAPTERS_STORE_NAME);
   const writePgnStore = writeTransaction.objectStore(PGNS_STORE_NAME);
   const acknowledgmentWrites: Promise<void>[] = [];
-  if (response.acknowledgedPgn !== null) {
+  if (response.acknowledgedPgn != null) {
     const acknowledgment = response.acknowledgedPgn;
     const existing = pgnById.get(acknowledgment.id);
     const sent = request.changes.pgns.find((pgn) => pgn.id === acknowledgment.id);
