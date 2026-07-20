@@ -8,7 +8,7 @@ import {
 } from "@/lib/chess";
 import type { MutationEffect, MutationResult } from "@/lib/useMutation";
 import { applyNagToList } from "./nags";
-import { normalizePgn } from "./pgnTree";
+import { toPgn } from "./pgnTree";
 import {
   deletePgnMove,
   requireMove,
@@ -36,6 +36,9 @@ import type {
   NormalizedPgn,
   Orientation,
   BoardAnimation,
+  MoveAnnotations,
+  MovePath,
+  PgnMutation,
 } from "./types";
 
 type VariationStart =
@@ -71,25 +74,6 @@ export function setBoardOrientation(
   state.set("orientation", orientation);
 }
 
-export function replaceCurrentChapterPgn(state: MutableAppState, ctx: Context, pgn: string): void {
-  const pgnId = getPgnId(state, ctx);
-  if (pgnId === null) {
-    return;
-  }
-
-  state.set("pgns", {
-    ...state.pgns,
-    [pgnId]: {
-      status: "success",
-      data: normalizePgn(pgn),
-    },
-  });
-  setChapterSelection(state, ctx, null, null);
-  state.set("analysis", []);
-  state.set("evaluations", []);
-  state.set("animation", null);
-}
-
 function moveSoundEffect(move: Move | undefined): MutationEffect | undefined {
   if (move === undefined) return undefined;
   return { type: "play-sound", sound: move.san.includes("x") ? "Capture" : "Move" };
@@ -100,6 +84,62 @@ function newMoveEffects(move: Move): MutationEffect[] {
   return sound === undefined
     ? [{ type: "record-cached-move" }]
     : [sound, { type: "record-cached-move" }];
+}
+
+function uci(move: Move): string {
+  return `${move.from}${move.to}${move.promotion ?? ""}`;
+}
+
+function movePath(pgn: NormalizedPgn, moveId: number | null): MovePath {
+  const path: string[] = [];
+  let currentId = moveId;
+  while (currentId !== null) {
+    const currentMove = requireMove(pgn.moves, currentId);
+    path.unshift(uci(currentMove));
+    currentId = currentMove.prev;
+  }
+  return path;
+}
+
+function moveAnnotations(move: Move): MoveAnnotations {
+  const metadata =
+    move.metadata.length > 0
+      ? move.metadata
+      : move.clock !== null
+        ? [`[%clk ${move.clock}]`]
+        : move.timeSpent !== null
+          ? [`[%emt ${move.timeSpent}]`]
+          : [];
+  const commentAfter = [
+    ...metadata,
+    ...(move.commentAfter === null || move.commentAfter === "" ? [] : [move.commentAfter]),
+  ].join(" ");
+  return {
+    nags: [...move.nags],
+    commentBefore: move.commentBefore,
+    commentAfter: commentAfter === "" ? null : commentAfter,
+  };
+}
+
+function pgnMutationEffect(
+  state: MutableAppState,
+  ctx: Context,
+  pgn: NormalizedPgn,
+  mutation: PgnMutation,
+): MutationEffect | undefined {
+  if (ctx.type !== "repertoire-builder") return undefined;
+  const pgnId = getPgnId(state, ctx);
+  if (pgnId === null) return undefined;
+  return {
+    type: "persist-pgn-mutation",
+    pgnId,
+    pgn: toPgn(pgn),
+    mutation,
+  };
+}
+
+function compactEffects(...effects: MutationResult[]): MutationEffect[] {
+  return effects.flatMap((effect) => effect ?? []);
 }
 
 function nextBoardAnimation(animation: AppliedMoveAnimation): BoardAnimation {
@@ -337,7 +377,15 @@ function move(
 
     setChapterSelection(state, ctx, newId, null);
     setBoardAnimation(state, animation, animate);
-    return newMoveEffects(newMove);
+    return compactEffects(
+      newMoveEffects(newMove),
+      pgnMutationEffect(state, ctx, pgn, {
+        type: "addMove",
+        parentPath: [],
+        move: uci(newMove),
+        annotations: moveAnnotations(newMove),
+      }),
+    );
   }
 
   const currentMove = pgn.moves[selectedMoveId];
@@ -390,7 +438,15 @@ function move(
 
   setChapterSelection(state, ctx, newId, null);
   setBoardAnimation(state, animation, animate);
-  return newMoveEffects(newMove);
+  return compactEffects(
+    newMoveEffects(newMove),
+    pgnMutationEffect(state, ctx, pgn, {
+      type: "addMove",
+      parentPath: movePath(pgn, currentMove.id),
+      move: uci(newMove),
+      annotations: moveAnnotations(newMove),
+    }),
+  );
 }
 
 export function moveToStart(state: MutableAppState, ctx: Context): void {
@@ -424,10 +480,17 @@ export function arrowUp(state: MutableAppState, ctx: Context): void {
   }
 }
 
-export function addEvalMoves(state: MutableAppState, ctx: Context, moves: EvalMove[]): void {
+export function addEvalMoves(
+  state: MutableAppState,
+  ctx: Context,
+  moves: EvalMove[],
+): MutationResult {
+  const effects: MutationEffect[] = [];
   for (const evalMove of moves) {
-    moveFromEvalMove(state, ctx, evalMove);
+    const result = moveFromEvalMove(state, ctx, evalMove);
+    effects.push(...compactEffects(result));
   }
+  return effects;
 }
 
 export function moveToLastMainLineMove(state: MutableAppState, ctx: Context): MutationResult {
@@ -513,7 +576,7 @@ export function updateMoveCommentAfter(
   ctx: Context,
   moveId: number,
   commentAfter: string,
-): void {
+): MutationResult {
   const pgn = getPgn(state, ctx);
   if (pgn === null) {
     return;
@@ -524,9 +587,15 @@ export function updateMoveCommentAfter(
     return;
   }
 
-  setPgnMove(pgn, {
+  const updatedMove = {
     ...move,
     commentAfter: commentAfter.trim() === "" ? null : commentAfter,
+  };
+  setPgnMove(pgn, updatedMove);
+  return pgnMutationEffect(state, ctx, pgn, {
+    type: "setAnnotations",
+    path: movePath(pgn, moveId),
+    annotations: moveAnnotations(updatedMove),
   });
 }
 
@@ -535,7 +604,7 @@ export function updateMoveCommentBefore(
   ctx: Context,
   moveId: number,
   commentBefore: string,
-): void {
+): MutationResult {
   const pgn = getPgn(state, ctx);
   if (pgn === null) {
     return;
@@ -546,9 +615,15 @@ export function updateMoveCommentBefore(
     return;
   }
 
-  setPgnMove(pgn, {
+  const updatedMove = {
     ...move,
     commentBefore: commentBefore.trim() === "" ? null : commentBefore,
+  };
+  setPgnMove(pgn, updatedMove);
+  return pgnMutationEffect(state, ctx, pgn, {
+    type: "setAnnotations",
+    path: movePath(pgn, moveId),
+    annotations: moveAnnotations(updatedMove),
   });
 }
 
@@ -573,7 +648,11 @@ export function copyMoveLearningDetails(
   });
 }
 
-export function setNagOnSelectedMove(state: MutableAppState, ctx: Context, nag: number): void {
+export function setNagOnSelectedMove(
+  state: MutableAppState,
+  ctx: Context,
+  nag: number,
+): MutationResult {
   const pgn = getPgn(state, ctx);
   const selectedMoveId = selectSelectedMoveId(state, ctx);
   if (pgn === null || selectedMoveId === null) {
@@ -585,9 +664,15 @@ export function setNagOnSelectedMove(state: MutableAppState, ctx: Context, nag: 
     return;
   }
 
-  setPgnMove(pgn, {
+  const updatedMove = {
     ...move,
     nags: applyNagToList(move.nags, nag),
+  };
+  setPgnMove(pgn, updatedMove);
+  return pgnMutationEffect(state, ctx, pgn, {
+    type: "setAnnotations",
+    path: movePath(pgn, selectedMoveId),
+    annotations: moveAnnotations(updatedMove),
   });
 }
 
@@ -616,7 +701,27 @@ function findStartOfVariation(pgn: NormalizedPgn, moveId: number): VariationStar
   }
 }
 
-export function promoteVariation(state: MutableAppState, ctx: Context, moveId: number): void {
+function reorderVariationEffect(
+  state: MutableAppState,
+  ctx: Context,
+  pgn: NormalizedPgn,
+  variation: VariationStart,
+): MutationEffect | undefined {
+  const parentPath = variation.type === "root" ? [] : movePath(pgn, variation.parentId);
+  const childIds =
+    variation.type === "root" ? pgn.rootMoveIds : requireMove(pgn.moves, variation.parentId).next;
+  return pgnMutationEffect(state, ctx, pgn, {
+    type: "reorderVariations",
+    parentPath,
+    childMoves: childIds.map((id) => uci(requireMove(pgn.moves, id))),
+  });
+}
+
+export function promoteVariation(
+  state: MutableAppState,
+  ctx: Context,
+  moveId: number,
+): MutationResult {
   const pgn = getPgn(state, ctx);
   if (pgn === null) {
     return;
@@ -629,7 +734,7 @@ export function promoteVariation(state: MutableAppState, ctx: Context, moveId: n
     newRootMoveIds.unshift(result.childId);
 
     setPgnRootMoveIds(pgn, newRootMoveIds);
-    return;
+    return reorderVariationEffect(state, ctx, pgn, result);
   }
 
   const { parentId, childId } = result;
@@ -642,6 +747,7 @@ export function promoteVariation(state: MutableAppState, ctx: Context, moveId: n
     ...parentMove,
     next: newNextMoves,
   });
+  return reorderVariationEffect(state, ctx, pgn, result);
 }
 
 function* flatten(move: Move, moves: Record<number, Move>): Generator<Move> {
@@ -651,7 +757,7 @@ function* flatten(move: Move, moves: Record<number, Move>): Generator<Move> {
   yield move;
 }
 
-export function deleteMove(state: MutableAppState, ctx: Context, moveId: number): void {
+export function deleteMove(state: MutableAppState, ctx: Context, moveId: number): MutationResult {
   const pgn = getPgn(state, ctx);
   if (pgn === null) {
     return;
@@ -661,6 +767,7 @@ export function deleteMove(state: MutableAppState, ctx: Context, moveId: number)
   if (move === undefined) {
     return;
   }
+  const path = movePath(pgn, moveId);
 
   if (move.prev !== null) {
     const previousMove = requireMove(pgn.moves, move.prev);
@@ -684,24 +791,37 @@ export function deleteMove(state: MutableAppState, ctx: Context, moveId: number)
   }
 
   setChapterSelection(state, ctx, move.prev, null);
+  return pgnMutationEffect(state, ctx, pgn, { type: "deleteSubtree", path });
 }
 
-export function moveVariationUp(state: MutableAppState, ctx: Context, moveId: number): void {
+export function moveVariationUp(
+  state: MutableAppState,
+  ctx: Context,
+  moveId: number,
+): MutationResult {
   const pgn = getPgn(state, ctx);
   if (pgn === null) {
     return;
   }
 
-  reorderVariation(pgn, findStartOfVariation(pgn, moveId), "up");
+  const variation = findStartOfVariation(pgn, moveId);
+  reorderVariation(pgn, variation, "up");
+  return reorderVariationEffect(state, ctx, pgn, variation);
 }
 
-export function moveVariationDown(state: MutableAppState, ctx: Context, moveId: number): void {
+export function moveVariationDown(
+  state: MutableAppState,
+  ctx: Context,
+  moveId: number,
+): MutationResult {
   const pgn = getPgn(state, ctx);
   if (pgn === null) {
     return;
   }
 
-  reorderVariation(pgn, findStartOfVariation(pgn, moveId), "down");
+  const variation = findStartOfVariation(pgn, moveId);
+  reorderVariation(pgn, variation, "down");
+  return reorderVariationEffect(state, ctx, pgn, variation);
 }
 
 function reorderVariation(

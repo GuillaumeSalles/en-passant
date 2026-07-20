@@ -1,11 +1,13 @@
-type PgnWriter = (id: string, pgn: string) => Promise<void>;
+import type { PgnMutation } from "@/lib/AppState";
+
+type PgnWriter = (id: string, pgn: string, mutations: PgnMutation[]) => Promise<void>;
 
 type AfterWrite = () => void;
 
 type QueueEntry = {
   latestPgn: string;
+  pendingMutations: PgnMutation[];
   isRunning: boolean;
-  hasPendingWrite: boolean;
   idle: Promise<void>;
   resolveIdle: () => void;
 };
@@ -18,55 +20,65 @@ function createIdlePromise(): { idle: Promise<void>; resolveIdle: () => void } {
   return { idle, resolveIdle };
 }
 
-function createEntry(pgn: string): QueueEntry {
+function createEntry(pgn: string, mutation: PgnMutation): QueueEntry {
   const { idle, resolveIdle } = createIdlePromise();
   return {
     latestPgn: pgn,
+    pendingMutations: [mutation],
     isRunning: false,
-    hasPendingWrite: true,
     idle,
     resolveIdle,
   };
 }
 
-export function createLatestPgnSaveQueue(writePgn: PgnWriter, afterWrite: AfterWrite) {
+export function createPgnMutationSaveQueue(writePgn: PgnWriter, afterWrite: AfterWrite) {
   const entries = new Map<string, QueueEntry>();
 
   async function drain(id: string, entry: QueueEntry): Promise<void> {
     entry.isRunning = true;
 
-    while (entry.hasPendingWrite) {
+    while (entry.pendingMutations.length > 0) {
       const pgn = entry.latestPgn;
-      entry.hasPendingWrite = false;
+      const mutations = entry.pendingMutations;
+      entry.pendingMutations = [];
 
       try {
-        await writePgn(id, pgn);
+        await writePgn(id, pgn, mutations);
         afterWrite();
       } catch {
-        // Keep the optimistic UI state. A later write for this PGN can still persist and sync.
+        entry.pendingMutations = [...mutations, ...entry.pendingMutations];
+        break;
       }
     }
 
     entry.isRunning = false;
-    entries.delete(id);
+    if (entry.pendingMutations.length === 0) {
+      entries.delete(id);
+    }
     entry.resolveIdle();
   }
 
-  function saveLatestPgn(id: string, pgn: string): Promise<void> {
+  function savePgnMutation(id: string, pgn: string, mutation: PgnMutation): Promise<void> {
     const existing = entries.get(id);
     if (existing !== undefined) {
       existing.latestPgn = pgn;
-      existing.hasPendingWrite = true;
+      existing.pendingMutations.push(mutation);
+      if (!existing.isRunning) {
+        const { idle, resolveIdle } = createIdlePromise();
+        existing.idle = idle;
+        existing.resolveIdle = resolveIdle;
+        void drain(id, existing);
+      }
       return existing.idle;
     }
 
-    const entry = createEntry(pgn);
+    const entry = createEntry(pgn, mutation);
     entries.set(id, entry);
     void drain(id, entry);
     return entry.idle;
   }
 
   return {
-    saveLatestPgn,
+    savePgnMutation,
   };
 }

@@ -1,10 +1,10 @@
 import { NewSerializedRepertoire, SerializedChapter } from "@/lib/AppState";
+import type { PgnMutation } from "@/lib/AppState";
 import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
-import { pgnMutationsBetween, type PgnMutation } from "./pgnMutations";
 
 const DB_NAME = "en-passant";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const REPERTOIRE_STORE_NAME = "repertoires";
 const CHAPTERS_STORE_NAME = "chapters";
@@ -46,9 +46,10 @@ type StoredPgnBase = {
   pgn: string;
 } & SyncMetadata;
 
-export type StoredPgn =
-  | (StoredPgnBase & { pendingMutations: PgnMutation[]; metadataDirty: boolean })
-  | (StoredPgnBase & { dirty: boolean });
+export type StoredPgn = StoredPgnBase & {
+  pendingMutations: PgnMutation[];
+  metadataDirty: boolean;
+};
 
 export type RepertoireSyncChanges = {
   repertoires: SyncedRepertoire[];
@@ -68,7 +69,7 @@ export type RepertoireSyncRequest = {
 export type RepertoireSyncResponse = {
   cursor: string;
   changes: RepertoireSyncChanges;
-  acknowledgedPgn?: {
+  acknowledgedPgn: {
     id: string;
     updatedAt: string;
     deletedAt?: string | null;
@@ -231,7 +232,9 @@ function hasRequiredStores(db: IDBDatabase): boolean {
   return REQUIRED_STORE_NAMES.every((storeName) => db.objectStoreNames.contains(storeName));
 }
 
-async function connect(onUpgrade: (db: IDBDatabase) => void): Promise<IDBDatabase> {
+async function connect(
+  onUpgrade: (db: IDBDatabase, oldVersion: number) => void,
+): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -256,7 +259,7 @@ async function connect(onUpgrade: (db: IDBDatabase) => void): Promise<IDBDatabas
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
-      onUpgrade(db);
+      onUpgrade(db, event.oldVersion);
     };
   });
 }
@@ -297,23 +300,29 @@ function put<T>(store: IDBObjectStore, key: string, value: T): Promise<void> {
   });
 }
 
-export async function savePgn(id: string, pgn: string): Promise<void> {
+export async function savePgnMutation(
+  id: string,
+  pgn: string,
+  mutations: PgnMutation[],
+): Promise<void> {
+  if (mutations.length === 0) return;
+  if (mutations.some((mutation) => mutation.type === "createPgn")) {
+    throw new Error("PGN creation must use a chapter creation operation");
+  }
   const db = await init();
   const readTransaction = db.transaction([PGNS_STORE_NAME], "readonly");
   const existing = await get<StoredPgn>(readTransaction.objectStore(PGNS_STORE_NAME), id);
-  const mutations = pgnMutationsBetween(existing?.pgn, pgn);
-  if (mutations.length === 0) return;
+  if (existing === undefined || existing.deletedAt != null) {
+    throw new Error("Cannot mutate a missing PGN");
+  }
   const transaction = db.transaction([PGNS_STORE_NAME], "readwrite");
   await waitForTransaction(
     transaction,
     put(transaction.objectStore(PGNS_STORE_NAME), id, {
       id,
       pgn,
-      pendingMutations: [
-        ...(existing === undefined ? [] : pendingMutationsFor(existing)),
-        ...mutations,
-      ],
-      metadataDirty: existing === undefined ? true : isPgnMetadataDirty(existing),
+      pendingMutations: [...pendingMutationsFor(existing), ...mutations],
+      metadataDirty: isPgnMetadataDirty(existing),
       updatedAt: nowIso(),
       deletedAt: null,
     } satisfies StoredPgn),
@@ -369,7 +378,7 @@ export async function createRepertoireAndChapter(
       put(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
-        pendingMutations: pgnMutationsBetween(undefined, pgn),
+        pendingMutations: [{ type: "createPgn", pgn }],
         metadataDirty: true,
         updatedAt,
         deletedAt: null,
@@ -479,7 +488,7 @@ export async function createChapter(chapter: SerializedChapter, pgn: string): Pr
       put(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
-        pendingMutations: pgnMutationsBetween(undefined, pgn),
+        pendingMutations: [{ type: "createPgn", pgn }],
         metadataDirty: true,
         updatedAt,
         deletedAt: null,
@@ -568,12 +577,11 @@ function isPgnDirty(pgn: StoredPgn): boolean {
 }
 
 function isPgnMetadataDirty(pgn: StoredPgn): boolean {
-  return "metadataDirty" in pgn ? pgn.metadataDirty : pgn.dirty;
+  return pgn.metadataDirty;
 }
 
 function pendingMutationsFor(pgn: StoredPgn): PgnMutation[] {
-  if ("pendingMutations" in pgn) return pgn.pendingMutations;
-  return pgn.dirty && pgn.deletedAt == null ? [{ type: "replacePgn", pgn: pgn.pgn }] : [];
+  return pgn.pendingMutations;
 }
 
 function shouldApplySyncedChange<T extends { id: string; updatedAt: string }>(
@@ -727,7 +735,13 @@ function init() {
     return dbPromise;
   }
 
-  dbPromise = connect((db) => {
+  dbPromise = connect((db, oldVersion) => {
+    if (oldVersion > 0 && oldVersion < 2) {
+      for (const storeName of db.objectStoreNames) {
+        db.deleteObjectStore(storeName);
+      }
+      clearLastSyncedAt();
+    }
     for (const storeName of REQUIRED_STORE_NAMES) {
       if (!db.objectStoreNames.contains(storeName)) {
         db.createObjectStore(storeName);
@@ -745,7 +759,7 @@ export const storage = {
   createChapter,
   getInitialRepertoiresAndChapters,
   getPgn,
-  savePgn,
+  savePgnMutation,
   deleteChapter,
   deleteRepertoire,
   updateChapter,

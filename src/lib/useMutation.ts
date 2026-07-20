@@ -1,5 +1,5 @@
 import { useStore } from "@/app/AppStateProvider";
-import type { AppState, Context } from "./AppState";
+import type { AppState, Context, PgnMutation } from "./AppState";
 import { useRouteContext } from "./useRouteContext";
 import { Store, StoreState } from "@/lib/createStore";
 import { type Storage, storage } from "@/storage";
@@ -7,12 +7,14 @@ import { useNavigate } from "@solidjs/router";
 import { untrack } from "solid-js";
 import { isSignedIn } from "@/lib/authSession";
 import { recordCachedMoveAdditions } from "@/lib/signupNudge";
+import { saveLatestPgnMutation } from "@/storage/pgnPersistence";
 
 export type MoveSound = "Move" | "Capture";
 
 export type MutationEffect =
   | { type: "play-sound"; sound: MoveSound }
-  | { type: "record-cached-move" };
+  | { type: "record-cached-move" }
+  | { type: "persist-pgn-mutation"; pgnId: string; pgn: string; mutation: PgnMutation };
 
 export type MutationResult = void | MutationEffect | MutationEffect[];
 
@@ -39,6 +41,8 @@ function runMutationEffects(result: MutationResult): void {
       playSound(effect.sound);
     } else if (effect.type === "record-cached-move" && !isSignedIn()) {
       recordCachedMoveAdditions(1);
+    } else if (effect.type === "persist-pgn-mutation") {
+      void saveLatestPgnMutation(effect.pgnId, effect.pgn, effect.mutation);
     }
   }
 }

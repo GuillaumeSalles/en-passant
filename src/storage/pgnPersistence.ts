@@ -1,9 +1,14 @@
-import { savePgn } from "@/storage";
+import { savePgnMutation } from "@/storage";
 import { queueRepertoireSync } from "@/storage/backendSync";
-import { createLatestPgnSaveQueue } from "./pgnSaveQueue";
+import { createPgnMutationSaveQueue } from "./pgnSaveQueue";
+import type { PgnMutation } from "@/lib/AppState";
 
-const pgnSaveQueue = createLatestPgnSaveQueue(savePgn, queueRepertoireSync);
+const pgnSaveQueue = createPgnMutationSaveQueue(savePgnMutation, queueRepertoireSync);
 
-export function saveLatestPgn(id: string, pgn: string): Promise<void> {
-  return pgnSaveQueue.saveLatestPgn(id, pgn);
+export function saveLatestPgnMutation(
+  id: string,
+  pgn: string,
+  mutation: PgnMutation,
+): Promise<void> {
+  return pgnSaveQueue.savePgnMutation(id, pgn, mutation);
 }

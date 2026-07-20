@@ -7,7 +7,6 @@ import {
   Context,
   Eval,
   getPgn,
-  getPgnId,
   getNagGlyph,
   getNagMeaning,
   HighlightKind,
@@ -18,7 +17,6 @@ import {
   selectOrientation,
   selectMove,
   selectedMove,
-  toPgn,
   updateEvaluation,
 } from "@/lib/AppState";
 import { MovesTree } from "./MovesTree";
@@ -30,7 +28,6 @@ import { WorkspaceLayout } from "./WorkspaceLayout";
 import { PgnExplorerToolbar } from "./PgnExplorerToolbar";
 import { useSquareHighlights } from "./useSquareHighlights";
 import { VariationSelector } from "./VariationSelector";
-import { saveLatestPgn } from "@/storage/pgnPersistence";
 import { useSelector } from "@/lib/useSelector";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { MutationContext, useMutation } from "@/lib/useMutation";
@@ -137,7 +134,6 @@ export function Repertoire(props: {
   );
 
   const pgn = useSelector(getPgn);
-  const pgnId = useSelector(getPgnId);
   const currentFen = useSelector(selectFen);
   const engineDepth = useSelector(selectEngineDepth);
   const isEngineEnabled = useSelector(selectIsEngineEnabled);
@@ -195,22 +191,6 @@ export function Repertoire(props: {
   onCleanup(() => {
     engine.terminate();
   });
-
-  // Save PGN whenever it changes
-  createEffect(
-    () => {
-      const id = pgnId();
-      const currentPgn = pgn();
-      return {
-        id,
-        serializedPgn: currentPgn === null ? null : toPgn(currentPgn),
-      };
-    },
-    ({ id, serializedPgn }) => {
-      if (id === null || serializedPgn === null) return;
-      void saveLatestPgn(id, serializedPgn);
-    },
-  );
 
   // Evaluate when fen/engine changes
   createEffect(

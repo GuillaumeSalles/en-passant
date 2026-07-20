@@ -24,7 +24,6 @@ type AuthPageOptions = {
   localName?: string;
   localPgn?: string;
   dirty?: boolean;
-  legacyPgnShape?: boolean;
 };
 
 async function dragPiece(page: Page, from: string, to: string): Promise<void> {
@@ -43,7 +42,6 @@ async function openAuthPage(page: Page, options: AuthPageOptions = {}) {
   const dirty = options.dirty ?? false;
   await seedIndexedDb(page, {
     clearLocalStorage: true,
-    legacyPgnShape: options.legacyPgnShape,
     repertoires: [
       {
         id: "auth-repertoire",
@@ -206,7 +204,6 @@ test("new account sign in uploads local repertoire data", async ({ page }) => {
     localName: "Local London Notes",
     localPgn: "1. d4 d5 *",
     dirty: true,
-    legacyPgnShape: true,
   });
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByLabel("Email").fill("player@example.com");
@@ -228,7 +225,7 @@ test("new account sign in uploads local repertoire data", async ({ page }) => {
       pgns: [
         {
           id: "auth-pgn",
-          mutations: [{ type: "replacePgn", pgn: "1. d4 d5 *" }],
+          mutations: [{ type: "createPgn", pgn: "1. d4 d5 *" }],
         },
       ],
     },
@@ -270,6 +267,7 @@ test("existing account sign in discards local repertoire data and loads server d
     return {
       cursor: "2026-06-26T00:00:02.000Z",
       changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
+      acknowledgedPgn: null,
     };
   });
   await page.route("**/api/auth/email-otp/send-verification-otp", async (route) => {
@@ -367,7 +365,7 @@ test("new Google account sign in uploads local repertoire data", async ({ page }
       pgns: [
         {
           id: "auth-pgn",
-          mutations: [{ type: "replacePgn", pgn: "1. d4 d5 *" }],
+          mutations: [{ type: "createPgn", pgn: "1. d4 d5 *" }],
         },
       ],
     },

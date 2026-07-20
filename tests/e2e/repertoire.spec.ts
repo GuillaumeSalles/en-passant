@@ -90,6 +90,50 @@ test.beforeEach(async ({ page }) => {
   await mockSignedOutAuth(page);
 });
 
+test("IndexedDB v2 wipes snapshot-era local repertoire data", async ({ page }) => {
+  await page.goto("/stockfish-18-lite-single.js");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase("en-passant");
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("en-passant", 1);
+      request.onerror = () => reject(request.error);
+      request.onupgradeneeded = () => {
+        for (const storeName of ["repertoires", "chapters", "pgns", "metadata"]) {
+          request.result.createObjectStore(storeName);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(["repertoires"], "readwrite");
+      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.objectStore("repertoires").put(
+        {
+          id: "snapshot-era",
+          handle: "snapshot-era",
+          name: "Snapshot era repertoire",
+          orientation: "white",
+          dirty: true,
+        },
+        "snapshot-era",
+      );
+    });
+  });
+
+  await page.goto("/app");
+
+  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
+  await expect(page.getByText("Snapshot era repertoire")).toHaveCount(0);
+});
+
 async function seedRepertoire(
   page: Page,
   pgn = defaultPgn,
@@ -1355,6 +1399,9 @@ test("adds a move at the end of the main line", async ({ page }) => {
 
   await expect(page.locator('[data-san="Nf6"]')).toBeVisible();
   await expect(page.locator('[data-square="f6"]')).toHaveAttribute("data-piece", "n");
+  await expect.poll(() => firstStoredPgn(page)).toContain("Nf6");
+  await page.reload();
+  await expect(page.locator('[data-san="Nf6"]')).toBeVisible();
   expect(consoleMessages).toEqual([]);
 });
 

@@ -120,6 +120,29 @@ export type NormalizedPgn = {
   moveIdCounter: number;
 };
 
+export type MovePath = string[];
+
+export type MoveAnnotations = {
+  nags: number[];
+  commentBefore: string | null;
+  commentAfter: string | null;
+};
+
+export type PgnMutation =
+  | {
+      type: "createPgn";
+      pgn: string;
+    }
+  | {
+      type: "addMove";
+      parentPath: MovePath;
+      move: string;
+      annotations: MoveAnnotations;
+    }
+  | { type: "deleteSubtree"; path: MovePath }
+  | { type: "setAnnotations"; path: MovePath; annotations: MoveAnnotations }
+  | { type: "reorderVariations"; parentPath: MovePath; childMoves: string[] };
+
 export type AppState = {
   orientation: Orientation;
   analysis: MoveAnalysis[];

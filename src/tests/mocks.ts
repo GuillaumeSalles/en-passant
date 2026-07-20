@@ -17,7 +17,7 @@ export function createStorageMock(): Mocked<Storage> {
     getRepertoireSyncRequest: vi.fn(),
     getPgn: vi.fn(),
     applyRepertoireSyncResponse: vi.fn(),
-    savePgn: vi.fn(),
+    savePgnMutation: vi.fn(),
     updateChapter: vi.fn(),
     updateRepertoire: vi.fn(),
   };

@@ -11,7 +11,6 @@ import {
   forward,
   moveFromChessboard,
   promoteVariation,
-  replaceCurrentChapterPgn,
   selectedMove,
   selectFen,
   selectMove,
@@ -201,26 +200,6 @@ test("selected move is tracked per chapter", () => {
   expect(selectedMove(state, chapterOneCtx)?.san).toBe("e5");
 });
 
-test("replacing PGN updates the current chapter only and clears its selection", () => {
-  const chapterOneCtx: Context = { ...ctx, chapterHandle: "chapter-1" };
-  const chapterTwoCtx: Context = { ...ctx, chapterHandle: "chapter-2" };
-  const state = fromChapterPgns({
-    "chapter-1": "1. e4 e5 *",
-    "chapter-2": "1. d4 d5 *",
-  });
-
-  forward(state, chapterOneCtx);
-  expect(selectedMove(state, chapterOneCtx)?.san).toBe("e4");
-
-  replaceCurrentChapterPgn(state, chapterOneCtx, "1. c4 c5 2. Nc3 *");
-
-  expect(selectedMove(state, chapterOneCtx)).toBeNull();
-  expectValidPgnTree(getLoadedPgn(state, chapterOneCtx));
-  expectValidPgnTree(getLoadedPgn(state, chapterTwoCtx));
-  expect(toPgn(getLoadedPgn(state, chapterOneCtx))).toBe("1. c4 c5 2. Nc3 *");
-  expect(toPgn(getLoadedPgn(state, chapterTwoCtx))).toBe("1. d4 d5 *");
-});
-
 test("updates move comments", () => {
   const state = fromPgn("1. d4 1... {Solid} d5 2. c4 {Queen's Gambit} e6 *");
   const pgn = getLoadedPgn(state);
@@ -365,7 +344,14 @@ test("sets NAGs on the selected move", () => {
   const state = fromPgn("1. e4 e5 *");
 
   forward(state, ctx);
-  expect(setNagOnSelectedMove(state, ctx, 1)).toBeUndefined();
+  expect(setNagOnSelectedMove(state, ctx, 1)).toMatchObject({
+    type: "persist-pgn-mutation",
+    mutation: {
+      type: "setAnnotations",
+      path: ["e2e4"],
+      annotations: { nags: [1] },
+    },
+  });
   expectValidPgnTree(getLoadedPgn(state));
   expect(selectedMove(state, ctx)?.nags).toEqual([1]);
 
@@ -383,7 +369,7 @@ test("sets NAGs on the selected move", () => {
   expect(toPgn(getPgn(state, ctx)!)).toBe("1. e4 $2 $9 e5 *");
 });
 
-test("emits sound effects only when selecting a move", () => {
+test("separates selection sound effects from persistent annotations", () => {
   const state = fromPgn("1. e4 d5 2. exd5 *");
   const pgn = getPgn(state, ctx)!;
   const e4 = pgn.rootMoveIds[0]!;
@@ -392,7 +378,10 @@ test("emits sound effects only when selecting a move", () => {
 
   expect(selectMove(state, ctx, e4)).toEqual({ type: "play-sound", sound: "Move" });
   expect(selectMove(state, ctx, e4)).toBeUndefined();
-  expect(setNagOnSelectedMove(state, ctx, 1)).toBeUndefined();
+  expect(setNagOnSelectedMove(state, ctx, 1)).toMatchObject({
+    type: "persist-pgn-mutation",
+    mutation: { type: "setAnnotations", path: ["e2e4"] },
+  });
   expect(selectMove(state, ctx, exd5)).toEqual({ type: "play-sound", sound: "Capture" });
 });
 
@@ -477,7 +466,11 @@ describe("delete move", () => {
     forward(state, ctx);
     const move = selectedMove(state, ctx)!;
     expect(move.san).toBe("e5");
-    deleteMove(state, ctx, move.id);
+    expect(deleteMove(state, ctx, move.id)).toMatchObject({
+      type: "persist-pgn-mutation",
+      mutation: { type: "deleteSubtree", path: ["e2e4", "e7e5"] },
+      pgn: "1. e4 *",
+    });
     expectValidPgnTree(getLoadedPgn(state));
     expect(selectedMove(state, ctx)?.san).toBe("e4");
     expect(toPgn(getPgn(state, ctx)!)).toBe("1. e4 *");
@@ -571,7 +564,20 @@ test("forward and back on main line", () => {
 test("move on main line", () => {
   let state = fromPgn("1. e4");
   forward(state, ctx);
-  moveFromChessboard(state, ctx, "e7", "e5", "bP");
+  expect(moveFromChessboard(state, ctx, "e7", "e5", "bP")).toEqual([
+    { type: "play-sound", sound: "Move" },
+    { type: "record-cached-move" },
+    expect.objectContaining({
+      type: "persist-pgn-mutation",
+      mutation: {
+        type: "addMove",
+        parentPath: ["e2e4"],
+        move: "e7e5",
+        annotations: { nags: [], commentBefore: null, commentAfter: null },
+      },
+      pgn: "1. e4 e5 *",
+    }),
+  ]);
   expectValidPgnTree(getLoadedPgn(state));
   expect(toPgn(getPgn(state, ctx)!)).toBe("1. e4 e5 *");
 });
@@ -665,7 +671,14 @@ describe("promote variation", () => {
       (move) => move.san === "d6",
     );
 
-    promoteVariation(state, ctx, d6Move!.id);
+    expect(promoteVariation(state, ctx, d6Move!.id)).toMatchObject({
+      type: "persist-pgn-mutation",
+      mutation: {
+        type: "reorderVariations",
+        parentPath: ["e2e4"],
+        childMoves: ["d7d6", "e7e5"],
+      },
+    });
     expectValidPgnTree(getLoadedPgn(state));
 
     expect(toPgn(getPgn(state, ctx)!)).toBe("1. e4 d6 (1... e5) *");

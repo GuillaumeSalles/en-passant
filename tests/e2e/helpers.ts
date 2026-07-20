@@ -194,21 +194,18 @@ export async function seedIndexedDb(
     chapters: ChapterRecord[];
     pgns: PgnRecord[];
     clearLocalStorage?: boolean;
-    legacyPgnShape?: boolean;
   },
 ): Promise<void> {
   const preparedRecords = {
     ...records,
-    pgns: records.legacyPgnShape
-      ? records.pgns
-      : records.pgns.map((record) => ({
-          id: record.id,
-          pgn: record.pgn,
-          pendingMutations: record.dirty ? [{ type: "replacePgn", pgn: record.pgn }] : [],
-          metadataDirty: record.dirty,
-          updatedAt: record.updatedAt,
-          deletedAt: record.deletedAt,
-        })),
+    pgns: records.pgns.map((record) => ({
+      id: record.id,
+      pgn: record.pgn,
+      pendingMutations: record.dirty ? [{ type: "createPgn", pgn: record.pgn }] : [],
+      metadataDirty: record.dirty,
+      updatedAt: record.updatedAt,
+      deletedAt: record.deletedAt,
+    })),
   };
   await gotoStorageOrigin(page);
   await page.evaluate(
@@ -222,7 +219,7 @@ export async function seedIndexedDb(
         });
       const openSeedDatabase = () =>
         new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant", 1);
+          const openRequest = indexedDB.open("en-passant", 2);
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onupgradeneeded = () => {
             const db = openRequest.result;
