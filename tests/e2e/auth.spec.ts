@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import {
+  acceptedPgnAcknowledgment,
+  acceptedSyncChanges,
   collectUnexpectedConsole,
   emptyChanges,
   isRecord,
   mockSignedInUser,
+  pgnSnapshot,
   seedIndexedDb,
   storedRepertoireHandles,
   type MockAuthSession,
@@ -21,7 +24,18 @@ type AuthPageOptions = {
   localName?: string;
   localPgn?: string;
   dirty?: boolean;
+  legacyPgnShape?: boolean;
 };
+
+async function dragPiece(page: Page, from: string, to: string): Promise<void> {
+  const source = await page.locator(`[data-square="${from}"]`).boundingBox();
+  const target = await page.locator(`[data-square="${to}"]`).boundingBox();
+  if (source === null || target === null) throw new Error("Expected both chessboard squares");
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2);
+  await page.mouse.up();
+}
 
 async function openAuthPage(page: Page, options: AuthPageOptions = {}) {
   const localName = options.localName ?? "Untitled Repertoire";
@@ -29,6 +43,7 @@ async function openAuthPage(page: Page, options: AuthPageOptions = {}) {
   const dirty = options.dirty ?? false;
   await seedIndexedDb(page, {
     clearLocalStorage: true,
+    legacyPgnShape: options.legacyPgnShape,
     repertoires: [
       {
         id: "auth-repertoire",
@@ -153,8 +168,11 @@ test("new account sign in uploads local repertoire data", async ({ page }) => {
   const syncRequests: unknown[] = [];
   const auth = await mockSignedInUser(page, undefined, null, (body) => {
     syncRequests.push(body);
-    const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : emptyChanges();
-    return { cursor: "2026-06-26T00:00:01.000Z", changes };
+    return {
+      cursor: "2026-06-26T00:00:01.000Z",
+      changes: acceptedSyncChanges(body),
+      acknowledgedPgn: acceptedPgnAcknowledgment(body),
+    };
   });
   await page.route("**/api/auth/email-otp/send-verification-otp", async (route) => {
     await route.fulfill({
@@ -188,6 +206,7 @@ test("new account sign in uploads local repertoire data", async ({ page }) => {
     localName: "Local London Notes",
     localPgn: "1. d4 d5 *",
     dirty: true,
+    legacyPgnShape: true,
   });
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByLabel("Email").fill("player@example.com");
@@ -209,7 +228,7 @@ test("new account sign in uploads local repertoire data", async ({ page }) => {
       pgns: [
         {
           id: "auth-pgn",
-          pgn: "1. d4 d5 *",
+          mutations: [{ type: "replacePgn", pgn: "1. d4 d5 *" }],
         },
       ],
     },
@@ -244,14 +263,7 @@ test("existing account sign in discards local repertoire data and loads server d
         deletedAt: null,
       },
     ],
-    pgns: [
-      {
-        id: "server-pgn",
-        pgn: "1. c4 e5 *",
-        updatedAt: "2026-06-26T00:00:01.000Z",
-        deletedAt: null,
-      },
-    ],
+    pgns: [pgnSnapshot("server-pgn", "1. c4 e5 *", "2026-06-26T00:00:01.000Z")],
   };
   const auth = await mockSignedInUser(page, undefined, null, (body) => {
     syncRequests.push(body);
@@ -327,8 +339,11 @@ test("new Google account sign in uploads local repertoire data", async ({ page }
   const syncRequests: unknown[] = [];
   const auth = await mockSignedInUser(page, undefined, null, (body) => {
     syncRequests.push(body);
-    const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : emptyChanges();
-    return { cursor: "2026-06-26T00:00:01.000Z", changes };
+    return {
+      cursor: "2026-06-26T00:00:01.000Z",
+      changes: acceptedSyncChanges(body),
+      acknowledgedPgn: acceptedPgnAcknowledgment(body),
+    };
   });
 
   await openAuthPage(page, {
@@ -352,7 +367,7 @@ test("new Google account sign in uploads local repertoire data", async ({ page }
       pgns: [
         {
           id: "auth-pgn",
-          pgn: "1. d4 d5 *",
+          mutations: [{ type: "replacePgn", pgn: "1. d4 d5 *" }],
         },
       ],
     },
@@ -387,20 +402,14 @@ test("existing Google account sign in discards local repertoire data and loads s
         deletedAt: null,
       },
     ],
-    pgns: [
-      {
-        id: "server-pgn",
-        pgn: "1. c4 e5 *",
-        updatedAt: "2026-06-26T00:00:01.000Z",
-        deletedAt: null,
-      },
-    ],
+    pgns: [pgnSnapshot("server-pgn", "1. c4 e5 *", "2026-06-26T00:00:01.000Z")],
   };
   const auth = await mockSignedInUser(page, undefined, null, (body) => {
     syncRequests.push(body);
     return {
       cursor: "2026-06-26T00:00:02.000Z",
       changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
+      acknowledgedPgn: null,
     };
   });
 
@@ -485,6 +494,45 @@ test("loads a backend session without a local signed-in marker", async ({ page }
     .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
     .toBeNull();
   expect(consoleMessages).toEqual([]);
+});
+
+test("sends a played move as a path-addressed PGN mutation", async ({ page }) => {
+  const syncRequests: unknown[] = [];
+  const auth = await mockSignedInUser(page, undefined, null, (body) => {
+    syncRequests.push(body);
+    return {
+      cursor: "2026-06-26T00:00:01.000Z",
+      changes: acceptedSyncChanges(body),
+      acknowledgedPgn: acceptedPgnAcknowledgment(body),
+    };
+  });
+  auth.signIn();
+
+  await openAuthPage(page, { localPgn: "1. e4 e5 *" });
+  await expect(page.locator("[data-square]")).toHaveCount(64);
+  await page.getByRole("button", { name: "Move to last main line move" }).click();
+  await dragPiece(page, "g1", "f3");
+
+  await expect.poll(() => JSON.stringify(syncRequests)).toContain('"type":"addMove"');
+  const requestWithMove = syncRequests.find((request) =>
+    JSON.stringify(request).includes('"type":"addMove"'),
+  );
+  expect(requestWithMove).toMatchObject({
+    changes: {
+      pgns: [
+        {
+          id: "auth-pgn",
+          mutations: expect.arrayContaining([
+            expect.objectContaining({
+              type: "addMove",
+              parentPath: ["e2e4", "e7e5"],
+              move: "g1f3",
+            }),
+          ]),
+        },
+      ],
+    },
+  });
 });
 
 test("mobile account menu opens above the username", async ({ page }) => {

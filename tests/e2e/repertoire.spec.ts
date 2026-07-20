@@ -786,7 +786,8 @@ test("labels alternative lines and accepts their moves without counting mistakes
   await expect(page.getByText("Good job!")).toBeVisible();
 
   await page.getByRole("link", { name: "Back to lines" }).click();
-  await expect(page.getByText("Trained", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("2/2 trained")).toBeVisible();
+  await expect(page.locator('[data-training-status="trained"]')).toHaveCount(2);
   await expect(page.getByText(/Trained with/)).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
