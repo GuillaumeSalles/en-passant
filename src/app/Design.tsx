@@ -12,6 +12,7 @@ import {
   Upload,
 } from "@/components/Icons";
 import { EvalBadge } from "@/components/EvalBadge";
+import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
 import { Button } from "@/components/ui/button";
 import { SignupNudgePanel } from "@/components/SignupNudge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,6 +65,15 @@ const tokenSwatches = [
   "accent",
   "destructive",
   "border",
+] as const;
+const masteryBadgeSamples = [
+  { intervalIndex: undefined, interval: "Unscheduled" },
+  { intervalIndex: 0, interval: "1 hour" },
+  { intervalIndex: 1, interval: "1 day" },
+  { intervalIndex: 2, interval: "3 days" },
+  { intervalIndex: 3, interval: "7 days" },
+  { intervalIndex: 4, interval: "14 days" },
+  { intervalIndex: 5, interval: "30 days" },
 ] as const;
 
 function noop(): void {}
@@ -329,6 +339,20 @@ function DisplaySamples() {
           <EvalBadge score={{ type: "cp", value: -118 }} />
           <EvalBadge score={{ type: "mate-in", value: 3 }} />
           <EvalBadge score={{ type: "stalemate" }} />
+        </div>
+      </div>
+      <HorizontalDashedDivider animation="none" />
+      <div class="grid gap-2" data-testid="mastery-badge-samples">
+        <div class="text-xs text-muted-foreground">Training mastery</div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <For each={masteryBadgeSamples}>
+            {(sample) => (
+              <div class="flex items-center gap-1.5">
+                <TrainingMasteryBadge intervalIndex={sample.intervalIndex} />
+                <span class="text-xs text-muted-foreground">{sample.interval}</span>
+              </div>
+            )}
+          </For>
         </div>
       </div>
       <HorizontalDashedDivider animation="none" />

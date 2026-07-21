@@ -76,3 +76,20 @@ test("shows the signup nudge on the design page", async ({ page }) => {
     page.getByText("Sign up to make sure you don't lose your repertoires. It's free."),
   ).toBeVisible();
 });
+
+test("shows every training mastery badge on the design page", async ({ page }) => {
+  await page.goto("/design");
+
+  const samples = page.getByTestId("mastery-badge-samples");
+  for (const level of [
+    "new",
+    "learning",
+    "familiar",
+    "practiced",
+    "reliable",
+    "strong",
+    "mastered",
+  ]) {
+    await expect(samples.locator(`[data-mastery-level="${level}"]`)).toBeVisible();
+  }
+});

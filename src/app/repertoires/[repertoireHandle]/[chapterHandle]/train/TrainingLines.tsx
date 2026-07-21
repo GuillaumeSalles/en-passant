@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
+import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
 import {
   getChapterPgn,
   getTrainingLines,
@@ -157,7 +158,8 @@ export function TrainingLines(props: {
           >
             {(line, index) => {
               const result = () => results().get(line.id);
-              const isLearned = () => isLineLearned(line.uciPath);
+              const review = () => reviewForLine(line.uciPath);
+              const isLearned = () => review() !== undefined;
               const isDue = () => isLineDue(line.uciPath);
               return (
                 <>
@@ -174,8 +176,9 @@ export function TrainingLines(props: {
                     data-alternative-line={line.isAlternative ? "true" : "false"}
                   >
                     <div class="min-w-0">
-                      <div class="flex items-center gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
                         <span class="font-medium">Line {index() + 1}</span>
+                        <TrainingMasteryBadge intervalIndex={review()?.intervalIndex} />
                         <Show when={line.isAlternative}>
                           <span class="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
                             Alternative

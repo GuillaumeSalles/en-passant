@@ -916,6 +916,8 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
   const firstLine = page.locator("[data-training-line]").first();
 
+  await expect(firstLine.locator('[data-mastery-level="new"]')).toHaveText("New");
+
   await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveAttribute(
     "href",
     /\/learn\/v1-[A-Za-z0-9_-]+$/,
@@ -950,6 +952,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
+  await expect(page.locator('[data-mastery-level="learning"]')).toHaveText("Learning");
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(1);
   await expect(page.getByText("Learned", { exact: true })).toHaveCount(0);
   await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveCount(0);

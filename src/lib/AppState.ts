@@ -38,11 +38,14 @@ export {
 } from "./app-state/trainingLines";
 export {
   DEFAULT_TRAINING_INTERVALS_MS,
+  TRAINING_MASTERY_LEVELS,
   initialTrainingReview,
   isTrainingReviewDue,
   nextTrainingReview,
   prioritizeDueTrainingLines,
   trainingLineReviewKey,
+  trainingMasteryLevel,
+  type TrainingMasteryLevel,
 } from "./app-state/spacedRepetition";
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";

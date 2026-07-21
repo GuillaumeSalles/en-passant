@@ -14,6 +14,26 @@ export const DEFAULT_TRAINING_INTERVALS_MS: readonly number[] = [
 
 export const TRAINING_ALGORITHM_VERSION = 1;
 
+export const TRAINING_MASTERY_LEVELS = [
+  "learning",
+  "familiar",
+  "practiced",
+  "reliable",
+  "strong",
+  "mastered",
+] as const;
+
+export type TrainingMasteryLevel = "new" | (typeof TRAINING_MASTERY_LEVELS)[number];
+
+export function trainingMasteryLevel(intervalIndex: number | undefined): TrainingMasteryLevel {
+  if (intervalIndex === undefined || !Number.isInteger(intervalIndex) || intervalIndex < 0) {
+    return "new";
+  }
+  return (
+    TRAINING_MASTERY_LEVELS[Math.min(intervalIndex, TRAINING_MASTERY_LEVELS.length - 1)] ?? "new"
+  );
+}
+
 export function trainingLineReviewKey(
   repertoireId: string,
   chapterId: string,

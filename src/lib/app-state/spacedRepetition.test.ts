@@ -5,6 +5,7 @@ import {
   isTrainingReviewDue,
   nextTrainingReview,
   prioritizeDueTrainingLines,
+  trainingMasteryLevel,
 } from "./spacedRepetition";
 
 const intervals = [10, 20, 40] as const;
@@ -18,6 +19,28 @@ const review = (intervalIndex: number, dueAt: number) => ({
 });
 
 describe("spaced repetition", () => {
+  test("maps schedule intervals to visible mastery levels", () => {
+    expect([
+      trainingMasteryLevel(undefined),
+      trainingMasteryLevel(0),
+      trainingMasteryLevel(1),
+      trainingMasteryLevel(2),
+      trainingMasteryLevel(3),
+      trainingMasteryLevel(4),
+      trainingMasteryLevel(5),
+      trainingMasteryLevel(6),
+    ]).toEqual([
+      "new",
+      "learning",
+      "familiar",
+      "practiced",
+      "reliable",
+      "strong",
+      "mastered",
+      "mastered",
+    ]);
+  });
+
   test("uses the initial review cadence", () => {
     const hour = 60 * 60 * 1000;
     const day = 24 * hour;
