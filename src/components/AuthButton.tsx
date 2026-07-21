@@ -313,7 +313,7 @@ export function AuthButton(
                 {signedInUser().email}
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={logout}>
+            <DropdownMenuItem disabled={false} onClick={logout}>
               <LogOut class="h-4 w-4" />
               Sign out
             </DropdownMenuItem>

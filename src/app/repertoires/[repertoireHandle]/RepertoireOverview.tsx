@@ -12,6 +12,7 @@ import { createNewChapter } from "@/mutations/createNewChapter";
 import { deleteChapter } from "@/app/Repertoires";
 import { useState } from "@/app/AppStateProvider";
 import { exportChapterPgn } from "@/lib/exportPgn";
+import { MAX_CHAPTERS_PER_REPERTOIRE } from "@/lib/repertoireLimits";
 
 function compareChapters(left: Chapter, right: Chapter): number {
   const byName = left.name.localeCompare(right.name, undefined, {
@@ -75,7 +76,16 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
       <div class="mx-auto flex w-full max-w-5xl flex-col px-4 py-4">
         <div class="flex items-center justify-between gap-3">
           <h1 class="truncate text-lg font-medium">Chapters</h1>
-          <Button aria-label="Create chapter" onClick={createChapter}>
+          <Button
+            aria-label="Create chapter"
+            onClick={createChapter}
+            disabled={repertoireChapters().length >= MAX_CHAPTERS_PER_REPERTOIRE}
+            title={
+              repertoireChapters().length >= MAX_CHAPTERS_PER_REPERTOIRE
+                ? `Maximum of ${MAX_CHAPTERS_PER_REPERTOIRE} chapters reached`
+                : undefined
+            }
+          >
             <Plus />
             Chapter
           </Button>

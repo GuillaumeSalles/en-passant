@@ -1,0 +1,2 @@
+export const MAX_REPERTOIRES = 10;
+export const MAX_CHAPTERS_PER_REPERTOIRE = 20;

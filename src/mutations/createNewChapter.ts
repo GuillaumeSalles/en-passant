@@ -3,6 +3,7 @@ import { uniqueHandle } from "@/lib/handles";
 import { repertoirePath } from "@/lib/routes";
 import { MutationContext } from "@/lib/useMutation";
 import { queueRepertoireSync } from "@/storage/backendSync";
+import { MAX_CHAPTERS_PER_REPERTOIRE } from "@/lib/repertoireLimits";
 
 export async function createNewChapter(
   { store, router, storage: { createChapter } }: MutationContext,
@@ -23,6 +24,9 @@ export async function createNewChapter(
   const repertoireChapters = Object.values(state.chapters.data).filter(
     (chapter) => chapter.repertoireId === repertoireId,
   );
+  if (repertoireChapters.length >= MAX_CHAPTERS_PER_REPERTOIRE) {
+    return;
+  }
   const chapterCount = repertoireChapters.length;
   const chapterName = `Chapter ${chapterCount + 1}`;
   const chapterHandle = uniqueHandle(

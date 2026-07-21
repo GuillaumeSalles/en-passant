@@ -1032,6 +1032,49 @@ test("creates a repertoire from the create repertoire menu", async ({ page }) =>
   expect(consoleMessages).toEqual([]);
 });
 
+test("disables repertoire creation after ten repertoires", async ({ page }) => {
+  const extraRepertoires = Array.from({ length: 9 }, (_, index) => ({
+    ...repertoire,
+    id: `extra-repertoire-${index}`,
+    handle: `extra-repertoire-${index}`,
+    name: `Extra Repertoire ${index + 1}`,
+  }));
+  await seedRepertoire(page, defaultPgn, [], repertoire, extraRepertoires);
+
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
+  await expectRepertoireReady(page);
+
+  const createButton = page.getByRole("button", { name: "Create repertoire" });
+  await expect(createButton).toBeDisabled();
+  await expect(createButton).toHaveAttribute("title", "Maximum of 10 repertoires reached");
+});
+
+test("disables chapter creation after twenty chapters", async ({ page }) => {
+  const extraChapters = Array.from({ length: 19 }, (_, index) => ({
+    ...chapter,
+    id: `extra-chapter-${index}`,
+    handle: `chapter-${index + 2}`,
+    name: `Chapter ${index + 2}`,
+    pgnId: `extra-pgn-${index}`,
+  }));
+  await seedRepertoire(page, defaultPgn, extraChapters);
+
+  await page.goto("/app/repertoires/untitled-repertoire");
+  const createButton = page.getByRole("button", { name: "Create chapter" });
+  await expect(createButton).toBeDisabled();
+  await expect(createButton).toHaveAttribute("title", "Maximum of 20 chapters reached");
+
+  await page.getByRole("button", { name: "Actions for Untitled Repertoire" }).click();
+  await expect(page.getByText("Create chapter from PGN (limit reached)")).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  await expect(page.getByText("Create empty chapter (limit reached)")).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+});
+
 test("creates a chapter from a PGN in the sidebar repertoire menu", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

@@ -245,15 +245,15 @@ function OverlaySamples() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem>
+            <DropdownMenuItem disabled={false}>
               <Plus />
               Create chapter
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem disabled={false}>
               <Check />
               Mark complete
             </DropdownMenuItem>
-            <DropdownMenuItem>Delete</DropdownMenuItem>
+            <DropdownMenuItem disabled={false}>Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <ContextMenu>

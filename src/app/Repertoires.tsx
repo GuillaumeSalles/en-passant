@@ -26,6 +26,7 @@ import { APP_ROOT, repertoireOverviewPath, repertoirePath, routePath } from "@/l
 import { formatRepertoireName, MAX_REPERTOIRE_NAME_LENGTH } from "@/lib/repertoireNames";
 import { LoadPGNDialog } from "@/components/LoadPgnDialog";
 import { exportChapterPgn } from "@/lib/exportPgn";
+import { MAX_CHAPTERS_PER_REPERTOIRE, MAX_REPERTOIRES } from "@/lib/repertoireLimits";
 
 function compareByNameThenId<T extends { name: string }>(
   [leftId, left]: [string, T],
@@ -267,7 +268,10 @@ export function Repertoires() {
       <>
         <div class="flex flex-row justify-between pl-4 pr-2 pt-2">
           <h2 class="pt-0.5 text-sm text-muted-foreground">Repertoires</h2>
-          <NewRepertoireMenu onCreate={onCreateNewRepertoire} />
+          <NewRepertoireMenu
+            onCreate={onCreateNewRepertoire}
+            limitReached={repertoireEntries().length >= MAX_REPERTOIRES}
+          />
         </div>
         <ul class="p-2">
           <For each={repertoireEntries()}>
@@ -277,6 +281,10 @@ export function Repertoires() {
                   id={id}
                   repertoire={repertoire}
                   canDelete={repertoireEntries().length > 1}
+                  canCreateChapter={
+                    chapterEntries().filter(([, chapter]) => chapter.repertoireId === id).length <
+                    MAX_CHAPTERS_PER_REPERTOIRE
+                  }
                   onCreateNewChapter={onCreateNewChapter}
                   onDeleteRepertoire={onDeleteRepertoire}
                   onRenameRepertoire={onRenameRepertoire}
@@ -311,7 +319,10 @@ export function Repertoires() {
   );
 }
 
-function NewRepertoireMenu(props: { onCreate: (input: CreateNewRepertoireInput) => void }) {
+function NewRepertoireMenu(props: {
+  onCreate: (input: CreateNewRepertoireInput) => void;
+  limitReached: boolean;
+}) {
   function createRepertoire(orientation: Orientation) {
     props.onCreate({
       name: "Untitled Repertoire",
@@ -322,16 +333,24 @@ function NewRepertoireMenu(props: { onCreate: (input: CreateNewRepertoireInput) 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger>
-        <Button variant="outline" size="sm-icon" aria-label="Create repertoire">
+        <Button
+          variant="outline"
+          size="sm-icon"
+          aria-label="Create repertoire"
+          disabled={props.limitReached}
+          title={
+            props.limitReached ? `Maximum of ${MAX_REPERTOIRES} repertoires reached` : undefined
+          }
+        >
           <Plus />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem onClick={() => createRepertoire("white")}>
+        <DropdownMenuItem disabled={false} onClick={() => createRepertoire("white")}>
           <ChessPawn class="h-4 w-4 fill-current" aria-hidden="true" />
           Create white repertoire
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => createRepertoire("black")}>
+        <DropdownMenuItem disabled={false} onClick={() => createRepertoire("black")}>
           <ChessPawn class="h-4 w-4" aria-hidden="true" />
           Create black repertoire
         </DropdownMenuItem>
@@ -344,6 +363,7 @@ function RepertoireSidebarItem(props: {
   id: string;
   repertoire: Repertoire;
   canDelete: boolean;
+  canCreateChapter: boolean;
   onCreateNewChapter: (args: { repertoireId: string; pgn?: string }) => void | Promise<void>;
   onDeleteRepertoire: (args: { repertoireId: string }) => void;
   onRenameRepertoire: (args: { repertoireId: string; name: string }) => void;
@@ -402,15 +422,21 @@ function RepertoireSidebarItem(props: {
         }
         dropdownContent={
           <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setCreateFromPgnOpen(true)}>
-              Create chapter from PGN
+            <DropdownMenuItem
+              disabled={!props.canCreateChapter}
+              onClick={() => setCreateFromPgnOpen(true)}
+            >
+              Create chapter from PGN{props.canCreateChapter ? "" : " (limit reached)"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => createChapter()}>
-              Create empty chapter
+            <DropdownMenuItem disabled={!props.canCreateChapter} onClick={() => createChapter()}>
+              Create empty chapter{props.canCreateChapter ? "" : " (limit reached)"}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={startRenaming}>Rename</DropdownMenuItem>
+            <DropdownMenuItem disabled={false} onClick={startRenaming}>
+              Rename
+            </DropdownMenuItem>
             <Show when={props.canDelete}>
               <DropdownMenuItem
+                disabled={false}
                 onClick={() => props.onDeleteRepertoire({ repertoireId: props.id })}
               >
                 Delete
@@ -487,6 +513,7 @@ function ChapterSidebarItem(props: {
       dropdownContent={
         <DropdownMenuContent>
           <DropdownMenuItem
+            disabled={false}
             onClick={() =>
               void props.onExportChapter({
                 repertoire: props.repertoire,
@@ -496,9 +523,12 @@ function ChapterSidebarItem(props: {
           >
             Export PGN
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={startRenaming}>Rename</DropdownMenuItem>
+          <DropdownMenuItem disabled={false} onClick={startRenaming}>
+            Rename
+          </DropdownMenuItem>
           <Show when={props.canDelete}>
             <DropdownMenuItem
+              disabled={false}
               onClick={() =>
                 props.onDeleteChapter({ chapterId: props.id, pgnId: props.chapter.pgnId })
               }

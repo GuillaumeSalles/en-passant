@@ -242,7 +242,7 @@ export function TrainingLines(props: {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem disabled={false}>
                               <A
                                 class="w-full"
                                 href={learningLinePath(

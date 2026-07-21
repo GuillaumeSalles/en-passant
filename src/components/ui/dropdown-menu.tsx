@@ -177,14 +177,21 @@ function positionRightMenu(
   };
 }
 
-function DropdownMenuItem(props: { children: JSX.Element; class?: string; onClick?: () => void }) {
+function DropdownMenuItem(props: {
+  children: JSX.Element;
+  class?: string;
+  disabled: boolean;
+  onClick?: () => void;
+}) {
   const ctx = useContext(DropdownMenuContext);
 
   return (
     <div
-      class={cn(menuItemClass, props.class)}
+      aria-disabled={props.disabled ? "true" : undefined}
+      class={cn(menuItemClass, props.disabled && "pointer-events-none opacity-50", props.class)}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => {
+        if (props.disabled) return;
         props.onClick?.();
         ctx.setOpen(false);
       }}

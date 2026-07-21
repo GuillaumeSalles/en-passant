@@ -11,6 +11,7 @@ import { MutationContext } from "@/lib/useMutation";
 import { queueRepertoireSync } from "@/storage/backendSync";
 import { repertoirePath } from "@/lib/routes";
 import { formatRepertoireName } from "@/lib/repertoireNames";
+import { MAX_REPERTOIRES } from "@/lib/repertoireLimits";
 
 export type CreateNewRepertoireInput = {
   name: string;
@@ -34,6 +35,13 @@ export async function createNewRepertoire(
   input: CreateNewRepertoireInput,
 ): Promise<void> {
   const state = store.state;
+
+  if (state.repertoires.status !== "success") {
+    throw new Error("Repertoires are not loaded");
+  }
+  if (Object.keys(state.repertoires.data).length >= MAX_REPERTOIRES) {
+    return;
+  }
 
   const repertoireId = crypto.randomUUID();
   const repertoireName = formatRepertoireName(input.name, "Untitled Repertoire");

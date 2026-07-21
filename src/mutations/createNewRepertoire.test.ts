@@ -4,6 +4,7 @@ import { AppState, Repertoire, emptyNormalizedPgn } from "@/lib/AppState";
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 import { MAX_REPERTOIRE_NAME_LENGTH } from "@/lib/repertoireNames";
+import { MAX_REPERTOIRES } from "@/lib/repertoireLimits";
 
 const defaultInput = {
   name: "Untitled Repertoire",
@@ -135,6 +136,24 @@ describe("createNewRepertoire", () => {
       expect(repertoires.find((r) => r.id === existingRepertoire.id)).toEqual(existingRepertoire);
       expect(repertoires).toHaveLength(2);
       expect(state.chapters.data![existingChapter.id]).toEqual(existingChapter);
+    });
+
+    test("does not create more than ten repertoires", async () => {
+      const existing = Array.from({ length: MAX_REPERTOIRES }, (_, index) =>
+        repertoireStub({ id: `repertoire-${index}`, handle: `repertoire-${index}` }),
+      );
+      const context = createMutationContext({
+        repertoires: {
+          status: "success",
+          data: Object.fromEntries(existing.map((repertoire) => [repertoire.id, repertoire])),
+        },
+      });
+
+      await createNewRepertoire(context, defaultInput);
+
+      expect(getRepertoiresOrThrow(context.store.state)).toHaveLength(MAX_REPERTOIRES);
+      expect(context.storage.createRepertoireAndChapter).not.toHaveBeenCalled();
+      expect(context.router.push).not.toHaveBeenCalled();
     });
 
     test("saves to storage", async () => {

@@ -3,6 +3,7 @@ import { AppState, Chapter, emptyNormalizedPgn, toPgn } from "@/lib/AppState";
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 import { createNewChapter } from "./createNewChapter";
+import { MAX_CHAPTERS_PER_REPERTOIRE } from "@/lib/repertoireLimits";
 
 function getChaptersOrThrow(state: AppState): Chapter[] {
   if (state.chapters.status !== "success") {
@@ -139,6 +140,33 @@ describe("createNewChapter", () => {
     expect(chapter.name).toBe("Chapter 1");
     expect(chapter.repertoireId).toBe(repertoire.id);
     expect(pgn).toBe("");
+  });
+
+  test("does not create more than twenty chapters in one repertoire", async () => {
+    const repertoire = repertoireStub({ id: "repertoire-id" });
+    const existing = Array.from({ length: MAX_CHAPTERS_PER_REPERTOIRE }, (_, index) =>
+      chapterStub({
+        id: `chapter-${index}`,
+        repertoireId: repertoire.id,
+        handle: `chapter-${index + 1}`,
+      }),
+    );
+    const context = createMutationContext({
+      repertoires: {
+        status: "success",
+        data: { [repertoire.id]: repertoire },
+      },
+      chapters: {
+        status: "success",
+        data: Object.fromEntries(existing.map((chapter) => [chapter.id, chapter])),
+      },
+    });
+
+    await createNewChapter(context, { repertoireId: repertoire.id });
+
+    expect(getChaptersOrThrow(context.store.state)).toHaveLength(MAX_CHAPTERS_PER_REPERTOIRE);
+    expect(context.storage.createChapter).not.toHaveBeenCalled();
+    expect(context.router.push).not.toHaveBeenCalled();
   });
 
   test("navigates to the created chapter route", async () => {
