@@ -36,6 +36,7 @@ export {
   trainingLineId,
   type TrainingLine,
 } from "./app-state/trainingLines";
+export { getScheduledTrainingLines, type ScheduledTrainingLine } from "./app-state/trainingQueue";
 export {
   DEFAULT_TRAINING_INTERVALS_MS,
   TRAINING_MASTERY_LEVELS,

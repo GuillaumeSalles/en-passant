@@ -31,6 +31,18 @@ function onPgnLoadCompleted(
   });
 }
 
+function onPgnLoadFailed(
+  state: StoreState<AppState>,
+  _ctx: Context,
+  pgnId: string,
+  error: Error,
+): void {
+  state.set("pgns", {
+    ...state.pgns,
+    [pgnId]: { status: "error", error },
+  });
+}
+
 export function useLoadPgn(getRepertoireHandle: () => string, getChapterHandle: () => string) {
   const state = useState();
   const onPgnLoadMutation = useMutation(onPgnLoadCompleted);
@@ -86,6 +98,38 @@ export function useLoadPgn(getRepertoireHandle: () => string, getChapterHandle: 
         }
         onPgnLoadMutation(chapter.pgnId, pgn);
       });
+    },
+  );
+}
+
+export function useLoadPgns(getPgnIds: () => readonly string[]) {
+  const state = useState();
+  const onPgnLoadMutation = useMutation(onPgnLoadCompleted);
+  const onPgnLoadFailedMutation = useMutation(onPgnLoadFailed);
+  const onStartLoadingPgnMutation = useMutation(startLoadingPgn);
+
+  createEffect(
+    () => ({ pgnIds: [...new Set(getPgnIds())], pgns: state.pgns }),
+    ({ pgnIds, pgns }) => {
+      for (const pgnId of pgnIds) {
+        if (pgns[pgnId] !== undefined) continue;
+
+        onStartLoadingPgnMutation(pgnId);
+        getPgn(pgnId)
+          .then((pgn) => {
+            if (pgn === undefined) {
+              onPgnLoadFailedMutation(pgnId, new Error("PGN not found"));
+              return;
+            }
+            onPgnLoadMutation(pgnId, pgn);
+          })
+          .catch((reason: unknown) => {
+            onPgnLoadFailedMutation(
+              pgnId,
+              reason instanceof Error ? reason : new Error("Failed to load PGN"),
+            );
+          });
+      }
     },
   );
 }

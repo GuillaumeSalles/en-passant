@@ -3,6 +3,10 @@ import { createChessPosition, positionKey } from "./chess";
 
 export const APP_ROOT = "/app";
 
+export function trainingQueuePath(): string {
+  return `${APP_ROOT}/training`;
+}
+
 type PathRepertoire = {
   id: string;
   handle: string;

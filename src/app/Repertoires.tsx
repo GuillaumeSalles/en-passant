@@ -7,7 +7,7 @@ import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapte
 import { useSelector } from "@/lib/useSelector";
 import { cn } from "@/lib/utils";
 import { handleFromName, uniqueHandle } from "@/lib/handles";
-import { Book, ChessPawn, Ellipsis, Plus } from "../components/Icons";
+import { Book, Brain, ChessPawn, Ellipsis, Plus } from "../components/Icons";
 import { A, useLocation } from "@solidjs/router";
 import { MutationContext, useMutation } from "@/lib/useMutation";
 import {
@@ -22,7 +22,13 @@ import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu
 import { InlineEditInput } from "@/components/ui/inline-edit-input";
 import { createNewRepertoire, CreateNewRepertoireInput } from "@/mutations/createNewRepertoire";
 import { createNewChapter } from "@/mutations/createNewChapter";
-import { APP_ROOT, repertoireOverviewPath, repertoirePath, routePath } from "@/lib/routes";
+import {
+  APP_ROOT,
+  repertoireOverviewPath,
+  repertoirePath,
+  routePath,
+  trainingQueuePath,
+} from "@/lib/routes";
 import { formatRepertoireName, MAX_REPERTOIRE_NAME_LENGTH } from "@/lib/repertoireNames";
 import { LoadPGNDialog } from "@/components/LoadPgnDialog";
 import { exportChapterPgn } from "@/lib/exportPgn";
@@ -266,6 +272,7 @@ export function Repertoires() {
   return (
     <Show when={repertoires().status === "success" && chapters().status === "success"}>
       <>
+        <TrainingSidebarLink />
         <div class="flex flex-row justify-between pl-4 pr-2 pt-2">
           <h2 class="pt-0.5 text-sm text-muted-foreground">Repertoires</h2>
           <NewRepertoireMenu
@@ -316,6 +323,26 @@ export function Repertoires() {
         </ul>
       </>
     </Show>
+  );
+}
+
+function TrainingSidebarLink() {
+  const location = useLocation();
+  const href = trainingQueuePath();
+
+  return (
+    <div class="px-2 pt-2">
+      <A
+        class={cn(
+          "group flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-sm active:bg-sidebar-link-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          location.pathname === href ? "bg-sidebar-link-active" : "hover:bg-sidebar-link-hover",
+        )}
+        href={href}
+      >
+        <Brain class="h-4 w-4 flex-none stroke-zinc-400 group-hover:stroke-white" />
+        <span>Training</span>
+      </A>
+    </div>
   );
 }
 

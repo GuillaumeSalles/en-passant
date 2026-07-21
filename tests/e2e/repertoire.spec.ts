@@ -635,7 +635,7 @@ test("creates a chapter from the repertoire overview before training", async ({ 
 
   const createChapterButton = page.getByRole("button", { name: "Create chapter" });
   await expect(createChapterButton).toBeVisible();
-  await expect(page.getByRole("link", { name: "Train" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Train", exact: true })).toBeVisible();
 
   await createChapterButton.click();
 

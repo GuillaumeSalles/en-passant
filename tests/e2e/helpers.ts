@@ -31,6 +31,18 @@ export type PgnRecord = {
   dirty: boolean;
 };
 
+export type TrainingLineScheduleRecord = {
+  repertoireId: string;
+  chapterId: string;
+  uciPath: string;
+  intervalIndex: number;
+  dueAt: number;
+  lastReviewedAt: number;
+  algorithmVersion: number;
+  updatedAt: string;
+  dirty: boolean;
+};
+
 type SyncChanges = {
   repertoires: unknown[];
   chapters: unknown[];
@@ -193,6 +205,7 @@ export async function seedIndexedDb(
     repertoires: RepertoireRecord[];
     chapters: ChapterRecord[];
     pgns: PgnRecord[];
+    trainingLineSchedules?: TrainingLineScheduleRecord[];
     clearLocalStorage?: boolean;
   },
 ): Promise<void> {
@@ -206,6 +219,7 @@ export async function seedIndexedDb(
       updatedAt: record.updatedAt,
       deletedAt: record.deletedAt,
     })),
+    trainingLineSchedules: records.trainingLineSchedules ?? [],
   };
   await gotoStorageOrigin(page);
   await page.evaluate(
@@ -219,13 +233,14 @@ export async function seedIndexedDb(
         });
       const openSeedDatabase = () =>
         new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant", 2);
+          const openRequest = indexedDB.open("en-passant", 3);
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onupgradeneeded = () => {
             const db = openRequest.result;
             db.createObjectStore("repertoires");
             db.createObjectStore("chapters");
             db.createObjectStore("pgns");
+            db.createObjectStore("training-line-schedules");
             db.createObjectStore("metadata");
           };
           openRequest.onsuccess = () => resolve(openRequest.result);
@@ -238,7 +253,10 @@ export async function seedIndexedDb(
       const db = await openSeedDatabase();
 
       await new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(["repertoires", "chapters", "pgns"], "readwrite");
+        const transaction = db.transaction(
+          ["repertoires", "chapters", "pgns", "training-line-schedules"],
+          "readwrite",
+        );
         transaction.onerror = () => reject(transaction.error);
         transaction.oncomplete = () => {
           db.close();
@@ -252,6 +270,10 @@ export async function seedIndexedDb(
         }
         for (const pgn of records.pgns) {
           transaction.objectStore("pgns").put(pgn, pgn.id);
+        }
+        for (const schedule of records.trainingLineSchedules) {
+          const key = `${schedule.repertoireId}/${schedule.chapterId}/${schedule.uciPath}`;
+          transaction.objectStore("training-line-schedules").put(schedule, key);
         }
       });
     },
