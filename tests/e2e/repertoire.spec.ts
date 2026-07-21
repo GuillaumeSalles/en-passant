@@ -6,6 +6,7 @@ import {
   firstStoredPgn,
   mockSignedOutAuth,
   seedIndexedDb,
+  storedTrainingLineUciPaths,
   type ChapterRecord,
   type RepertoireRecord,
 } from "./helpers";
@@ -945,6 +946,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await dragPiece(page, "g1", "f3");
 
   await expect(page.getByText("Line learned.")).toBeVisible();
+  await expect.poll(() => storedTrainingLineUciPaths(page)).toEqual(["e2e4 e7e5 g1f3"]);
   await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
@@ -952,6 +954,8 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page.getByText("Learned", { exact: true })).toHaveCount(0);
   await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveCount(0);
   await expect(firstLine.getByRole("link", { name: "Train" })).toBeVisible();
+  await page.reload();
+  await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
   await firstLine.getByRole("button", { name: "More actions for line 1" }).click();
   await expect(page.getByRole("link", { name: "Learn again" })).toBeVisible();
   expect(consoleMessages).toEqual([]);

@@ -34,7 +34,7 @@ import {
   prepareTrainingReplayMove,
   startTrainingLine,
 } from "@/mutations/trainingSession";
-import { learningLineKey } from "@/mutations/learningSession";
+import { trainingLineScheduleKey } from "@/mutations/learningSession";
 import {
   createEffect,
   createMemo,
@@ -101,7 +101,6 @@ export function useVariationTrainingFlow(
   const animation = useSelector(selectAnimation);
   const training = useSelector(selectTraining);
   const reviews = useSelector((state) => state.training.reviews);
-  const learnedLineKeys = useSelector((state) => state.learning.learnedLineKeys);
   const selectedMoveId = useSelector(selectSelectedMoveId);
   const currentMove = useSelector(selectCurrentMove);
   const replayMoveIds = useSelector((state) => state.training.session?.replayMoveIds ?? null);
@@ -134,7 +133,10 @@ export function useVariationTrainingFlow(
     return prioritizeDueTrainingLines(
       sourceLines,
       Object.fromEntries(
-        sourceLines.map((line) => [line.id, reviews()[learningLineKey(ctx(), line.id)]]),
+        sourceLines.map((line) => {
+          const key = trainingLineScheduleKey(state, ctx(), line.uciPath);
+          return [line.id, key === null ? undefined : reviews()[key]];
+        }),
       ),
       Date.now(),
     );
@@ -215,9 +217,12 @@ export function useVariationTrainingFlow(
   }
 
   function completeLineAttempt(completedMoveId: number): void {
+    const line = activeLine();
+    if (line === undefined) return;
     const finishesLine = completedRepetitions() + 1 >= repetitions();
     onCompleteTrainingLine({
       lineId: props.lineId,
+      uciPath: line.uciPath,
       completedMoveId,
       finishLine: finishesLine,
     });
@@ -355,7 +360,13 @@ export function useVariationTrainingFlow(
 
     if (activePhase.type === "awaiting-replay-move") {
       const finishesLine = completedRepetitions() + 1 >= repetitions();
-      onCompleteTrainingReplayMove({ lineId: props.lineId, finishLine: finishesLine });
+      const line = activeLine();
+      if (line === undefined) return;
+      onCompleteTrainingReplayMove({
+        lineId: props.lineId,
+        uciPath: line.uciPath,
+        finishLine: finishesLine,
+      });
       if ((state.training.session?.replayMoveIds.length ?? 0) > 0) {
         setPhaseAfterLineCompletion();
       } else {
@@ -391,10 +402,10 @@ export function useVariationTrainingFlow(
     for (let offset = 1; offset <= allLines.length; offset++) {
       const line = allLines[(activeLineIndex() + offset) % allLines.length];
       if (line === undefined) continue;
-      const key = learningLineKey(ctx(), line.id);
-      const needsTraining = learnedLineKeys().includes(key)
-        ? isTrainingReviewDue(reviews()[key], Date.now())
-        : !trained.has(line.id);
+      const key = trainingLineScheduleKey(state, ctx(), line.uciPath);
+      const review = key === null ? undefined : reviews()[key];
+      const needsTraining =
+        review !== undefined ? isTrainingReviewDue(review, Date.now()) : !trained.has(line.id);
       if (needsTraining) {
         return line;
       }

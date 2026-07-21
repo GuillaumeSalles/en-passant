@@ -166,9 +166,6 @@ export type AppState = {
     session: TrainingSessionDraft | null;
     reviews: Record<string, TrainingLineReview>;
   };
-  learning: {
-    learnedLineKeys: string[];
-  };
   preselectedVariation: number | null;
   highlights: Highlights;
   animation: BoardAnimation | null;
@@ -184,8 +181,13 @@ export type TrainingLineResult = {
 };
 
 export type TrainingLineReview = {
+  repertoireId: string;
+  chapterId: string;
+  uciPath: string;
   intervalIndex: number;
   dueAt: number;
+  lastReviewedAt: number;
+  algorithmVersion: number;
 };
 
 export type TrainingSessionDraft = {

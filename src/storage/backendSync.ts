@@ -1,5 +1,5 @@
 import { StoreState } from "@/lib/createStore";
-import { AppState, normalizePgn, type Context } from "@/lib/AppState";
+import { AppState, normalizePgn, trainingLineReviewKey, type Context } from "@/lib/AppState";
 import {
   applyRepertoireSyncResponse,
   getRepertoireSyncRequest,
@@ -54,6 +54,7 @@ export async function pullRepertoireFromBackend(): Promise<RepertoireSyncChanges
       repertoires: [],
       chapters: [],
       pgns: [],
+      trainingLineSchedules: [],
     },
   });
 }
@@ -103,6 +104,15 @@ function applyChangesToState(
     }
   }
   state.set("pgns", pgns);
+
+  if (changes.trainingLineSchedules.length > 0) {
+    const reviews = { ...state.training.reviews };
+    for (const schedule of changes.trainingLineSchedules) {
+      reviews[trainingLineReviewKey(schedule.repertoireId, schedule.chapterId, schedule.uciPath)] =
+        schedule;
+    }
+    state.set("training", { ...state.training, reviews });
+  }
 }
 
 export async function syncRepertoireFromBackend(
@@ -190,7 +200,8 @@ const repertoireSyncQueue = createRepertoireSyncQueue({
     if (
       remaining.changes.repertoires.length > 0 ||
       remaining.changes.chapters.length > 0 ||
-      remaining.changes.pgns.length > 0
+      remaining.changes.pgns.length > 0 ||
+      remaining.changes.trainingLineSchedules.length > 0
     ) {
       queueMicrotask(queueRepertoireSync);
     }

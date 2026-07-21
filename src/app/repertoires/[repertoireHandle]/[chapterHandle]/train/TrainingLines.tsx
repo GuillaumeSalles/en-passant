@@ -25,13 +25,15 @@ import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { ensureTrainingSession } from "@/mutations/trainingSession";
-import { learningLineKey } from "@/mutations/learningSession";
+import { trainingLineScheduleKey } from "@/mutations/learningSession";
+import { useState } from "@/app/AppStateProvider";
 
 export function TrainingLines(props: {
   repertoireHandle: string;
   chapterHandle: string;
   missingLine: boolean;
 }) {
+  const state = useState();
   useLoadPgn(
     () => props.repertoireHandle,
     () => props.chapterHandle,
@@ -48,20 +50,24 @@ export function TrainingLines(props: {
     const pgn = chapterPgn();
     return pgn === null ? [] : getTrainingLines(pgn, orientation());
   });
-  const reviewKey = (lineId: string) =>
-    learningLineKey(
+  const reviewKey = (uciPath: string) =>
+    trainingLineScheduleKey(
+      state,
       {
         type: "variation-training",
         repertoireHandle: props.repertoireHandle,
         chapterHandle: props.chapterHandle,
       },
-      lineId,
+      uciPath,
     );
-  const reviewForLine = (lineId: string) => reviews()[reviewKey(lineId)];
+  const reviewForLine = (uciPath: string) => {
+    const key = reviewKey(uciPath);
+    return key === null ? undefined : reviews()[key];
+  };
   const lines = createMemo(() =>
     prioritizeDueTrainingLines(
       sourceLines(),
-      Object.fromEntries(sourceLines().map((line) => [line.id, reviewForLine(line.id)])),
+      Object.fromEntries(sourceLines().map((line) => [line.id, reviewForLine(line.uciPath)])),
       now(),
     ),
   );
@@ -69,19 +75,10 @@ export function TrainingLines(props: {
   const results = createMemo(
     () => new Map(trainingSession()?.results.map((result) => [result.lineId, result]) ?? []),
   );
-  const learnedLineKeys = useSelector((state) => state.learning.learnedLineKeys);
-  const learnedLines = createMemo(
-    () =>
-      new Set(
-        learnedLineKeys().filter((key) =>
-          key.startsWith(`${props.repertoireHandle}/${props.chapterHandle}/`),
-        ),
-      ),
-  );
-  const isLineLearned = (lineId: string) => learnedLines().has(reviewKey(lineId));
-  const isLineDue = (lineId: string) => isTrainingReviewDue(reviewForLine(lineId), now());
+  const isLineLearned = (uciPath: string) => reviewForLine(uciPath) !== undefined;
+  const isLineDue = (uciPath: string) => isTrainingReviewDue(reviewForLine(uciPath), now());
   const firstDueLine = createMemo(() =>
-    lines().find((line) => isLineLearned(line.id) && isLineDue(line.id)),
+    lines().find((line) => isLineLearned(line.uciPath) && isLineDue(line.uciPath)),
   );
 
   let dueTimer: ReturnType<typeof setTimeout> | undefined;
@@ -160,8 +157,8 @@ export function TrainingLines(props: {
           >
             {(line, index) => {
               const result = () => results().get(line.id);
-              const isLearned = () => isLineLearned(line.id);
-              const isDue = () => isLineDue(line.id);
+              const isLearned = () => isLineLearned(line.uciPath);
+              const isDue = () => isLineDue(line.uciPath);
               return (
                 <>
                   <Show when={index() > 0}>

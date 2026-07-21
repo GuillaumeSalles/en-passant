@@ -13,7 +13,9 @@ import type {
   Orientation,
   Repertoire,
   SerializedChapter,
+  TrainingLineReview,
 } from "./types";
+import { trainingLineReviewKey } from "./spacedRepetition";
 
 type ChapterScope = {
   repertoire: Repertoire;
@@ -55,9 +57,6 @@ export function emptyState(): AppState {
       session: null,
       reviews: {},
     },
-    learning: {
-      learnedLineKeys: [],
-    },
     highlights: {
       squares: {},
       arrows: {},
@@ -71,6 +70,7 @@ export function onRepertoireAndChapterLoad(
   _ctx: Context,
   repertoires: NewSerializedRepertoire[],
   chapters: SerializedChapter[],
+  trainingLineSchedules: TrainingLineReview[] = [],
 ): void {
   const newRepertoires: Record<string, Repertoire> = {};
   const newChapters: Record<string, Chapter> = {};
@@ -101,6 +101,15 @@ export function onRepertoireAndChapterLoad(
   state.set("chapters", {
     status: "success",
     data: newChapters,
+  });
+  state.set("training", {
+    ...state.training,
+    reviews: Object.fromEntries(
+      trainingLineSchedules.map((schedule) => [
+        trainingLineReviewKey(schedule.repertoireId, schedule.chapterId, schedule.uciPath),
+        schedule,
+      ]),
+    ),
   });
 }
 

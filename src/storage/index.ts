@@ -1,19 +1,26 @@
-import { NewSerializedRepertoire, SerializedChapter } from "@/lib/AppState";
+import {
+  NewSerializedRepertoire,
+  SerializedChapter,
+  trainingLineReviewKey,
+  type TrainingLineReview,
+} from "@/lib/AppState";
 import type { PgnMutation } from "@/lib/AppState";
 import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
 
 const DB_NAME = "en-passant";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const REPERTOIRE_STORE_NAME = "repertoires";
 const CHAPTERS_STORE_NAME = "chapters";
 const PGNS_STORE_NAME = "pgns";
+const TRAINING_LINE_SCHEDULES_STORE_NAME = "training-line-schedules";
 const METADATA_STORE_NAME = "metadata";
 const REQUIRED_STORE_NAMES = [
   REPERTOIRE_STORE_NAME,
   CHAPTERS_STORE_NAME,
   PGNS_STORE_NAME,
+  TRAINING_LINE_SCHEDULES_STORE_NAME,
   METADATA_STORE_NAME,
 ] as const;
 const LAST_SYNCED_AT_KEY = "en_passant_repertoire_last_synced_at";
@@ -33,6 +40,7 @@ export type SyncedPgn = {
   id: string;
   pgn: string;
 } & SyncMetadata;
+export type SyncedTrainingLineSchedule = TrainingLineReview & { updatedAt: string };
 
 export type PgnMutationChange = {
   id: string;
@@ -41,6 +49,7 @@ export type PgnMutationChange = {
 
 export type StoredRepertoire = NewSerializedRepertoire & LocalSyncMetadata;
 export type StoredChapter = SerializedChapter & LocalSyncMetadata;
+export type StoredTrainingLineSchedule = SyncedTrainingLineSchedule & { dirty: boolean };
 type StoredPgnBase = {
   id: string;
   pgn: string;
@@ -55,6 +64,7 @@ export type RepertoireSyncChanges = {
   repertoires: SyncedRepertoire[];
   chapters: SyncedChapter[];
   pgns: SyncedPgn[];
+  trainingLineSchedules: SyncedTrainingLineSchedule[];
 };
 
 export type RepertoireSyncRequest = {
@@ -63,6 +73,7 @@ export type RepertoireSyncRequest = {
     repertoires: SyncedRepertoire[];
     chapters: SyncedChapter[];
     pgns: PgnMutationChange[];
+    trainingLineSchedules: SyncedTrainingLineSchedule[];
   };
 };
 
@@ -143,6 +154,25 @@ function cleanPgn(pgn: SyncedPgn): StoredPgn {
     pendingMutations: [],
     metadataDirty: false,
   };
+}
+
+function cleanTrainingLineSchedule(
+  schedule: SyncedTrainingLineSchedule,
+): StoredTrainingLineSchedule {
+  return { ...schedule, dirty: false };
+}
+
+function toSyncedTrainingLineSchedule(
+  schedule: StoredTrainingLineSchedule,
+): SyncedTrainingLineSchedule {
+  const { dirty: _dirty, ...synced } = schedule;
+  return synced;
+}
+
+function trainingLineScheduleStorageKey(
+  schedule: Pick<TrainingLineReview, "repertoireId" | "chapterId" | "uciPath">,
+): string {
+  return trainingLineReviewKey(schedule.repertoireId, schedule.chapterId, schedule.uciPath);
 }
 
 function toSyncedRepertoire(repertoire: StoredRepertoire): SyncedRepertoire {
@@ -475,6 +505,29 @@ export async function updateChapter(chapter: SerializedChapter): Promise<void> {
   );
 }
 
+export async function saveTrainingLineSchedule(schedule: TrainingLineReview): Promise<void> {
+  const db = await init();
+  const transaction = db.transaction([TRAINING_LINE_SCHEDULES_STORE_NAME], "readwrite");
+  const store = transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
+  await waitForTransaction(
+    transaction,
+    put(store, trainingLineScheduleStorageKey(schedule), {
+      ...schedule,
+      updatedAt: nowIso(),
+      dirty: true,
+    } satisfies StoredTrainingLineSchedule),
+  );
+}
+
+export async function getAllTrainingLineSchedules(): Promise<TrainingLineReview[]> {
+  const db = await init();
+  const transaction = db.transaction([TRAINING_LINE_SCHEDULES_STORE_NAME], "readonly");
+  const values = await getAll<StoredTrainingLineSchedule>(
+    transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME),
+  );
+  return values.map(({ dirty: _dirty, updatedAt: _updatedAt, ...value }) => value);
+}
+
 export async function createChapter(chapter: SerializedChapter, pgn: string): Promise<void> {
   const db = await init();
   const transaction = db.transaction([CHAPTERS_STORE_NAME, PGNS_STORE_NAME], "readwrite");
@@ -517,13 +570,18 @@ export async function getAllChapters(): Promise<SerializedChapter[]> {
 export type InitialRepertoireLoad = {
   repertoires: NewSerializedRepertoire[];
   chapters: SerializedChapter[];
+  trainingLineSchedules: TrainingLineReview[];
   createdDemo: boolean;
 };
 
 export async function getStoredRepertoiresAndChapters(): Promise<InitialRepertoireLoad> {
-  const [repertoires, chapters] = await Promise.all([getAllRepertoires(), getAllChapters()]);
+  const [repertoires, chapters, trainingLineSchedules] = await Promise.all([
+    getAllRepertoires(),
+    getAllChapters(),
+    getAllTrainingLineSchedules(),
+  ]);
 
-  return { repertoires, chapters, createdDemo: false };
+  return { repertoires, chapters, trainingLineSchedules, createdDemo: false };
 }
 
 export async function createDemoInitialRepertoire(): Promise<InitialRepertoireLoad> {
@@ -533,6 +591,7 @@ export async function createDemoInitialRepertoire(): Promise<InitialRepertoireLo
   return {
     repertoires: [demo.repertoire],
     chapters: [demo.chapter],
+    trainingLineSchedules: [],
     createdDemo: true,
   };
 }
@@ -550,16 +609,23 @@ export async function getInitialRepertoiresAndChapters(): Promise<InitialReperto
 export async function getRepertoireSyncRequest(): Promise<RepertoireSyncRequest> {
   const db = await init();
   const transaction = db.transaction(
-    [REPERTOIRE_STORE_NAME, CHAPTERS_STORE_NAME, PGNS_STORE_NAME],
+    [
+      REPERTOIRE_STORE_NAME,
+      CHAPTERS_STORE_NAME,
+      PGNS_STORE_NAME,
+      TRAINING_LINE_SCHEDULES_STORE_NAME,
+    ],
     "readonly",
   );
   const repertoireStore = transaction.objectStore(REPERTOIRE_STORE_NAME);
   const chapterStore = transaction.objectStore(CHAPTERS_STORE_NAME);
   const pgnStore = transaction.objectStore(PGNS_STORE_NAME);
-  const [rawRepertoires, rawChapters, rawPgns] = await Promise.all([
+  const scheduleStore = transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
+  const [rawRepertoires, rawChapters, rawPgns, rawTrainingLineSchedules] = await Promise.all([
     getAll<StoredRepertoire>(repertoireStore),
     getAll<StoredChapter>(chapterStore),
     getAll<StoredPgn>(pgnStore),
+    getAll<StoredTrainingLineSchedule>(scheduleStore),
   ]);
 
   return {
@@ -568,6 +634,9 @@ export async function getRepertoireSyncRequest(): Promise<RepertoireSyncRequest>
       repertoires: rawRepertoires.filter((repertoire) => repertoire.dirty).map(toSyncedRepertoire),
       chapters: rawChapters.filter((chapter) => chapter.dirty).map(toSyncedChapter),
       pgns: rawPgns.filter(isPgnDirty).slice(0, 1).map(toPgnMutationChange),
+      trainingLineSchedules: rawTrainingLineSchedules
+        .filter((schedule) => schedule.dirty)
+        .map(toSyncedTrainingLineSchedule),
     },
   };
 }
@@ -605,25 +674,42 @@ export async function applyRepertoireSyncResponse(
 ): Promise<RepertoireSyncChanges> {
   const db = await init();
   const readTransaction = db.transaction(
-    [REPERTOIRE_STORE_NAME, CHAPTERS_STORE_NAME, PGNS_STORE_NAME],
+    [
+      REPERTOIRE_STORE_NAME,
+      CHAPTERS_STORE_NAME,
+      PGNS_STORE_NAME,
+      TRAINING_LINE_SCHEDULES_STORE_NAME,
+    ],
     "readonly",
   );
   const repertoireStore = readTransaction.objectStore(REPERTOIRE_STORE_NAME);
   const chapterStore = readTransaction.objectStore(CHAPTERS_STORE_NAME);
   const pgnStore = readTransaction.objectStore(PGNS_STORE_NAME);
-  const [existingRepertoires, existingChapters, existingPgns] = await Promise.all([
-    getAll<StoredRepertoire>(repertoireStore),
-    getAll<StoredChapter>(chapterStore),
-    getAll<StoredPgn>(pgnStore),
-  ]);
+  const scheduleStore = readTransaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
+  const [existingRepertoires, existingChapters, existingPgns, existingSchedules] =
+    await Promise.all([
+      getAll<StoredRepertoire>(repertoireStore),
+      getAll<StoredChapter>(chapterStore),
+      getAll<StoredPgn>(pgnStore),
+      getAll<StoredTrainingLineSchedule>(scheduleStore),
+    ]);
   const repertoireById = new Map(
     existingRepertoires.map((repertoire) => [repertoire.id, repertoire]),
   );
   const chapterById = new Map(existingChapters.map((chapter) => [chapter.id, chapter]));
   const pgnById = new Map(existingPgns.map((pgn) => [pgn.id, pgn]));
+  const scheduleByKey = new Map(
+    existingSchedules.map((schedule) => [trainingLineScheduleStorageKey(schedule), schedule]),
+  );
   const sentRepertoireUpdatedAt = sentUpdatedAtById(request.changes.repertoires);
   const sentChapterUpdatedAt = sentUpdatedAtById(request.changes.chapters);
   const sentPgnUpdatedAt = sentUpdatedAtById(request.changes.pgns);
+  const sentScheduleUpdatedAt = new Map(
+    request.changes.trainingLineSchedules.map((schedule) => [
+      trainingLineScheduleStorageKey(schedule),
+      schedule.updatedAt,
+    ]),
+  );
   const appliedChanges: RepertoireSyncChanges = {
     repertoires: response.changes.repertoires.filter((repertoire) =>
       shouldApplySyncedChange(repertoireById.get(repertoire.id), sentRepertoireUpdatedAt),
@@ -639,15 +725,29 @@ export async function applyRepertoireSyncResponse(
         sentPgnUpdatedAt.get(pgn.id) === existing.updatedAt
       );
     }),
+    trainingLineSchedules: (response.changes.trainingLineSchedules ?? []).filter((schedule) => {
+      const existing = scheduleByKey.get(trainingLineScheduleStorageKey(schedule));
+      return (
+        existing === undefined ||
+        !existing.dirty ||
+        sentScheduleUpdatedAt.get(trainingLineScheduleStorageKey(schedule)) === existing.updatedAt
+      );
+    }),
   };
 
   const writeTransaction = db.transaction(
-    [REPERTOIRE_STORE_NAME, CHAPTERS_STORE_NAME, PGNS_STORE_NAME],
+    [
+      REPERTOIRE_STORE_NAME,
+      CHAPTERS_STORE_NAME,
+      PGNS_STORE_NAME,
+      TRAINING_LINE_SCHEDULES_STORE_NAME,
+    ],
     "readwrite",
   );
   const writeRepertoireStore = writeTransaction.objectStore(REPERTOIRE_STORE_NAME);
   const writeChapterStore = writeTransaction.objectStore(CHAPTERS_STORE_NAME);
   const writePgnStore = writeTransaction.objectStore(PGNS_STORE_NAME);
+  const writeScheduleStore = writeTransaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
   const acknowledgmentWrites: Promise<void>[] = [];
   if (response.acknowledgedPgn != null) {
     const acknowledgment = response.acknowledgedPgn;
@@ -687,6 +787,13 @@ export async function applyRepertoireSyncResponse(
         put(writeChapterStore, chapter.id, cleanChapter(chapter)),
       ),
       ...appliedChanges.pgns.map((pgn) => put(writePgnStore, pgn.id, cleanPgn(pgn))),
+      ...appliedChanges.trainingLineSchedules.map((schedule) =>
+        put(
+          writeScheduleStore,
+          trainingLineScheduleStorageKey(schedule),
+          cleanTrainingLineSchedule(schedule),
+        ),
+      ),
       ...acknowledgmentWrites,
     ]),
   );
@@ -764,6 +871,8 @@ export const storage = {
   deleteRepertoire,
   updateChapter,
   updateRepertoire,
+  saveTrainingLineSchedule,
+  getAllTrainingLineSchedules,
   getAllChapters,
   getAllRepertoires,
   getRepertoireSyncRequest,

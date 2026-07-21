@@ -274,6 +274,12 @@ export async function firstStoredPgn(page: Page): Promise<string> {
   return pgn;
 }
 
+export async function storedTrainingLineUciPaths(page: Page): Promise<string[]> {
+  return await readObjectStore(page, "training-line-schedules", (record) =>
+    isRecord(record) && typeof record["uciPath"] === "string" ? record["uciPath"] : "",
+  );
+}
+
 async function readObjectStore<T>(
   page: Page,
   storeName: string,

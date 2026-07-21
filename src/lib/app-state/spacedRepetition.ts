@@ -12,6 +12,16 @@ export const DEFAULT_TRAINING_INTERVALS_MS: readonly number[] = [
   30 * DAY_MS,
 ];
 
+export const TRAINING_ALGORITHM_VERSION = 1;
+
+export function trainingLineReviewKey(
+  repertoireId: string,
+  chapterId: string,
+  uciPath: string,
+): string {
+  return `${repertoireId}/${chapterId}/${uciPath}`;
+}
+
 function intervalAt(intervals: readonly number[], index: number): number {
   const interval = intervals[index];
   if (interval === undefined) {
@@ -21,12 +31,16 @@ function intervalAt(intervals: readonly number[], index: number): number {
 }
 
 export function initialTrainingReview(
+  identity: Pick<TrainingLineReview, "repertoireId" | "chapterId" | "uciPath">,
   now: number,
   intervals: readonly number[] = DEFAULT_TRAINING_INTERVALS_MS,
 ): TrainingLineReview {
   return {
+    ...identity,
     intervalIndex: 0,
     dueAt: now + intervalAt(intervals, 0),
+    lastReviewedAt: now,
+    algorithmVersion: TRAINING_ALGORITHM_VERSION,
   };
 }
 
@@ -38,8 +52,13 @@ export function nextTrainingReview(
 ): TrainingLineReview {
   const intervalIndex = successful ? Math.min(current.intervalIndex + 1, intervals.length - 1) : 0;
   return {
+    repertoireId: current.repertoireId,
+    chapterId: current.chapterId,
+    uciPath: current.uciPath,
     intervalIndex,
     dueAt: now + intervalAt(intervals, intervalIndex),
+    lastReviewedAt: now,
+    algorithmVersion: TRAINING_ALGORITHM_VERSION,
   };
 }
 

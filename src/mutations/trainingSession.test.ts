@@ -11,7 +11,7 @@ import {
 } from "@/mutations/trainingSession";
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
-import { learningLineKey, markLineLearned } from "@/mutations/learningSession";
+import { trainingLineScheduleKey, markLineLearned } from "@/mutations/learningSession";
 
 afterEach(() => vi.useRealTimers());
 
@@ -32,6 +32,12 @@ function createTrainingContext() {
   );
 }
 
+function scheduledLineKey(context: ReturnType<typeof createTrainingContext>): string {
+  const key = trainingLineScheduleKey(context.state, context.route, "e2e4 e7e5");
+  if (key === null) throw new Error("Expected a training line key");
+  return key;
+}
+
 describe("training session", () => {
   test("keeps results for unchanged lines when the chapter lines change", () => {
     const context = createTrainingContext();
@@ -43,6 +49,7 @@ describe("training session", () => {
     });
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
@@ -65,13 +72,26 @@ describe("training session", () => {
     markTrainingMistake(context.state, context.route, { moveId: 2 });
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
 
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
 
     expect(context.state.training.status).toBe("success");
     expect(context.state.training.session?.results).toEqual([
@@ -83,8 +103,8 @@ describe("training session", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const context = createTrainingContext();
-    const key = learningLineKey(context.route, "line-a");
-    markLineLearned(context.state, context.route, "line-a");
+    const key = scheduledLineKey(context);
+    markLineLearned(context.state, context.route, "e2e4 e7e5");
     vi.setSystemTime(3_601_000);
     startTrainingLine(context.state, context.route, {
       lineIds: ["line-a"],
@@ -94,13 +114,19 @@ describe("training session", () => {
 
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
 
     expect(context.state.training.reviews[key]).toEqual({
+      repertoireId: "rep-1",
+      chapterId: "chapter-1",
+      uciPath: "e2e4 e7e5",
       intervalIndex: 1,
       dueAt: 90_001_000,
+      lastReviewedAt: 3_601_000,
+      algorithmVersion: 1,
     });
   });
 
@@ -108,12 +134,20 @@ describe("training session", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const context = createTrainingContext();
-    const key = learningLineKey(context.route, "line-a");
-    markLineLearned(context.state, context.route, "line-a");
+    const key = scheduledLineKey(context);
+    markLineLearned(context.state, context.route, "e2e4 e7e5");
     context.state.set("training", {
       ...context.state.training,
       reviews: {
-        [key]: { intervalIndex: 4, dueAt: 1_000 },
+        [key]: {
+          repertoireId: "rep-1",
+          chapterId: "chapter-1",
+          uciPath: "e2e4 e7e5",
+          intervalIndex: 4,
+          dueAt: 1_000,
+          lastReviewedAt: 1_000,
+          algorithmVersion: 1,
+        },
       },
     });
     startTrainingLine(context.state, context.route, {
@@ -124,16 +158,34 @@ describe("training session", () => {
     markTrainingMistake(context.state, context.route, { moveId: 2 });
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
 
     expect(context.state.training.reviews[key]).toEqual({
+      repertoireId: "rep-1",
+      chapterId: "chapter-1",
+      uciPath: "e2e4 e7e5",
       intervalIndex: 0,
       dueAt: 3_601_000,
+      lastReviewedAt: 1_000,
+      algorithmVersion: 1,
     });
   });
 
@@ -147,12 +199,25 @@ describe("training session", () => {
     markTrainingMistake(context.state, context.route, { moveId: 2 });
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: true });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
     startTrainingLine(context.state, context.route, {
       lineIds: ["line-a"],
       lineId: "line-a",
@@ -160,6 +225,7 @@ describe("training session", () => {
     });
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
@@ -180,12 +246,25 @@ describe("training session", () => {
 
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: false,
     });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: false });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: false });
-    completeTrainingReplayMove(context, { lineId: "line-a", finishLine: false });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: false,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: false,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: false,
+    });
 
     expect(context.state.training.session).toMatchObject({
       currentMistakeCount: 1,
@@ -196,6 +275,7 @@ describe("training session", () => {
 
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });
@@ -213,6 +293,7 @@ describe("training session", () => {
     });
     completeTrainingLine(context, {
       lineId: "line-a",
+      uciPath: "e2e4 e7e5",
       completedMoveId: 4,
       finishLine: true,
     });

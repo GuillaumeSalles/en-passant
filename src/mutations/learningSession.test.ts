@@ -1,6 +1,6 @@
 import { normalizePgn } from "@/lib/AppState";
 import {
-  learningLineKey,
+  trainingLineScheduleKey,
   markLineLearned,
   playLearningMove,
   removeLearningPreview,
@@ -8,12 +8,22 @@ import {
 } from "@/mutations/learningSession";
 import { createMutationContext } from "@/tests/mocks";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { chapterStub, repertoireStub } from "@/tests/stubs";
 
 afterEach(() => vi.useRealTimers());
 
 function createLearningContext() {
+  const repertoire = repertoireStub({ id: "rep-1", handle: "white" });
+  const chapter = chapterStub({
+    id: "chapter-1",
+    repertoireId: repertoire.id,
+    handle: "main",
+  });
   return createMutationContext(
-    {},
+    {
+      repertoires: { status: "success", data: { [repertoire.id]: repertoire } },
+      chapters: { status: "success", data: { [chapter.id]: chapter } },
+    },
     {
       type: "variation-training",
       repertoireHandle: "white",
@@ -71,15 +81,20 @@ describe("learning session", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
     const context = createLearningContext();
-    const key = learningLineKey(context.route, "v1-line");
+    const key = trainingLineScheduleKey(context.state, context.route, "e2e4 e7e5");
+    if (key === null) throw new Error("Expected a training line key");
 
-    markLineLearned(context.state, context.route, "v1-line");
-    markLineLearned(context.state, context.route, "v1-line");
+    markLineLearned(context.state, context.route, "e2e4 e7e5");
+    markLineLearned(context.state, context.route, "e2e4 e7e5");
 
-    expect(context.state.learning.learnedLineKeys).toEqual([key]);
     expect(context.state.training.reviews[key]).toEqual({
+      repertoireId: "rep-1",
+      chapterId: "chapter-1",
+      uciPath: "e2e4 e7e5",
       intervalIndex: 0,
       dueAt: 3_601_000,
+      lastReviewedAt: 1_000,
+      algorithmVersion: 1,
     });
   });
 });

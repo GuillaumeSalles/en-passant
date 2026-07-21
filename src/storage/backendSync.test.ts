@@ -31,6 +31,7 @@ function syncRequest(label: string): RepertoireSyncRequest {
       ],
       chapters: [],
       pgns: [],
+      trainingLineSchedules: [],
     },
   };
 }

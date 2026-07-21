@@ -13,11 +13,13 @@ export function createStorageMock(): Mocked<Storage> {
     deleteRepertoire: vi.fn(),
     getAllChapters: vi.fn(),
     getAllRepertoires: vi.fn(),
+    getAllTrainingLineSchedules: vi.fn(),
     getInitialRepertoiresAndChapters: vi.fn(),
     getRepertoireSyncRequest: vi.fn(),
     getPgn: vi.fn(),
     applyRepertoireSyncResponse: vi.fn(),
     savePgnMutation: vi.fn(),
+    saveTrainingLineSchedule: vi.fn().mockResolvedValue(undefined),
     updateChapter: vi.fn(),
     updateRepertoire: vi.fn(),
   };

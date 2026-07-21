@@ -8,6 +8,14 @@ import {
 } from "./spacedRepetition";
 
 const intervals = [10, 20, 40] as const;
+const identity = { repertoireId: "rep-1", chapterId: "chapter-1", uciPath: "e2e4 e7e5" };
+const review = (intervalIndex: number, dueAt: number) => ({
+  ...identity,
+  intervalIndex,
+  dueAt,
+  lastReviewedAt: 90,
+  algorithmVersion: 1,
+});
 
 describe("spaced repetition", () => {
   test("uses the initial review cadence", () => {
@@ -25,21 +33,48 @@ describe("spaced repetition", () => {
   });
 
   test("uses the configured intervals and repeats the final interval", () => {
-    const initial = initialTrainingReview(100, intervals);
+    const initial = initialTrainingReview(identity, 100, intervals);
     const second = nextTrainingReview(initial, true, 110, intervals);
     const third = nextTrainingReview(second, true, 130, intervals);
     const repeatedFinal = nextTrainingReview(third, true, 170, intervals);
 
-    expect(initial).toEqual({ intervalIndex: 0, dueAt: 110 });
-    expect(second).toEqual({ intervalIndex: 1, dueAt: 130 });
-    expect(third).toEqual({ intervalIndex: 2, dueAt: 170 });
-    expect(repeatedFinal).toEqual({ intervalIndex: 2, dueAt: 210 });
+    expect(initial).toEqual({
+      ...identity,
+      intervalIndex: 0,
+      dueAt: 110,
+      lastReviewedAt: 100,
+      algorithmVersion: 1,
+    });
+    expect(second).toEqual({
+      ...identity,
+      intervalIndex: 1,
+      dueAt: 130,
+      lastReviewedAt: 110,
+      algorithmVersion: 1,
+    });
+    expect(third).toEqual({
+      ...identity,
+      intervalIndex: 2,
+      dueAt: 170,
+      lastReviewedAt: 130,
+      algorithmVersion: 1,
+    });
+    expect(repeatedFinal).toEqual({
+      ...identity,
+      intervalIndex: 2,
+      dueAt: 210,
+      lastReviewedAt: 170,
+      algorithmVersion: 1,
+    });
   });
 
   test("a failed training returns to the first interval", () => {
-    expect(nextTrainingReview({ intervalIndex: 2, dueAt: 100 }, false, 200, intervals)).toEqual({
+    expect(nextTrainingReview(review(2, 100), false, 200, intervals)).toEqual({
+      ...identity,
       intervalIndex: 0,
       dueAt: 210,
+      lastReviewedAt: 200,
+      algorithmVersion: 1,
     });
   });
 
@@ -50,13 +85,13 @@ describe("spaced repetition", () => {
       prioritizeDueTrainingLines(
         lines,
         {
-          future: { intervalIndex: 0, dueAt: 300 },
-          "due-later": { intervalIndex: 0, dueAt: 190 },
-          due: { intervalIndex: 0, dueAt: 150 },
+          future: review(0, 300),
+          "due-later": review(0, 190),
+          due: review(0, 150),
         },
         200,
       ).map((line) => line.id),
     ).toEqual(["due", "due-later", "future", "unscheduled"]);
-    expect(isTrainingReviewDue({ intervalIndex: 0, dueAt: 200 }, 200)).toBe(true);
+    expect(isTrainingReviewDue(review(0, 200), 200)).toBe(true);
   });
 });

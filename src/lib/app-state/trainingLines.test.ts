@@ -18,6 +18,7 @@ describe("training lines", () => {
 
     expect(trainingLineId(firstMoves)).toBe(trainingLineId(secondMoves));
     expect(trainingLineId(firstMoves)).toMatch(/^v1-[A-Za-z0-9_-]+$/);
+    expect(getTrainingLines(first, "white")[0]?.uciPath).toBe("e2e4 e7e5 g1f3");
   });
 
   test("returns leaf lines in PGN order", () => {

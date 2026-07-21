@@ -42,6 +42,7 @@ export {
   isTrainingReviewDue,
   nextTrainingReview,
   prioritizeDueTrainingLines,
+  trainingLineReviewKey,
 } from "./app-state/spacedRepetition";
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";
@@ -57,6 +58,7 @@ export {
 } from "./app-state/pgnTree";
 export {
   emptyState,
+  getChapter,
   getChapterName,
   getChapterPgn,
   getChapterScope,

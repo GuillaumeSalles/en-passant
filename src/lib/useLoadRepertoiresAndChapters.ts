@@ -74,7 +74,11 @@ export function useLoadRepertoiresAndChapters() {
         signedIn && shouldResetLocalDataForExistingSocialAccount(),
         signedIn,
       );
-      onRepertoireAndChapterLoadMutation(load.repertoires, load.chapters);
+      onRepertoireAndChapterLoadMutation(
+        load.repertoires,
+        load.chapters,
+        load.trainingLineSchedules,
+      );
       if (!signedIn) {
         return;
       }

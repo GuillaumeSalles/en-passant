@@ -2,6 +2,7 @@ import type { Move, NormalizedPgn, Orientation } from "./types";
 
 export type TrainingLine = {
   id: string;
+  uciPath: string;
   terminalMoveId: number;
   plyCount: number;
   isAlternative: boolean;
@@ -51,6 +52,10 @@ export function trainingLineId(moves: readonly Move[]): string {
   return `v1-${encodeBytes(bytes)}`;
 }
 
+export function trainingLineUciPath(moves: readonly Move[]): string {
+  return moves.map((move) => `${move.from}${move.to}${move.promotion ?? ""}`).join(" ");
+}
+
 function isUserMove(move: Move, orientation: Orientation): boolean {
   return (move.halfMoveNumber % 2 === 0 ? "white" : "black") === orientation;
 }
@@ -86,6 +91,7 @@ export function getTrainingLines(pgn: NormalizedPgn, orientation: Orientation): 
     if (move.next.length === 0) {
       lines.push({
         id: trainingLineId(path),
+        uciPath: trainingLineUciPath(path),
         terminalMoveId: move.id,
         plyCount: path.length,
         isAlternative,

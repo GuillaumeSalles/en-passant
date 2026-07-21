@@ -3,14 +3,15 @@ import {
   Context,
   emptyNormalizedPgn,
   EvalMove,
-  initialTrainingReview,
   moveFromEvalMove,
   nextTrainingReview,
   TrainingSessionDraft,
 } from "@/lib/AppState";
 import { StoreState } from "@/lib/createStore";
 import { MutationContext } from "@/lib/useMutation";
-import { learningLineKey } from "@/mutations/learningSession";
+import { trainingLineScheduleKey } from "@/mutations/learningSession";
+import { queueRepertoireSync } from "@/storage/backendSync";
+import type { TrainingLineReview } from "@/lib/AppState";
 
 export const FAILED_MOVE_SUCCESS_REPETITIONS = 3;
 
@@ -169,7 +170,8 @@ function finishTrainingLine(
   ctx: Context,
   session: TrainingSessionDraft,
   lineId: string,
-): void {
+  uciPath: string,
+): TrainingLineReview | null {
   const result = {
     lineId,
     mistakeCount: session.currentMistakeCount,
@@ -178,22 +180,22 @@ function finishTrainingLine(
     ...session.results.filter((existingResult) => existingResult.lineId !== lineId),
     result,
   ];
-  const key = learningLineKey(ctx, lineId);
-  const isLearned = state.learning.learnedLineKeys.includes(key);
-  const currentReview = state.training.reviews[key];
+  const key = trainingLineScheduleKey(state, ctx, uciPath);
+  const currentReview = key === null ? undefined : state.training.reviews[key];
   const review =
     currentReview === undefined
-      ? initialTrainingReview(Date.now())
+      ? null
       : nextTrainingReview(currentReview, result.mistakeCount === 0, Date.now());
   state.set("training", {
     ...state.training,
     status: "success",
-    reviews: isLearned
-      ? {
-          ...state.training.reviews,
-          [key]: review,
-        }
-      : state.training.reviews,
+    reviews:
+      key !== null && review !== null
+        ? {
+            ...state.training.reviews,
+            [key]: review,
+          }
+        : state.training.reviews,
     session: {
       ...session,
       results,
@@ -202,6 +204,7 @@ function finishTrainingLine(
       replayMoveIds: [],
     },
   });
+  return review;
 }
 
 function finishTrainingLineAttempt(
@@ -209,11 +212,11 @@ function finishTrainingLineAttempt(
   ctx: Context,
   session: TrainingSessionDraft,
   lineId: string,
+  uciPath: string,
   finishLine: boolean,
-): void {
+): TrainingLineReview | null {
   if (finishLine) {
-    finishTrainingLine(state, ctx, session, lineId);
-    return;
+    return finishTrainingLine(state, ctx, session, lineId, uciPath);
   }
 
   state.set("training", {
@@ -225,11 +228,17 @@ function finishTrainingLineAttempt(
       replayMoveIds: [],
     },
   });
+  return null;
+}
+
+function persistSchedule(ctx: MutationContext, schedule: TrainingLineReview | null): void {
+  if (schedule === null) return;
+  void ctx.storage.saveTrainingLineSchedule(schedule).then(queueRepertoireSync);
 }
 
 export function completeTrainingLine(
   ctx: MutationContext,
-  details: { lineId: string; completedMoveId: number; finishLine: boolean },
+  details: { lineId: string; uciPath: string; completedMoveId: number; finishLine: boolean },
 ): void {
   const { state } = ctx;
   const session = state.training.session;
@@ -240,7 +249,17 @@ export function completeTrainingLine(
 
   const replayMoveIds = createFailedMoveReplayQueue(session.failedMoveIds, details.completedMoveId);
   if (replayMoveIds.length === 0) {
-    finishTrainingLineAttempt(state, ctx.route, session, details.lineId, details.finishLine);
+    persistSchedule(
+      ctx,
+      finishTrainingLineAttempt(
+        state,
+        ctx.route,
+        session,
+        details.lineId,
+        details.uciPath,
+        details.finishLine,
+      ),
+    );
     return;
   }
 
@@ -277,7 +296,7 @@ export function prepareTrainingReplayMove(
 
 export function completeTrainingReplayMove(
   ctx: MutationContext,
-  details: { lineId: string; finishLine: boolean },
+  details: { lineId: string; uciPath: string; finishLine: boolean },
 ): void {
   const { state } = ctx;
   const session = state.training.session;
@@ -285,12 +304,16 @@ export function completeTrainingReplayMove(
 
   const replayMoveIds = session.replayMoveIds.slice(1);
   if (replayMoveIds.length === 0) {
-    finishTrainingLineAttempt(
-      state,
-      ctx.route,
-      { ...session, replayMoveIds },
-      details.lineId,
-      details.finishLine,
+    persistSchedule(
+      ctx,
+      finishTrainingLineAttempt(
+        state,
+        ctx.route,
+        { ...session, replayMoveIds },
+        details.lineId,
+        details.uciPath,
+        details.finishLine,
+      ),
     );
     return;
   }

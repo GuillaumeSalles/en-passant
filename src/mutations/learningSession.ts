@@ -9,12 +9,35 @@ import {
   moveFromChessboard,
   moveFromEvalMove,
   initialTrainingReview,
+  getChapter,
+  getRepertoire,
+  trainingLineReviewKey,
+  type TrainingLineReview,
 } from "@/lib/AppState";
 import { StoreState } from "@/lib/createStore";
 import type { MutationResult } from "@/lib/useMutation";
 
-export function learningLineKey(ctx: Context, lineId: string): string {
-  return `${ctx.repertoireHandle}/${ctx.chapterHandle}/${lineId}`;
+export function trainingLineIdentity(
+  state: AppState,
+  ctx: Context,
+  uciPath: string,
+): Pick<TrainingLineReview, "repertoireId" | "chapterId" | "uciPath"> | null {
+  const repertoire = getRepertoire(state, ctx);
+  if (repertoire === undefined) return null;
+  const chapter = getChapter(state, repertoire.id, ctx.chapterHandle);
+  if (chapter === undefined) return null;
+  return { repertoireId: repertoire.id, chapterId: chapter.id, uciPath };
+}
+
+export function trainingLineScheduleKey(
+  state: AppState,
+  ctx: Context,
+  uciPath: string,
+): string | null {
+  const identity = trainingLineIdentity(state, ctx, uciPath);
+  return identity === null
+    ? null
+    : trainingLineReviewKey(identity.repertoireId, identity.chapterId, identity.uciPath);
 }
 
 export function startLearningLine(state: StoreState<AppState>): void {
@@ -53,18 +76,21 @@ export function removeLearningPreview(
   state.set("animation", null);
 }
 
-export function markLineLearned(state: StoreState<AppState>, ctx: Context, lineId: string): void {
-  const key = learningLineKey(ctx, lineId);
-  if (!state.learning.learnedLineKeys.includes(key)) {
-    state.set("learning", {
-      learnedLineKeys: [...state.learning.learnedLineKeys, key],
-    });
-  }
+export function markLineLearned(
+  state: StoreState<AppState>,
+  ctx: Context,
+  uciPath: string,
+): MutationResult {
+  const identity = trainingLineIdentity(state, ctx, uciPath);
+  if (identity === null) return;
+  const key = trainingLineReviewKey(identity.repertoireId, identity.chapterId, identity.uciPath);
+  const schedule = initialTrainingReview(identity, Date.now());
   state.set("training", {
     ...state.training,
     reviews: {
       ...state.training.reviews,
-      [key]: initialTrainingReview(Date.now()),
+      [key]: schedule,
     },
   });
+  return { type: "persist-training-line-schedule", schedule };
 }

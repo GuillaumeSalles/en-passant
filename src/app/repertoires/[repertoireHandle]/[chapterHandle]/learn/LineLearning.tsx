@@ -82,7 +82,8 @@ export function LineLearning(props: {
     enabled: () => phase() === "reinforcement",
     repetitions: 2,
     onLineComplete: () => {
-      onMarkLineLearned(props.lineId);
+      const line = activeLine();
+      if (line !== undefined) onMarkLineLearned(line.uciPath);
       setPhase("complete");
     },
   });
