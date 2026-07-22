@@ -1,4 +1,5 @@
 import { createMemo, For, Show } from "solid-js";
+import { useParams } from "@solidjs/router";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { Brain, Download, Pencil, Plus, Trash } from "@/components/Icons";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { deleteChapter } from "@/app/Repertoires";
 import { useState } from "@/app/AppStateProvider";
 import { exportChapterPgn } from "@/lib/exportPgn";
 import { MAX_CHAPTERS_PER_REPERTOIRE } from "@/lib/repertoireLimits";
+import { useRedirectMissingRepertoireOverviewRoute } from "@/app/routeRedirects";
 
 function compareChapters(left: Chapter, right: Chapter): number {
   const byName = left.name.localeCompare(right.name, undefined, {
@@ -138,4 +140,12 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
       </div>
     </FullWidthLayout>
   );
+}
+
+export default function RepertoireOverviewRoute() {
+  const params = useParams<{ repertoireHandle: string }>();
+  useRedirectMissingRepertoireOverviewRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+  });
+  return <RepertoireOverview repertoireHandle={params.repertoireHandle} />;
 }

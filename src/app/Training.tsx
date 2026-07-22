@@ -167,3 +167,5 @@ export function Training() {
     </FullWidthLayout>
   );
 }
+
+export default Training;

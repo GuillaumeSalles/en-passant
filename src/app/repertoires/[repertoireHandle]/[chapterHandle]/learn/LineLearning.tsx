@@ -33,6 +33,8 @@ import {
   startLearningLine,
 } from "@/mutations/learningSession";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { useParams } from "@solidjs/router";
+import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
 import { TrainingLines } from "../train/TrainingLines";
 import { useVariationTrainingFlow } from "../train/useVariationTrainingFlow";
 
@@ -297,6 +299,25 @@ export function LineLearning(props: {
         />
       </Show>
     </Show>
+  );
+}
+
+export default function LineLearningRoute() {
+  const params = useParams<{
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  }>();
+  useRedirectMissingRepertoireRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+    getChapterHandle: () => params.chapterHandle,
+  });
+  return (
+    <LineLearning
+      repertoireHandle={params.repertoireHandle}
+      chapterHandle={params.chapterHandle}
+      lineId={params.lineId}
+    />
   );
 }
 

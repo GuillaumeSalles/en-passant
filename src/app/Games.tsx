@@ -350,3 +350,5 @@ export function Games() {
     </FullWidthLayout>
   );
 }
+
+export default Games;

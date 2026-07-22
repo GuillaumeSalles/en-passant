@@ -447,3 +447,5 @@ export function Design() {
     </main>
   );
 }
+
+export default Design;
