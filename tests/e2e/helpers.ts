@@ -122,6 +122,13 @@ export async function mockSignedOutAuth(page: Page): Promise<void> {
       body: JSON.stringify({ error: "unauthorized" }),
     });
   });
+  await page.route("**/api/games/position-moves?*", async (route) => {
+    await route.fulfill({
+      status: 401,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ error: "unauthorized" }),
+    });
+  });
 }
 
 export async function mockSignedInUser(
@@ -224,6 +231,18 @@ export async function mockSignedInUser(
         "x-pgn-revision": `revision-${pgnId}`,
       },
       body: pgn,
+    });
+  });
+  await page.route("**/api/games/position-moves?*", async (route) => {
+    const requestedPositionKey = new URL(route.request().url()).searchParams.get("positionKey");
+    await route.fulfill({
+      status: isSignedIn ? 200 : 401,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        isSignedIn
+          ? { positionKey: requestedPositionKey, playedBy: "user", games: 0, moves: [] }
+          : { error: "unauthorized" },
+      ),
     });
   });
   return {

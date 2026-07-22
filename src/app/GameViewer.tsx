@@ -20,7 +20,7 @@ import { useSquareHighlights } from "@/components/useSquareHighlights";
 import { useStore } from "@/app/AppStateProvider";
 import { StoreState } from "@/lib/createStore";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
-import { loadLichessGame, type StoredLichessGame } from "@/lib/lichessGames";
+import { loadGame, type StoredGame } from "@/lib/games";
 import { APP_ROOT, repertoireMovePath } from "@/lib/routes";
 import { useSelector } from "@/lib/useSelector";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
@@ -28,7 +28,7 @@ import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; game: StoredLichessGame }
+  | { status: "success"; game: StoredGame }
   | { status: "signed-out" }
   | { status: "not-found" }
   | { status: "error"; message: string };
@@ -45,7 +45,7 @@ function numberedSan(ply: number, san: string): string {
   return `${moveNumber}${ply % 2 === 1 ? "." : "..."} ${san}`;
 }
 
-function resetImportedGameState(state: StoreState<AppState>, game: StoredLichessGame): void {
+function resetImportedGameState(state: StoreState<AppState>, game: StoredGame): void {
   state.set("pgns", {
     ...state.pgns,
     [game.id]: { status: "success", data: normalizePgn(game.pgn) },
@@ -58,7 +58,7 @@ function resetImportedGameState(state: StoreState<AppState>, game: StoredLichess
   state.set("highlights", { squares: {}, arrows: {} });
 }
 
-function titleForGame(game: StoredLichessGame): string {
+function titleForGame(game: StoredGame): string {
   return `${game.whiteName} vs ${game.blackName}`;
 }
 
@@ -72,7 +72,7 @@ function errorMessage(reason: string): string {
   return "This game is unavailable right now.";
 }
 
-function GameViewerTitle(props: { game: StoredLichessGame }) {
+function GameViewerTitle(props: { game: StoredGame }) {
   return (
     <div class="min-w-0">
       <h1 class="truncate text-base font-medium">{titleForGame(props.game)}</h1>
@@ -83,7 +83,7 @@ function GameViewerTitle(props: { game: StoredLichessGame }) {
   );
 }
 
-function mainLineMoveIdAtPly(game: StoredLichessGame, ply: number): number | null {
+function mainLineMoveIdAtPly(game: StoredGame, ply: number): number | null {
   const pgn = normalizePgn(game.pgn);
   let moveId = pgn.rootMoveIds[0];
   for (let currentPly = 1; currentPly < ply && moveId !== undefined; currentPly++) {
@@ -153,7 +153,7 @@ export function GameViewer(props: { gameId: string }) {
       }
 
       setState({ status: "loading" });
-      loadLichessGame(gameId).then((result) => {
+      loadGame(gameId).then((result) => {
         if (currentRequestId !== requestId) {
           return;
         }

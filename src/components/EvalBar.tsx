@@ -7,6 +7,11 @@ type EvalBarDisplay = {
   isWWinning: boolean;
 };
 
+export const EVAL_BAR_WHITE_CLASS = "bg-neutral-200 dark:bg-neutral-800";
+export const EVAL_BAR_BLACK_CLASS = "bg-neutral-900 dark:bg-neutral-100";
+export const EVAL_BAR_LIGHT_CLASS = "bg-neutral-200 dark:bg-neutral-100";
+export const EVAL_BAR_DARK_CLASS = "bg-neutral-900 dark:bg-neutral-800";
+
 function getEvalDisplay(evaluation: Eval | undefined): string {
   if (!evaluation) return "";
 
@@ -44,11 +49,15 @@ export function EvalBar(props: { evaluation: Eval | undefined; orientation: Orie
   return (
     <div
       aria-label="Evaluation bar"
-      class="relative h-6 w-full flex-shrink-0 overflow-hidden bg-neutral-200 dark:bg-neutral-800 xl:h-auto xl:w-6"
+      class={cn(
+        "relative h-6 w-full flex-shrink-0 overflow-hidden xl:h-auto xl:w-6",
+        EVAL_BAR_WHITE_CLASS,
+      )}
     >
       <div
         class={cn(
-          "absolute top-0 h-full w-[var(--eval-fill)] bg-neutral-900 transition-[width] duration-300 ease-emil-out motion-reduce:transition-none dark:bg-neutral-100 xl:h-[var(--eval-fill)] xl:w-full xl:transition-[height]",
+          "absolute top-0 h-full w-[var(--eval-fill)] transition-[width] duration-300 ease-emil-out motion-reduce:transition-none xl:h-[var(--eval-fill)] xl:w-full xl:transition-[height]",
+          EVAL_BAR_BLACK_CLASS,
           isWhiteOriented()
             ? "left-0 xl:bottom-0 xl:left-auto xl:top-auto"
             : "right-0 xl:right-auto xl:top-0",

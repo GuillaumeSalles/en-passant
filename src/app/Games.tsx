@@ -7,22 +7,22 @@ import { Input } from "@/components/ui/input";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import {
   importRecentLichessGames,
-  loadLichessGames,
-  type LichessGameColor,
-  type LichessGameSort,
-  type StoredLichessGame,
-} from "@/lib/lichessGames";
+  loadGames,
+  type GameColor,
+  type GameSort,
+  type StoredGame,
+} from "@/lib/games";
 import { importedGamePath } from "@/lib/routes";
 import { Repeat2, Upload } from "@/components/Icons";
 
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; games: StoredLichessGame[]; imported?: number }
+  | { status: "success"; games: StoredGame[]; imported?: number }
   | { status: "signed-out" }
   | { status: "error"; message: string };
 
-type ColorFilter = "all" | LichessGameColor;
+type ColorFilter = "all" | GameColor;
 
 function formatDate(value: number): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -77,7 +77,7 @@ function Select(props: {
   );
 }
 
-function GamesTable(props: { games: StoredLichessGame[] }) {
+function GamesTable(props: { games: StoredGame[] }) {
   return (
     <div class="min-h-0 overflow-auto">
       <table class="w-full min-w-[720px] border-collapse text-sm">
@@ -155,7 +155,7 @@ export function Games() {
   const [handle, setHandle] = createSignal("");
   const [timeControl, setTimeControl] = createSignal("all");
   const [color, setColor] = createSignal<ColorFilter>("all");
-  const [sort, setSort] = createSignal<LichessGameSort>("desc");
+  const [sort, setSort] = createSignal<GameSort>("desc");
   const [refreshVersion, setRefreshVersion] = createSignal(0);
   let requestId = 0;
 
@@ -179,7 +179,7 @@ export function Games() {
       }
 
       setState({ status: "loading" });
-      loadLichessGames().then((result) => {
+      loadGames().then((result) => {
         if (currentRequestId !== requestId) {
           return;
         }

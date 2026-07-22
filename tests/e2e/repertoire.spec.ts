@@ -5,6 +5,7 @@ import {
   collectUnexpectedConsole,
   firstStoredPgn,
   mockSignedOutAuth,
+  mockSignedInUser,
   seedIndexedDb,
   storedTrainingLineUciPaths,
   type ChapterRecord,
@@ -133,6 +134,68 @@ test("IndexedDB v4 wipes pre-R2 local repertoire data", async ({ page }) => {
 
   await expect(page.getByText("Demo repertoire").first()).toBeVisible();
   await expect(page.getByText("Snapshot era repertoire")).toHaveCount(0);
+});
+
+test("shows the signed-in user's move statistics for the selected position", async ({ page }) => {
+  const session = await mockSignedInUser(page);
+  session.signIn();
+  await page.route("**/api/games/position-moves?*", async (route) => {
+    const searchParams = new URL(route.request().url()).searchParams;
+    const positionKey = searchParams.get("positionKey");
+    expect(searchParams.get("color")).toBe("white");
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        positionKey,
+        playedBy: "user",
+        games: 8,
+        moves: [
+          {
+            uci: "e2e4",
+            san: "e4",
+            games: 5,
+            whiteWins: 3,
+            draws: 1,
+            blackWins: 1,
+            whiteWinRate: 0.6,
+            drawRate: 0.2,
+            blackWinRate: 0.2,
+          },
+          {
+            uci: "d2d4",
+            san: "d4",
+            games: 3,
+            whiteWins: 1,
+            draws: 1,
+            blackWins: 1,
+            whiteWinRate: 1 / 3,
+            drawRate: 1 / 3,
+            blackWinRate: 1 / 3,
+          },
+        ],
+      }),
+    });
+  });
+
+  await openRepertoire(page);
+
+  const stats = page.getByRole("region", { name: "Your games" });
+  await expect(stats.getByRole("cell", { name: "62.5% of games, 5 games" })).toBeVisible();
+  await expect(
+    stats.getByRole("img", {
+      name: "e4 results: 3 white wins (60%), 1 draw (20%), 1 black win (20%)",
+    }),
+  ).toBeVisible();
+  await expect(stats.getByRole("cell", { name: "Total", exact: true })).toBeVisible();
+  await expect(
+    stats.getByRole("img", {
+      name: "Total results: 4 white wins (50%), 2 draws (25%), 2 black wins (25%)",
+    }),
+  ).toBeVisible();
+  await expect(stats.locator("tbody tr").first()).toHaveAttribute("data-position-move", "e2e4");
+  await stats.locator('[data-position-move="e2e4"]').click();
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
 });
 
 async function seedRepertoire(

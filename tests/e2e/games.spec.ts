@@ -4,13 +4,15 @@ import { mockSignedInUser } from "./helpers";
 test("shows the latest repertoire move on an imported game", async ({ page }) => {
   const session = await mockSignedInUser(page);
   session.signIn();
-  await page.route("**/api/lichess/games/abc123", async (route) => {
+  await page.route("**/api/games/lichess-abc123", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         game: {
-          id: "abc123",
-          importedHandle: "PlayerOne",
+          id: "lichess-abc123",
+          source: "lichess",
+          sourceGameId: "abc123",
+          importedAccount: "PlayerOne",
           userColor: "white",
           opponentName: "Opponent",
           opponentRating: 1810,
@@ -42,7 +44,7 @@ test("shows the latest repertoire move on an imported game", async ({ page }) =>
     });
   });
 
-  await page.goto("/app/games/abc123");
+  await page.goto("/app/games/lichess-abc123");
 
   const move = page.getByRole("button", { name: "Move Nc6" });
   const indicator = move.locator('[data-move-indicator="repertoire"]');

@@ -6,12 +6,14 @@ import {
   Arrows,
   Context,
   Eval,
+  EvalMove,
   findMoveIdByPositionKey,
   getPgn,
   getNagGlyph,
   getNagMeaning,
   HighlightKind,
   moveFromChessboard,
+  moveFromEvalMove,
   selectAnimation,
   selectFen,
   selectNextMoveIds,
@@ -35,6 +37,17 @@ import { MutationContext, useMutation } from "@/lib/useMutation";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { RepertoireHeader } from "./RepertoireHeader";
 import { StoreState } from "@/lib/createStore";
+import { PositionMoveStats } from "./PositionMoveStats";
+
+function positionStatMove(uci: string, san: string): EvalMove | null {
+  if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(uci)) return null;
+  return {
+    from: uci.slice(0, 2),
+    to: uci.slice(2, 4),
+    promotion: uci.slice(4) || null,
+    san,
+  };
+}
 
 function getBestMoveArrow(evaluations: Eval[]): { [fromTo: string]: ArrowKind } {
   const evaluation = evaluations[0];
@@ -147,6 +160,7 @@ export function Repertoire(props: {
   const onUpdateEvaluation = useMutation(updateEvaluation);
   const onAddEvalMoves = useMutation(addEvalMoves);
   const onMoveFromChessboard = useMutation(moveFromChessboard);
+  const onMoveFromStats = useMutation(moveFromEvalMove);
   const onSelectMove = useMutation(selectMove);
   const onDrawArrow = useMutation(drawArrow);
   const onHighlightSquare = useMutation(highlightSquare);
@@ -259,6 +273,14 @@ export function Repertoire(props: {
           <Show when={nextMoveIds().length > 1}>
             <VariationSelector />
           </Show>
+          <PositionMoveStats
+            fen={currentFen()}
+            color={orientation()}
+            onMove={(move) => {
+              const evalMove = positionStatMove(move.uci, move.san);
+              if (evalMove !== null) onMoveFromStats(evalMove);
+            }}
+          />
           <PgnExplorerToolbar />
         </>
       }

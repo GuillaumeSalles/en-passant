@@ -1,7 +1,7 @@
 import { createChessPosition, positionKey } from "./chess";
 
-export type LichessGameColor = "white" | "black";
-export type LichessGameSort = "asc" | "desc";
+export type GameColor = "white" | "black";
+export type GameSort = "asc" | "desc";
 
 export type LatestRepertoireMove = {
   ply: number;
@@ -11,10 +11,12 @@ export type LatestRepertoireMove = {
   chapter: { handle: string; name: string };
 };
 
-export type StoredLichessGame = {
+export type StoredGame = {
   id: string;
-  importedHandle: string;
-  userColor: LichessGameColor;
+  source: string;
+  sourceGameId: string;
+  importedAccount: string;
+  userColor: GameColor;
   opponentName: string;
   opponentRating: number | null;
   userRating: number | null;
@@ -22,7 +24,7 @@ export type StoredLichessGame = {
   blackName: string;
   whiteRating: number | null;
   blackRating: number | null;
-  winner: LichessGameColor | null;
+  winner: GameColor | null;
   result: "1-0" | "0-1" | "1/2-1/2" | "*";
   speed: string;
   perf: string;
@@ -39,8 +41,8 @@ export type StoredLichessGame = {
   latestRepertoireMove: LatestRepertoireMove | null;
 };
 
-export type LichessGamesResult =
-  | { ok: true; games: StoredLichessGame[]; imported?: number }
+export type GamesResult =
+  | { ok: true; games: StoredGame[]; imported?: number }
   | {
       ok: false;
       reason:
@@ -51,12 +53,35 @@ export type LichessGamesResult =
         | "lichess-auth-required";
     };
 
-export type LichessGameResult =
-  | { ok: true; game: StoredLichessGame }
+export type GameResult =
+  | { ok: true; game: StoredGame }
   | {
       ok: false;
       reason: "unauthorized" | "invalid-response" | "not-found" | "unavailable";
     };
+
+export type PositionMoveStat = {
+  uci: string;
+  san: string;
+  games: number;
+  whiteWins: number;
+  draws: number;
+  blackWins: number;
+  whiteWinRate: number;
+  drawRate: number;
+  blackWinRate: number;
+};
+
+export type PositionMoves = {
+  positionKey: string;
+  playedBy: "user" | "opponent";
+  games: number;
+  moves: PositionMoveStat[];
+};
+
+export type PositionMovesResult =
+  | { ok: true; data: PositionMoves }
+  | { ok: false; reason: "unauthorized" | "invalid-response" | "unavailable" };
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>;
 
@@ -68,11 +93,19 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function parseColor(value: unknown): LichessGameColor | null {
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isRate(value: unknown): value is number {
+  return isNumber(value) && value >= 0 && value <= 1;
+}
+
+function parseColor(value: unknown): GameColor | null {
   return value === "white" || value === "black" ? value : null;
 }
 
-function parseOpening(value: unknown): StoredLichessGame["opening"] {
+function parseOpening(value: unknown): StoredGame["opening"] {
   if (value === null || value === undefined) {
     return null;
   }
@@ -90,7 +123,7 @@ function nullableNumber(value: unknown): number | null | undefined {
   return isNumber(value) ? value : undefined;
 }
 
-function nullableColor(value: unknown): LichessGameColor | null | undefined {
+function nullableColor(value: unknown): GameColor | null | undefined {
   if (value === null) return null;
   return parseColor(value) ?? undefined;
 }
@@ -135,13 +168,15 @@ function isPositionKey(value: string): boolean {
   }
 }
 
-function parseGame(value: unknown): StoredLichessGame | null {
+function parseGame(value: unknown): StoredGame | null {
   if (!isRecord(value)) {
     return null;
   }
 
   const id = value["id"];
-  const importedHandle = value["importedHandle"];
+  const source = value["source"];
+  const sourceGameId = value["sourceGameId"];
+  const importedAccount = value["importedAccount"];
   const userColor = parseColor(value["userColor"]);
   const opponentName = value["opponentName"];
   const opponentRating = nullableNumber(value["opponentRating"]);
@@ -164,7 +199,9 @@ function parseGame(value: unknown): StoredLichessGame | null {
 
   if (
     typeof id !== "string" ||
-    typeof importedHandle !== "string" ||
+    typeof source !== "string" ||
+    typeof sourceGameId !== "string" ||
+    typeof importedAccount !== "string" ||
     userColor === null ||
     typeof opponentName !== "string" ||
     opponentRating === undefined ||
@@ -190,7 +227,9 @@ function parseGame(value: unknown): StoredLichessGame | null {
 
   return {
     id,
-    importedHandle,
+    source,
+    sourceGameId,
+    importedAccount,
     userColor,
     opponentName,
     opponentRating,
@@ -214,7 +253,7 @@ function parseGame(value: unknown): StoredLichessGame | null {
   };
 }
 
-function parseGames(value: unknown): StoredLichessGame[] | null {
+function parseGames(value: unknown): StoredGame[] | null {
   if (!isRecord(value) || !Array.isArray(value["games"])) {
     return null;
   }
@@ -223,7 +262,57 @@ function parseGames(value: unknown): StoredLichessGame[] | null {
   return games.some((game) => game === null) ? null : games.filter((game) => game !== null);
 }
 
-function parseGameResponse(value: unknown): StoredLichessGame | null {
+function parsePositionMove(value: unknown): PositionMoveStat | null {
+  if (!isRecord(value)) return null;
+  const uci = value["uci"];
+  const san = value["san"];
+  const games = value["games"];
+  const whiteWins = value["whiteWins"];
+  const draws = value["draws"];
+  const blackWins = value["blackWins"];
+  const whiteWinRate = value["whiteWinRate"];
+  const drawRate = value["drawRate"];
+  const blackWinRate = value["blackWinRate"];
+  if (
+    typeof uci !== "string" ||
+    typeof san !== "string" ||
+    !isNonNegativeInteger(games) ||
+    !isNonNegativeInteger(whiteWins) ||
+    !isNonNegativeInteger(draws) ||
+    !isNonNegativeInteger(blackWins) ||
+    whiteWins + draws + blackWins !== games ||
+    !isRate(whiteWinRate) ||
+    !isRate(drawRate) ||
+    !isRate(blackWinRate)
+  ) {
+    return null;
+  }
+  return { uci, san, games, whiteWins, draws, blackWins, whiteWinRate, drawRate, blackWinRate };
+}
+
+export function parsePositionMovesResponse(value: unknown): PositionMoves | null {
+  if (!isRecord(value)) return null;
+  const currentPositionKey = value["positionKey"];
+  const playedBy = value["playedBy"];
+  const games = value["games"];
+  const rawMoves = value["moves"];
+  if (
+    typeof currentPositionKey !== "string" ||
+    !isPositionKey(currentPositionKey) ||
+    (playedBy !== "user" && playedBy !== "opponent") ||
+    !isNonNegativeInteger(games) ||
+    !Array.isArray(rawMoves)
+  ) {
+    return null;
+  }
+  const moves = rawMoves.map(parsePositionMove);
+  if (moves.some((move) => move === null)) return null;
+  const parsedMoves = moves.filter((move) => move !== null);
+  if (parsedMoves.reduce((total, move) => total + move.games, 0) !== games) return null;
+  return { positionKey: currentPositionKey, playedBy, games, moves: parsedMoves };
+}
+
+function parseStoredGameResponse(value: unknown): StoredGame | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -247,7 +336,7 @@ async function readError(response: Response): Promise<string | null> {
   return typeof error === "string" ? error : null;
 }
 
-function errorResult(response: Response, error: string | null): LichessGamesResult {
+function errorResult(response: Response, error: string | null): GamesResult {
   if (response.status === 401) {
     return { ok: false, reason: "unauthorized" };
   }
@@ -263,22 +352,22 @@ function errorResult(response: Response, error: string | null): LichessGamesResu
   return { ok: false, reason: "unavailable" };
 }
 
-export function parseLichessGamesResponse(value: unknown): StoredLichessGame[] | null {
+export function parseGamesResponse(value: unknown): StoredGame[] | null {
   return parseGames(value);
 }
 
-export function parseLichessGameResponse(value: unknown): StoredLichessGame | null {
-  return parseGameResponse(value);
+export function parseGameResponse(value: unknown): StoredGame | null {
+  return parseStoredGameResponse(value);
 }
 
-export async function loadLichessGames(
+export async function loadGames(
   filters: {
     timeControl?: string;
-    color?: LichessGameColor;
-    sort?: LichessGameSort;
+    color?: GameColor;
+    sort?: GameSort;
   } = {},
   options: { fetcher?: Fetcher } = {},
-): Promise<LichessGamesResult> {
+): Promise<GamesResult> {
   const params = new URLSearchParams();
   if (filters.timeControl !== undefined) {
     params.set("timeControl", filters.timeControl);
@@ -290,7 +379,7 @@ export async function loadLichessGames(
     params.set("sort", filters.sort);
   }
 
-  const path = `/api/lichess/games${params.size === 0 ? "" : `?${params}`}`;
+  const path = `/api/games${params.size === 0 ? "" : `?${params}`}`;
   const fetcher = options.fetcher ?? fetch;
   let response: Response;
   try {
@@ -310,14 +399,14 @@ export async function loadLichessGames(
   return games === null ? { ok: false, reason: "invalid-response" } : { ok: true, games };
 }
 
-export async function loadLichessGame(
+export async function loadGame(
   gameId: string,
   options: { fetcher?: Fetcher } = {},
-): Promise<LichessGameResult> {
+): Promise<GameResult> {
   const fetcher = options.fetcher ?? fetch;
   let response: Response;
   try {
-    response = await fetcher(`/api/lichess/games/${encodeURIComponent(gameId)}`, {
+    response = await fetcher(`/api/games/${encodeURIComponent(gameId)}`, {
       credentials: "include",
       headers: { accept: "application/json" },
     });
@@ -335,18 +424,41 @@ export async function loadLichessGame(
     return { ok: false, reason: "unavailable" };
   }
 
-  const game = parseGameResponse(await readJson(response));
+  const game = parseStoredGameResponse(await readJson(response));
   return game === null ? { ok: false, reason: "invalid-response" } : { ok: true, game };
+}
+
+export async function loadPositionMoves(
+  currentPositionKey: string,
+  color: GameColor,
+  options: { fetcher?: Fetcher } = {},
+): Promise<PositionMovesResult> {
+  const fetcher = options.fetcher ?? fetch;
+  const params = new URLSearchParams({ positionKey: currentPositionKey, color });
+  let response: Response;
+  try {
+    response = await fetcher(`/api/games/position-moves?${params}`, {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+  if (response.status === 401) return { ok: false, reason: "unauthorized" };
+  if (!response.ok) return { ok: false, reason: "unavailable" };
+
+  const data = parsePositionMovesResponse(await readJson(response));
+  return data === null ? { ok: false, reason: "invalid-response" } : { ok: true, data };
 }
 
 export async function importRecentLichessGames(
   handle: string,
   options: { fetcher?: Fetcher; max?: number } = {},
-): Promise<LichessGamesResult> {
+): Promise<GamesResult> {
   const fetcher = options.fetcher ?? fetch;
   let response: Response;
   try {
-    response = await fetcher("/api/lichess/games/import", {
+    response = await fetcher("/api/game-imports/lichess", {
       method: "POST",
       credentials: "include",
       headers: {
