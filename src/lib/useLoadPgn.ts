@@ -1,6 +1,6 @@
 import { createEffect } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
-import { getPgn } from "@/storage";
+import { loadPgn } from "@/storage/backendSync";
 import { useMutation } from "./useMutation";
 import {
   AppState,
@@ -46,6 +46,7 @@ function onPgnLoadFailed(
 export function useLoadPgn(getRepertoireHandle: () => string, getChapterHandle: () => string) {
   const state = useState();
   const onPgnLoadMutation = useMutation(onPgnLoadCompleted);
+  const onPgnLoadFailedMutation = useMutation(onPgnLoadFailed);
   const onStartLoadingPgnMutation = useMutation(startLoadingPgn);
   const onSetBoardOrientation = useMutation(setBoardOrientation);
   let lastAppliedRepertoireId: string | null = null;
@@ -92,12 +93,20 @@ export function useLoadPgn(getRepertoireHandle: () => string, getChapterHandle: 
 
       onStartLoadingPgnMutation(chapter.pgnId);
 
-      getPgn(chapter.pgnId).then((pgn) => {
-        if (pgn == null) {
-          return;
-        }
-        onPgnLoadMutation(chapter.pgnId, pgn);
-      });
+      loadPgn(chapter.pgnId)
+        .then((pgn) => {
+          if (pgn === undefined) {
+            onPgnLoadFailedMutation(chapter.pgnId, new Error("PGN not found"));
+            return;
+          }
+          onPgnLoadMutation(chapter.pgnId, pgn);
+        })
+        .catch((reason: unknown) => {
+          onPgnLoadFailedMutation(
+            chapter.pgnId,
+            reason instanceof Error ? reason : new Error("Failed to load PGN"),
+          );
+        });
     },
   );
 }
@@ -115,7 +124,7 @@ export function useLoadPgns(getPgnIds: () => readonly string[]) {
         if (pgns[pgnId] !== undefined) continue;
 
         onStartLoadingPgnMutation(pgnId);
-        getPgn(pgnId)
+        loadPgn(pgnId)
           .then((pgn) => {
             if (pgn === undefined) {
               onPgnLoadFailedMutation(pgnId, new Error("PGN not found"));

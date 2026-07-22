@@ -9,7 +9,7 @@ import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
 
 const DB_NAME = "en-passant";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const REPERTOIRE_STORE_NAME = "repertoires";
 const CHAPTERS_STORE_NAME = "chapters";
@@ -38,7 +38,8 @@ export type SyncedRepertoire = NewSerializedRepertoire & SyncMetadata;
 export type SyncedChapter = SerializedChapter & SyncMetadata;
 export type SyncedPgn = {
   id: string;
-  pgn: string;
+  revision: string;
+  byteSize: number;
 } & SyncMetadata;
 export type SyncedTrainingLineSchedule = TrainingLineReview & { updatedAt: string };
 
@@ -52,7 +53,9 @@ export type StoredChapter = SerializedChapter & LocalSyncMetadata;
 export type StoredTrainingLineSchedule = SyncedTrainingLineSchedule & { dirty: boolean };
 type StoredPgnBase = {
   id: string;
-  pgn: string;
+  pgn?: string;
+  revision: string | null;
+  byteSize: number;
 } & SyncMetadata;
 
 export type StoredPgn = StoredPgnBase & {
@@ -82,6 +85,8 @@ export type RepertoireSyncResponse = {
   changes: RepertoireSyncChanges;
   acknowledgedPgn: {
     id: string;
+    revision: string;
+    byteSize: number;
     updatedAt: string;
     deletedAt?: string | null;
   } | null;
@@ -148,9 +153,10 @@ function cleanChapter(chapter: SyncedChapter): StoredChapter {
   };
 }
 
-function cleanPgn(pgn: SyncedPgn): StoredPgn {
+function cleanPgn(pgn: SyncedPgn, cachedPgn?: string): StoredPgn {
   return {
     ...pgn,
+    ...(cachedPgn === undefined ? {} : { pgn: cachedPgn }),
     pendingMutations: [],
     metadataDirty: false,
   };
@@ -351,6 +357,8 @@ export async function savePgnMutation(
     put(transaction.objectStore(PGNS_STORE_NAME), id, {
       id,
       pgn,
+      revision: existing.revision,
+      byteSize: new TextEncoder().encode(pgn).byteLength,
       pendingMutations: [...pendingMutationsFor(existing), ...mutations],
       metadataDirty: isPgnMetadataDirty(existing),
       updatedAt: nowIso(),
@@ -408,6 +416,8 @@ export async function createRepertoireAndChapter(
       put(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
+        revision: null,
+        byteSize: new TextEncoder().encode(pgn).byteLength,
         pendingMutations: [{ type: "createPgn", pgn }],
         metadataDirty: true,
         updatedAt,
@@ -424,6 +434,29 @@ export async function getPgn(pgnId: string): Promise<string | undefined> {
 
   const value = await get<StoredPgn>(store, pgnId);
   return value?.deletedAt == null ? value?.pgn : undefined;
+}
+
+export async function cacheRemotePgn(pgnId: string, revision: string, pgn: string): Promise<void> {
+  const db = await init();
+  const readTransaction = db.transaction([PGNS_STORE_NAME], "readonly");
+  const existing = await get<StoredPgn>(readTransaction.objectStore(PGNS_STORE_NAME), pgnId);
+  if (
+    existing === undefined ||
+    existing.deletedAt != null ||
+    existing.revision !== revision ||
+    isPgnDirty(existing)
+  ) {
+    return;
+  }
+
+  const writeTransaction = db.transaction([PGNS_STORE_NAME], "readwrite");
+  await waitForTransaction(
+    writeTransaction,
+    put(writeTransaction.objectStore(PGNS_STORE_NAME), pgnId, {
+      ...existing,
+      pgn,
+    } satisfies StoredPgn),
+  );
 }
 
 export async function deleteChapter(chapterId: string, pgnId: string): Promise<void> {
@@ -541,6 +574,8 @@ export async function createChapter(chapter: SerializedChapter, pgn: string): Pr
       put(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
+        revision: null,
+        byteSize: new TextEncoder().encode(pgn).byteLength,
         pendingMutations: [{ type: "createPgn", pgn }],
         metadataDirty: true,
         updatedAt,
@@ -766,6 +801,8 @@ export async function applyRepertoireSyncResponse(
     acknowledgmentWrites.push(
       put(writePgnStore, acknowledgment.id, {
         ...existing,
+        revision: acknowledgment.revision,
+        byteSize: acknowledgment.byteSize,
         pendingMutations: acknowledgedRemainingMutations,
         metadataDirty: existing.deletedAt === sent.deletedAt ? false : isPgnMetadataDirty(existing),
         updatedAt:
@@ -786,7 +823,16 @@ export async function applyRepertoireSyncResponse(
       ...appliedChanges.chapters.map((chapter) =>
         put(writeChapterStore, chapter.id, cleanChapter(chapter)),
       ),
-      ...appliedChanges.pgns.map((pgn) => put(writePgnStore, pgn.id, cleanPgn(pgn))),
+      ...appliedChanges.pgns.map((pgn) => {
+        const existing = pgnById.get(pgn.id);
+        const sent = request.changes.pgns.find((change) => change.id === pgn.id);
+        const sentCreation = sent?.mutations.some((mutation) => mutation.type === "createPgn");
+        const cachedPgn =
+          existing !== undefined && (existing.revision === pgn.revision || sentCreation === true)
+            ? existing.pgn
+            : undefined;
+        return put(writePgnStore, pgn.id, cleanPgn(pgn, cachedPgn));
+      }),
       ...appliedChanges.trainingLineSchedules.map((schedule) =>
         put(
           writeScheduleStore,
@@ -843,7 +889,7 @@ function init() {
   }
 
   dbPromise = connect((db, oldVersion) => {
-    if (oldVersion > 0 && oldVersion < 2) {
+    if (oldVersion > 0 && oldVersion < 4) {
       for (const storeName of db.objectStoreNames) {
         db.deleteObjectStore(storeName);
       }

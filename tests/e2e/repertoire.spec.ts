@@ -91,7 +91,7 @@ test.beforeEach(async ({ page }) => {
   await mockSignedOutAuth(page);
 });
 
-test("IndexedDB v2 wipes snapshot-era local repertoire data", async ({ page }) => {
+test("IndexedDB v4 wipes pre-R2 local repertoire data", async ({ page }) => {
   await page.goto("/stockfish-18-lite-single.js");
   await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {

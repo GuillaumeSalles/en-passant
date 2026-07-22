@@ -225,11 +225,12 @@ test("new account sign in uploads local repertoire data", async ({ page }) => {
       pgns: [
         {
           id: "auth-pgn",
-          mutations: [{ type: "createPgn", pgn: "1. d4 d5 *" }],
+          mutations: [],
         },
       ],
     },
   });
+  expect(auth.pgnUploads).toContainEqual({ id: "auth-pgn", pgn: "1. d4 d5 *" });
   expect(consoleMessages).toEqual([]);
 });
 
@@ -262,14 +263,20 @@ test("existing account sign in discards local repertoire data and loads server d
     ],
     pgns: [pgnSnapshot("server-pgn", "1. c4 e5 *", "2026-06-26T00:00:01.000Z")],
   };
-  const auth = await mockSignedInUser(page, undefined, null, (body) => {
-    syncRequests.push(body);
-    return {
-      cursor: "2026-06-26T00:00:02.000Z",
-      changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
-      acknowledgedPgn: null,
-    };
-  });
+  const auth = await mockSignedInUser(
+    page,
+    undefined,
+    null,
+    (body) => {
+      syncRequests.push(body);
+      return {
+        cursor: "2026-06-26T00:00:02.000Z",
+        changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
+        acknowledgedPgn: null,
+      };
+    },
+    { "server-pgn": "1. c4 e5 *" },
+  );
   await page.route("**/api/auth/email-otp/send-verification-otp", async (route) => {
     await route.fulfill({
       status: 200,
@@ -365,11 +372,12 @@ test("new Google account sign in uploads local repertoire data", async ({ page }
       pgns: [
         {
           id: "auth-pgn",
-          mutations: [{ type: "createPgn", pgn: "1. d4 d5 *" }],
+          mutations: [],
         },
       ],
     },
   });
+  expect(auth.pgnUploads).toContainEqual({ id: "auth-pgn", pgn: "1. d4 d5 *" });
   expect(consoleMessages).toEqual([]);
 });
 
@@ -402,14 +410,20 @@ test("existing Google account sign in discards local repertoire data and loads s
     ],
     pgns: [pgnSnapshot("server-pgn", "1. c4 e5 *", "2026-06-26T00:00:01.000Z")],
   };
-  const auth = await mockSignedInUser(page, undefined, null, (body) => {
-    syncRequests.push(body);
-    return {
-      cursor: "2026-06-26T00:00:02.000Z",
-      changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
-      acknowledgedPgn: null,
-    };
-  });
+  const auth = await mockSignedInUser(
+    page,
+    undefined,
+    null,
+    (body) => {
+      syncRequests.push(body);
+      return {
+        cursor: "2026-06-26T00:00:02.000Z",
+        changes: syncRequests.length === 1 ? remoteChanges : emptyChanges(),
+        acknowledgedPgn: null,
+      };
+    },
+    { "server-pgn": "1. c4 e5 *" },
+  );
 
   await openAuthPage(page, {
     localName: "Local Draft Should Disappear",

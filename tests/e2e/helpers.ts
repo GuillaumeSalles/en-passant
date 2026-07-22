@@ -64,16 +64,25 @@ export function acceptedPgnAcknowledgment(body: unknown): unknown {
   if (!isRecord(mutation)) return null;
   return {
     id: mutation["id"],
+    revision: "server-ack-revision",
+    byteSize: 0,
     updatedAt: "2026-06-26T00:00:01.000Z",
     deletedAt: mutation["deletedAt"] ?? null,
   };
 }
 
 export function pgnSnapshot(id: string, pgn: string, updatedAt: string) {
-  return { id, pgn, updatedAt, deletedAt: null };
+  return {
+    id,
+    revision: `revision-${id}`,
+    byteSize: new TextEncoder().encode(pgn).byteLength,
+    updatedAt,
+    deletedAt: null,
+  };
 }
 
 export type MockAuthSession = {
+  pgnUploads: { id: string; pgn: string }[];
   signIn: () => void;
   signOut: () => void;
 };
@@ -120,8 +129,11 @@ export async function mockSignedInUser(
   onSync?: () => void,
   image: string | null = null,
   syncResponseForRequest?: (body: unknown) => unknown,
+  remotePgnBodies: Record<string, string> = {},
 ): Promise<MockAuthSession> {
   let isSignedIn = false;
+  const pgnBodies = new Map(Object.entries(remotePgnBodies));
+  const pgnUploads: { id: string; pgn: string }[] = [];
   await page.route("**/api/auth/get-session", async (route) => {
     await route.fulfill({
       status: 200,
@@ -165,7 +177,57 @@ export async function mockSignedInUser(
       body: JSON.stringify(isSignedIn ? responseBody : { error: "unauthorized" }),
     });
   });
+  await page.route("**/api/pgns/*", async (route) => {
+    const pgnId = decodeURIComponent(
+      new URL(route.request().url()).pathname.split("/").at(-1) ?? "",
+    );
+    if (!isSignedIn) {
+      await route.fulfill({
+        status: 401,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ error: "unauthorized" }),
+      });
+      return;
+    }
+
+    if (route.request().method() === "PUT") {
+      const pgn = route.request().postData() ?? "";
+      pgnBodies.set(pgnId, pgn);
+      pgnUploads.push({ id: pgnId, pgn });
+      await route.fulfill({
+        status: 201,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: pgnId,
+          revision: `revision-${pgnId}`,
+          byteSize: new TextEncoder().encode(pgn).byteLength,
+          updatedAt: "2026-06-26T00:00:01.000Z",
+          deletedAt: null,
+        }),
+      });
+      return;
+    }
+
+    const pgn = pgnBodies.get(pgnId);
+    if (pgn === undefined) {
+      await route.fulfill({
+        status: 404,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ error: "pgn_not_found" }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      headers: {
+        "content-type": "application/x-chess-pgn; charset=utf-8",
+        "x-pgn-revision": `revision-${pgnId}`,
+      },
+      body: pgn,
+    });
+  });
   return {
+    pgnUploads,
     signIn() {
       isSignedIn = true;
     },
@@ -214,6 +276,8 @@ export async function seedIndexedDb(
     pgns: records.pgns.map((record) => ({
       id: record.id,
       pgn: record.pgn,
+      revision: record.dirty ? null : `revision-${record.id}`,
+      byteSize: new TextEncoder().encode(record.pgn).byteLength,
       pendingMutations: record.dirty ? [{ type: "createPgn", pgn: record.pgn }] : [],
       metadataDirty: record.dirty,
       updatedAt: record.updatedAt,
@@ -233,7 +297,7 @@ export async function seedIndexedDb(
         });
       const openSeedDatabase = () =>
         new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant", 3);
+          const openRequest = indexedDB.open("en-passant", 4);
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onupgradeneeded = () => {
             const db = openRequest.result;

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { createRepertoireSyncQueue } from "./backendSync";
+import { createRepertoireSyncQueue, withoutInlinePgnCreation } from "./backendSync";
 import type { RepertoireSyncRequest } from "@/storage";
 
 type Deferred<T> = {
@@ -86,5 +86,37 @@ describe("createRepertoireSyncQueue", () => {
 
     expect(getSyncRequest).not.toHaveBeenCalled();
     expect(pushSyncRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe("withoutInlinePgnCreation", () => {
+  test("removes the uploaded snapshot while retaining later incremental mutations", () => {
+    const request = syncRequest("1");
+    request.changes.pgns = [
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        updatedAt: "2026-07-22T00:00:00.000Z",
+        deletedAt: null,
+        mutations: [
+          { type: "createPgn", pgn: "1. e4 *" },
+          {
+            type: "addMove",
+            parentPath: ["e2e4"],
+            move: "e7e5",
+            annotations: { nags: [], commentBefore: null, commentAfter: null },
+          },
+        ],
+      },
+    ];
+
+    expect(withoutInlinePgnCreation(request).changes.pgns[0]?.mutations).toEqual([
+      {
+        type: "addMove",
+        parentPath: ["e2e4"],
+        move: "e7e5",
+        annotations: { nags: [], commentBefore: null, commentAfter: null },
+      },
+    ]);
+    expect(request.changes.pgns[0]?.mutations).toHaveLength(2);
   });
 });

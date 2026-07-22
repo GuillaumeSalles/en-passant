@@ -1,7 +1,9 @@
 import { StoreState } from "@/lib/createStore";
-import { AppState, normalizePgn, trainingLineReviewKey, type Context } from "@/lib/AppState";
+import { AppState, trainingLineReviewKey, type Context } from "@/lib/AppState";
 import {
   applyRepertoireSyncResponse,
+  cacheRemotePgn,
+  getPgn,
   getRepertoireSyncRequest,
   type RepertoireSyncChanges,
   type RepertoireSyncRequest,
@@ -13,6 +15,30 @@ import { limitRepertoireNameLength } from "@/lib/repertoireNames";
 type ApiError = {
   error: string;
 };
+
+export function withoutInlinePgnCreation(
+  syncRequest: RepertoireSyncRequest,
+): RepertoireSyncRequest {
+  const pgnChange = syncRequest.changes.pgns[0];
+  if (
+    pgnChange === undefined ||
+    !pgnChange.mutations.some((mutation) => mutation.type === "createPgn")
+  ) {
+    return syncRequest;
+  }
+  return {
+    ...syncRequest,
+    changes: {
+      ...syncRequest.changes,
+      pgns: [
+        {
+          ...pgnChange,
+          mutations: pgnChange.mutations.filter((mutation) => mutation.type !== "createPgn"),
+        },
+      ],
+    },
+  };
+}
 
 async function readJson<T>(response: Response): Promise<T | null> {
   if (response.status === 204 || response.status === 401) {
@@ -28,11 +54,27 @@ async function readJson<T>(response: Response): Promise<T | null> {
 async function syncRemoteChanges(
   syncRequest: RepertoireSyncRequest,
 ): Promise<RepertoireSyncChanges | null> {
+  const pgnChange = syncRequest.changes.pgns[0];
+  const creation = pgnChange?.mutations.find((mutation) => mutation.type === "createPgn");
+  let request = syncRequest;
+  if (pgnChange !== undefined && creation !== undefined) {
+    const uploadResponse = await fetch(`/api/pgns/${encodeURIComponent(pgnChange.id)}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "content-type": "application/x-chess-pgn" },
+      body: creation.pgn,
+    });
+    if (!uploadResponse.ok) {
+      throw new Error(await uploadResponse.text());
+    }
+    request = withoutInlinePgnCreation(syncRequest);
+  }
+
   const response = await fetch("/api/sync", {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(syncRequest),
+    body: JSON.stringify(request),
   });
   if (response.status === 401) {
     return null;
@@ -45,6 +87,25 @@ async function syncRemoteChanges(
     return null;
   }
   return await applyRepertoireSyncResponse(syncResponse, syncRequest);
+}
+
+export async function loadPgn(pgnId: string): Promise<string | undefined> {
+  const localPgn = await getPgn(pgnId);
+  if (localPgn !== undefined) return localPgn;
+
+  const response = await fetch(`/api/pgns/${encodeURIComponent(pgnId)}`, {
+    credentials: "include",
+  });
+  if (response.status === 401 || response.status === 404) return undefined;
+  if (!response.ok) throw new Error(await response.text());
+
+  const revision = response.headers.get("x-pgn-revision");
+  if (revision === null || revision === "") {
+    throw new Error("PGN response is missing its revision");
+  }
+  const pgn = await response.text();
+  await cacheRemotePgn(pgnId, revision, pgn);
+  return pgn;
 }
 
 export async function pullRepertoireFromBackend(): Promise<RepertoireSyncChanges | null> {
@@ -98,7 +159,7 @@ function applyChangesToState(
   const pgns = { ...state.pgns };
   for (const pgn of changes.pgns) {
     if (pgn.deletedAt == null) {
-      pgns[pgn.id] = { status: "success", data: normalizePgn(pgn.pgn) };
+      delete pgns[pgn.id];
     } else {
       delete pgns[pgn.id];
     }

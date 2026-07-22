@@ -5,8 +5,8 @@ Cloudflare Pages project `enpassant`.
 
 ## Non-Negotiables
 
-- Do not import backend source. Use HTTP contracts such as `/api/auth/*` and
-  `POST /api/sync`.
+- Do not import backend source. Use HTTP contracts such as `/api/auth/*`,
+  `/api/pgns/:id`, and `POST /api/sync`.
 - Do not use `any`; prefer generics, `unknown`, or explicit tuple inference.
 - Keep chess rules, PGN parsing, move tree mutation, NAG handling, and
   serialization testable outside UI components.
