@@ -62,3 +62,5 @@ export function Debug() {
     </main>
   );
 }
+
+export default Debug;

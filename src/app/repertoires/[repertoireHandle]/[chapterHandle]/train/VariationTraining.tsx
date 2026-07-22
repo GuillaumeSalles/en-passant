@@ -12,6 +12,8 @@ import { repertoirePath, trainingLinePath, trainingPath } from "@/lib/routes";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { Show } from "solid-js";
+import { useParams } from "@solidjs/router";
+import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
 import { TrainingLines } from "./TrainingLines";
 import { useVariationTrainingFlow } from "./useVariationTrainingFlow";
 
@@ -123,6 +125,25 @@ export function VariationTraining(props: {
         />
       </Show>
     </Show>
+  );
+}
+
+export default function VariationTrainingRoute() {
+  const params = useParams<{
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  }>();
+  useRedirectMissingRepertoireRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+    getChapterHandle: () => params.chapterHandle,
+  });
+  return (
+    <VariationTraining
+      repertoireHandle={params.repertoireHandle}
+      chapterHandle={params.chapterHandle}
+      lineId={params.lineId}
+    />
   );
 }
 

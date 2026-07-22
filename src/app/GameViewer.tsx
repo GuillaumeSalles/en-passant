@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import { A } from "@solidjs/router";
+import { A, useParams } from "@solidjs/router";
 import {
   AppState,
   Arrows,
@@ -284,4 +284,9 @@ export function GameViewer(props: { gameId: string }) {
       )}
     </Show>
   );
+}
+
+export default function GameViewerRoute() {
+  const params = useParams<{ gameId: string }>();
+  return <GameViewer gameId={params.gameId} />;
 }

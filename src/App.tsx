@@ -1,23 +1,11 @@
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
-import type { Accessor } from "solid-js";
+import { createEffect, createMemo, createSignal, lazy, Loading, Show } from "solid-js";
 import { Router, Route } from "@solidjs/router";
-import { useLocation, useNavigate, useParams } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { AppStateProvider, useState } from "@/app/AppStateProvider";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Repertoires } from "@/app/Repertoires";
-import { Design } from "@/app/Design";
-import { Debug } from "@/app/Debug";
-import { GameViewer } from "@/app/GameViewer";
-import { Games } from "@/app/Games";
-import { Training } from "@/app/Training";
-import { NotFound } from "@/app/NotFound";
-import { Repertoire } from "@/components/Repertoire";
-import { RepertoireOverview } from "@/app/repertoires/[repertoireHandle]/RepertoireOverview";
-import { VariationTraining } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/VariationTraining";
-import { TrainingLines } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/TrainingLines";
-import { LineLearning } from "@/app/repertoires/[repertoireHandle]/[chapterHandle]/learn/LineLearning";
 import { EnPassantLogo } from "@/components/EnPassantLogo";
 import { AuthButton } from "@/components/AuthButton";
 import { SignupNudge } from "@/components/SignupNudge";
@@ -32,13 +20,32 @@ import {
 } from "@/components/ui/dialog";
 import { MobileNavigationProvider } from "@/components/MobileNavigation";
 import { GitHub, Info, X, XLogo } from "@/components/Icons";
-import { getChapterScopeFromData } from "@/lib/AppState";
 import { isSafariBrowser } from "@/lib/browser";
-import { APP_ROOT, firstRepertoireChapterPath, parseSelectedPositionKey } from "@/lib/routes";
+import { APP_ROOT, firstRepertoireChapterPath } from "@/lib/routes";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
+
+const Design = lazy(() => import("@/app/Design"));
+const Debug = lazy(() => import("@/app/Debug"));
+const GameViewer = lazy(() => import("@/app/GameViewer"));
+const Games = lazy(() => import("@/app/Games"));
+const Training = lazy(() => import("@/app/Training"));
+const NotFound = lazy(() => import("@/app/NotFound"));
+const Repertoire = lazy(() => import("@/app/RepertoireRoute"));
+const RepertoireOverview = lazy(
+  () => import("@/app/repertoires/[repertoireHandle]/RepertoireOverview"),
+);
+const VariationTraining = lazy(
+  () => import("@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/VariationTraining"),
+);
+const TrainingLines = lazy(
+  () => import("@/app/repertoires/[repertoireHandle]/[chapterHandle]/train/TrainingLines"),
+);
+const LineLearning = lazy(
+  () => import("@/app/repertoires/[repertoireHandle]/[chapterHandle]/learn/LineLearning"),
+);
 
 function SidebarHeader() {
   return (
@@ -296,150 +303,6 @@ function AppRootRoute() {
   return <BaseLayout />;
 }
 
-function useRedirectMissingRepertoireRoute(props: {
-  getRepertoireHandle: Accessor<string>;
-  getChapterHandle: Accessor<string>;
-}) {
-  const state = useState();
-  const navigate = useNavigate();
-
-  createEffect(
-    () => ({
-      repertoireHandle: props.getRepertoireHandle(),
-      chapterHandle: props.getChapterHandle(),
-      repertoires: state.repertoires,
-      chapters: state.chapters,
-    }),
-    ({ repertoireHandle, chapterHandle, repertoires, chapters }) => {
-      if (repertoires.status !== "success" || chapters.status !== "success") {
-        return;
-      }
-
-      const scope = getChapterScopeFromData(
-        repertoires.data,
-        chapters.data,
-        repertoireHandle,
-        chapterHandle,
-      );
-      if (scope === null) {
-        navigate(APP_ROOT, { replace: true });
-      }
-    },
-  );
-}
-
-function useRedirectMissingRepertoireOverviewRoute(props: {
-  getRepertoireHandle: Accessor<string>;
-}) {
-  const state = useState();
-  const navigate = useNavigate();
-
-  createEffect(
-    () => ({
-      repertoireHandle: props.getRepertoireHandle(),
-      repertoires: state.repertoires,
-    }),
-    ({ repertoireHandle, repertoires }) => {
-      if (repertoires.status !== "success") {
-        return;
-      }
-
-      const repertoire = Object.values(repertoires.data).find(
-        (candidate) => candidate.handle === repertoireHandle,
-      );
-      if (repertoire === undefined) {
-        navigate(APP_ROOT, { replace: true });
-      }
-    },
-  );
-}
-
-function RepertoireOverviewRoute() {
-  const params = useParams<{ repertoireHandle: string }>();
-  useRedirectMissingRepertoireOverviewRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-  });
-  return <RepertoireOverview repertoireHandle={params.repertoireHandle} />;
-}
-
-function RepertoireRoute() {
-  const params = useParams<{ repertoireHandle: string; chapterHandle: string }>();
-  const location = useLocation();
-  useRedirectMissingRepertoireRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-    getChapterHandle: () => params.chapterHandle,
-  });
-  return (
-    <Repertoire
-      repertoireHandle={params.repertoireHandle}
-      chapterHandle={params.chapterHandle}
-      requestedPositionKey={parseSelectedPositionKey(
-        typeof location.query["selectedPositionKey"] === "string"
-          ? location.query["selectedPositionKey"]
-          : undefined,
-      )}
-    />
-  );
-}
-
-function TrainRoute() {
-  const params = useParams<{ repertoireHandle: string; chapterHandle: string }>();
-  useRedirectMissingRepertoireRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-    getChapterHandle: () => params.chapterHandle,
-  });
-  return (
-    <TrainingLines
-      repertoireHandle={params.repertoireHandle}
-      chapterHandle={params.chapterHandle}
-      missingLine={false}
-    />
-  );
-}
-
-function TrainLineRoute() {
-  const params = useParams<{
-    repertoireHandle: string;
-    chapterHandle: string;
-    lineId: string;
-  }>();
-  useRedirectMissingRepertoireRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-    getChapterHandle: () => params.chapterHandle,
-  });
-  return (
-    <VariationTraining
-      repertoireHandle={params.repertoireHandle}
-      chapterHandle={params.chapterHandle}
-      lineId={params.lineId}
-    />
-  );
-}
-
-function LearnLineRoute() {
-  const params = useParams<{
-    repertoireHandle: string;
-    chapterHandle: string;
-    lineId: string;
-  }>();
-  useRedirectMissingRepertoireRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-    getChapterHandle: () => params.chapterHandle,
-  });
-  return (
-    <LineLearning
-      repertoireHandle={params.repertoireHandle}
-      chapterHandle={params.chapterHandle}
-      lineId={params.lineId}
-    />
-  );
-}
-
-function GameRoute() {
-  const params = useParams<{ gameId: string }>();
-  return <GameViewer gameId={params.gameId} />;
-}
-
 function Root(props: { children?: JSX.Element }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -458,9 +321,13 @@ function Root(props: { children?: JSX.Element }) {
   }
 
   return (
-    <Show when={isAppRoute()} fallback={props.children}>
+    <Show when={isAppRoute()} fallback={<Loading on={location.pathname}>{props.children}</Loading>}>
       <AppStateProvider>
-        <AppShell>{props.children}</AppShell>
+        <AppShell>
+          <Loading fallback={<BaseLayout />} on={location.pathname}>
+            {props.children}
+          </Loading>
+        </AppShell>
       </AppStateProvider>
     </Show>
   );
@@ -474,26 +341,23 @@ export default function App() {
       <Route path={APP_ROOT} component={AppRootRoute} />
       <Route path={`${APP_ROOT}/games`} component={Games} />
       <Route path={`${APP_ROOT}/training`} component={Training} />
-      <Route path={`${APP_ROOT}/games/:gameId`} component={GameRoute} />
-      <Route
-        path={`${APP_ROOT}/repertoires/:repertoireHandle`}
-        component={RepertoireOverviewRoute}
-      />
+      <Route path={`${APP_ROOT}/games/:gameId`} component={GameViewer} />
+      <Route path={`${APP_ROOT}/repertoires/:repertoireHandle`} component={RepertoireOverview} />
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle`}
-        component={RepertoireRoute}
+        component={Repertoire}
       />
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train`}
-        component={TrainRoute}
+        component={TrainingLines}
       />
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`}
-        component={TrainLineRoute}
+        component={VariationTraining}
       />
       <Route
         path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/learn/:lineId`}
-        component={LearnLineRoute}
+        component={LineLearning}
       />
       <Route path="*" component={NotFound} />
     </Router>

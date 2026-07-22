@@ -1,4 +1,4 @@
-import { A } from "@solidjs/router";
+import { A, useParams } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { Ellipsis } from "@/components/Icons";
@@ -28,6 +28,7 @@ import { useSelector } from "@/lib/useSelector";
 import { ensureTrainingSession } from "@/mutations/trainingSession";
 import { trainingLineScheduleKey } from "@/mutations/learningSession";
 import { useState } from "@/app/AppStateProvider";
+import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
 
 export function TrainingLines(props: {
   repertoireHandle: string;
@@ -266,5 +267,20 @@ export function TrainingLines(props: {
         </div>
       </div>
     </FullWidthLayout>
+  );
+}
+
+export default function TrainingLinesRoute() {
+  const params = useParams<{ repertoireHandle: string; chapterHandle: string }>();
+  useRedirectMissingRepertoireRoute({
+    getRepertoireHandle: () => params.repertoireHandle,
+    getChapterHandle: () => params.chapterHandle,
+  });
+  return (
+    <TrainingLines
+      repertoireHandle={params.repertoireHandle}
+      chapterHandle={params.chapterHandle}
+      missingLine={false}
+    />
   );
 }
