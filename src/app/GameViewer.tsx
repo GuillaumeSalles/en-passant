@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { A, useParams } from "@solidjs/router";
 import {
   AppState,
@@ -8,10 +8,12 @@ import {
   selectAnimation,
   selectFen,
   selectOrientation,
+  updateEvaluation,
 } from "@/lib/AppState";
 import { Button } from "@/components/ui/button";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { Chessboard } from "@/components/Chessboard/Chessboard";
+import { EvalBar } from "@/components/EvalBar";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree, type MoveIndicator } from "@/components/MovesTree";
@@ -22,6 +24,8 @@ import { StoreState } from "@/lib/createStore";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import { loadGame, type StoredGame } from "@/lib/games";
 import { APP_ROOT, repertoireMovePath } from "@/lib/routes";
+import { Engine } from "@/lib/engine";
+import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 
@@ -129,9 +133,20 @@ export function GameViewer(props: { gameId: string }) {
   const currentFen = useSelector(selectFen);
   const orientation = useSelector(selectOrientation);
   const animation = useSelector(selectAnimation);
+  const engineDepth = useSelector((appState) => appState.engineSettings.depth);
+  const isEngineEnabled = useSelector((appState) => appState.engineSettings.isEnabled);
+  const isEvalBarVisible = useSelector(
+    (appState) => appState.engineSettings.isEnabled && appState.engineSettings.showEvalBar,
+  );
+  const evaluations = useSelector((appState) => appState.evaluations);
   const squareHighlights = useSquareHighlights();
   const emptyArrows = createMemo<Arrows>(() => ({}));
+  const onUpdateEvaluation = useMutation(updateEvaluation);
   let requestId = 0;
+
+  const engine = new Engine();
+  engine.onEvaluation(onUpdateEvaluation);
+  onCleanup(() => engine.terminate());
 
   createEffect(
     () => ({
@@ -174,6 +189,21 @@ export function GameViewer(props: { gameId: string }) {
     const current = state();
     return current.status === "success" ? current.game : null;
   });
+
+  createEffect(
+    () => ({
+      depth: engineDepth(),
+      enabled: isEngineEnabled(),
+      fen: currentFen(),
+      gameLoaded: game() !== null,
+    }),
+    ({ depth, enabled, fen, gameLoaded }) => {
+      if (enabled && gameLoaded) {
+        engine.evaluate(fen, depth);
+      }
+    },
+  );
+
   const repertoireCoverage = createMemo<RepertoireCoverage | null>(() => {
     const match = game()?.latestRepertoireMove;
     if (match === null || match === undefined) return null;
@@ -251,7 +281,11 @@ export function GameViewer(props: { gameId: string }) {
               annotations={{}}
             />
           }
-          evalBar={null}
+          evalBar={
+            isEvalBarVisible() ? (
+              <EvalBar orientation={orientation()} evaluation={evaluations()[0]} />
+            ) : null
+          }
           panelChildren={
             <>
               <Show when={repertoireCoverage()}>

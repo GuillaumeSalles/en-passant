@@ -49,6 +49,7 @@ test("shows the latest repertoire move on an imported game", async ({ page }) =>
   const move = page.getByRole("button", { name: "Move Nc6" });
   const indicator = move.locator('[data-move-indicator="repertoire"]');
   const coverageBanner = page.locator("[data-repertoire-coverage]");
+  await expect(page.locator('[aria-label="Evaluation bar"]')).toBeVisible();
   await expect(coverageBanner).toContainText("Last repertoire move 2... Nc6");
   await expect(
     coverageBanner.getByRole("link", { name: "White repertoire / Italian Game" }),
