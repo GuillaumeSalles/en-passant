@@ -1,3 +1,4 @@
+import { MemoryRouter, Route } from "@solidjs/router";
 import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, test, vi } from "vitest";
 import { STARTING_FEN } from "@/lib/chess";
@@ -40,13 +41,46 @@ test("shows move results and hides the total row when there is only one next mov
           blackWinRate: 1 / 6,
         },
       ],
+      recentGames: [
+        {
+          id: "lichess-newest",
+          source: "lichess",
+          createdAt: 1_765_000_000_000,
+          white: { name: "Player One", rating: 1800 },
+          black: { name: "Opponent One", rating: 1810 },
+          result: "1-0",
+          speed: "blitz",
+          timeControl: "180+2",
+          move: { ply: 1, uci: "e2e4", san: "e4" },
+        },
+        {
+          id: "chesscom-older",
+          source: "chesscom",
+          createdAt: 1_764_000_000_000,
+          white: { name: "Opponent Two", rating: null },
+          black: { name: "Player One", rating: 1790 },
+          result: "1/2-1/2",
+          speed: "rapid",
+          timeControl: "600+0",
+          move: { ply: 1, uci: "e2e4", san: "e4" },
+        },
+      ],
     }),
   );
   vi.stubGlobal("fetch", fetcher);
 
-  render(() => <PositionMoveStats fen={STARTING_FEN} color="black" onMove={onMove} />);
+  render(() => (
+    <MemoryRouter
+      root={() => <PositionMoveStats fen={STARTING_FEN} color="black" onMove={onMove} />}
+    >
+      <Route path="/" component={() => null} />
+    </MemoryRouter>
+  ));
 
   await waitFor(() => expect(screen.getByText("e4")).not.toBeNull());
+  const section = screen.getByRole("region", { name: "Your games" });
+  expect(section.className).toContain("max-h-[450px]");
+  expect(section.className).toContain("overflow-y-auto");
   expect(screen.getByRole("heading", { name: "Your games" })).not.toBeNull();
   expect(screen.getByRole("button", { name: "Play e4" })).not.toBeNull();
   expect(screen.getByRole("cell", { name: "100% of games, 6 games" })).not.toBeNull();
@@ -63,6 +97,12 @@ test("shows move results and hides the total row when there is only one next mov
   expect(resultBar.children[2]?.className).toContain("dark:bg-neutral-800");
   expect(resultBar.textContent).toBe("50%33.3%16.7%");
   expect(screen.queryByRole("cell", { name: "Total" })).toBeNull();
+  const recentGames = screen.getByLabelText("Recent games");
+  const recentLinks = recentGames.querySelectorAll("a");
+  expect(recentLinks).toHaveLength(2);
+  expect(recentLinks[0]?.getAttribute("href")).toBe("/app/games/lichess-newest");
+  expect(recentLinks[1]?.getAttribute("href")).toBe("/app/games/chesscom-older");
+  expect(recentLinks[0]?.textContent).toBe("Player One (1800) – Opponent One (1810)180+21-0");
 
   const requestedUrl = String(fetcher.mock.calls[0]?.[0]);
   expect(requestedUrl).toContain("/api/games/position-moves?");
@@ -105,11 +145,18 @@ test("shows the total row when there are multiple next moves", async () => {
             blackWinRate: 1,
           },
         ],
+        recentGames: [],
       }),
     ),
   );
 
-  render(() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />);
+  render(() => (
+    <MemoryRouter
+      root={() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />}
+    >
+      <Route path="/" component={() => null} />
+    </MemoryRouter>
+  ));
 
   await waitFor(() => expect(screen.getByText("e4")).not.toBeNull());
   expect(screen.getByRole("cell", { name: "Total" })).not.toBeNull();
@@ -126,7 +173,13 @@ test("hides the section for anonymous users", async () => {
   const fetcher = vi.fn();
   vi.stubGlobal("fetch", fetcher);
 
-  render(() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />);
+  render(() => (
+    <MemoryRouter
+      root={() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />}
+    >
+      <Route path="/" component={() => null} />
+    </MemoryRouter>
+  ));
 
   await waitFor(() => {
     expect(screen.queryByRole("region", { name: "Your games" })).toBeNull();

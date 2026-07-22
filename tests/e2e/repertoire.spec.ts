@@ -173,6 +173,30 @@ test("shows the signed-in user's move statistics for the selected position", asy
             blackWinRate: 1 / 3,
           },
         ],
+        recentGames: [
+          {
+            id: "lichess-newest",
+            source: "lichess",
+            createdAt: 1_765_000_000_000,
+            white: { name: "Player One", rating: 1800 },
+            black: { name: "Opponent One", rating: 1810 },
+            result: "1-0",
+            speed: "blitz",
+            timeControl: "180+2",
+            move: { ply: 1, uci: "e2e4", san: "e4" },
+          },
+          {
+            id: "lichess-older",
+            source: "lichess",
+            createdAt: 1_764_000_000_000,
+            white: { name: "Opponent Two", rating: 1750 },
+            black: { name: "Player One", rating: 1800 },
+            result: "0-1",
+            speed: "rapid",
+            timeControl: "600+0",
+            move: { ply: 1, uci: "e2e4", san: "e4" },
+          },
+        ],
       }),
     });
   });
@@ -192,6 +216,10 @@ test("shows the signed-in user's move statistics for the selected position", asy
       name: "Total results: 4 white wins (50%), 2 draws (25%), 2 black wins (25%)",
     }),
   ).toBeVisible();
+  const recentGames = stats.getByLabel("Recent games").getByRole("link");
+  await expect(recentGames).toHaveCount(2);
+  await expect(recentGames.nth(0)).toHaveAttribute("href", "/app/games/lichess-newest");
+  await expect(recentGames.nth(1)).toHaveAttribute("href", "/app/games/lichess-older");
   await expect(stats.locator("tbody tr").first()).toHaveAttribute("data-position-move", "e2e4");
   await stats.locator('[data-position-move="e2e4"]').click();
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");

@@ -1,12 +1,15 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { A } from "@solidjs/router";
 import { createChessPosition, positionKey } from "@/lib/chess";
 import {
   loadPositionMoves,
   type GameColor,
   type PositionMoveStat,
   type PositionMoves,
+  type RecentPositionGame,
 } from "@/lib/games";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
+import { importedGamePath } from "@/lib/routes";
 import { EVAL_BAR_DARK_CLASS, EVAL_BAR_LIGHT_CLASS } from "./EvalBar";
 import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
 
@@ -26,6 +29,10 @@ function moveFrequency(games: number, totalGames: number): string {
 
 function resultLabel(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function playerName(player: RecentPositionGame["white"]): string {
+  return player.rating === null ? player.name : `${player.name} (${player.rating})`;
 }
 
 function totalResults(positionMoves: PositionMoves) {
@@ -114,6 +121,31 @@ function TotalResultsRow(props: { positionMoves: PositionMoves }) {
   );
 }
 
+function RecentGames(props: { games: RecentPositionGame[] }) {
+  return (
+    <Show when={props.games.length > 0}>
+      <div class="mt-1 border-t border-border pt-1" aria-label="Recent games">
+        <For each={props.games}>
+          {(game) => (
+            <A
+              href={importedGamePath(game.id)}
+              class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-sm px-2 py-1.5 text-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              aria-label={`${playerName(game.white)} versus ${playerName(game.black)}, ${game.timeControl}, ${game.result}`}
+              data-recent-position-game={game.id}
+            >
+              <span class="truncate font-medium">
+                {playerName(game.white)} – {playerName(game.black)}
+              </span>
+              <span class="whitespace-nowrap text-muted-foreground">{game.timeControl}</span>
+              <span class="whitespace-nowrap font-mono">{game.result}</span>
+            </A>
+          )}
+        </For>
+      </div>
+    </Show>
+  );
+}
+
 export function PositionMoveStats(props: {
   fen: string;
   color: GameColor;
@@ -160,7 +192,10 @@ export function PositionMoveStats(props: {
 
   return (
     <Show when={authStatus() !== "signed-out" && state().status !== "signed-out"}>
-      <section aria-labelledby="position-move-stats-title" class="flex flex-col">
+      <section
+        aria-labelledby="position-move-stats-title"
+        class="flex max-h-[450px] flex-col overflow-y-auto"
+      >
         <HorizontalDashedDivider direction="right-to-left" />
         <div class="px-4 py-3">
           <h2 id="position-move-stats-title" class="text-sm font-medium">
@@ -263,6 +298,7 @@ export function PositionMoveStats(props: {
                     </tfoot>
                   </Show>
                 </table>
+                <RecentGames games={positionMoves().recentGames} />
               </div>
             </Show>
           )}

@@ -240,7 +240,13 @@ export async function mockSignedInUser(
       headers: { "content-type": "application/json" },
       body: JSON.stringify(
         isSignedIn
-          ? { positionKey: requestedPositionKey, playedBy: "user", games: 0, moves: [] }
+          ? {
+              positionKey: requestedPositionKey,
+              playedBy: "user",
+              games: 0,
+              moves: [],
+              recentGames: [],
+            }
           : { error: "unauthorized" },
       ),
     });

@@ -85,6 +85,19 @@ describe("parsePositionMovesResponse", () => {
             blackWinRate: 0.25,
           },
         ],
+        recentGames: [
+          {
+            id: "lichess-newest",
+            source: "lichess",
+            createdAt: 1_765_000_000_000,
+            white: { name: "PlayerOne", rating: 1800 },
+            black: { name: "Opponent", rating: null },
+            result: "1-0",
+            speed: "blitz",
+            timeControl: "180+2",
+            move: { ply: 1, uci: "e2e4", san: "e4" },
+          },
+        ],
       }),
     ).toEqual({
       positionKey,
@@ -103,6 +116,19 @@ describe("parsePositionMovesResponse", () => {
           blackWinRate: 0.25,
         },
       ],
+      recentGames: [
+        {
+          id: "lichess-newest",
+          source: "lichess",
+          createdAt: 1_765_000_000_000,
+          white: { name: "PlayerOne", rating: 1800 },
+          black: { name: "Opponent", rating: null },
+          result: "1-0",
+          speed: "blitz",
+          timeControl: "180+2",
+          move: { ply: 1, uci: "e2e4", san: "e4" },
+        },
+      ],
     });
   });
 
@@ -113,8 +139,43 @@ describe("parsePositionMovesResponse", () => {
         playedBy: "user",
         games: 2,
         moves: [],
+        recentGames: [],
       }),
     ).toBeNull();
+  });
+
+  test("accepts a response from an older backend with more than five recent games", () => {
+    expect(
+      parsePositionMovesResponse({
+        positionKey: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
+        playedBy: "user",
+        games: 6,
+        moves: [
+          {
+            uci: "e2e4",
+            san: "e4",
+            games: 6,
+            whiteWins: 3,
+            draws: 2,
+            blackWins: 1,
+            whiteWinRate: 0.5,
+            drawRate: 1 / 3,
+            blackWinRate: 1 / 6,
+          },
+        ],
+        recentGames: Array.from({ length: 6 }, (_, index) => ({
+          id: `lichess-${index}`,
+          source: "lichess",
+          createdAt: 1_765_000_000_000 - index,
+          white: { name: "PlayerOne", rating: 1800 },
+          black: { name: "Opponent", rating: 1810 },
+          result: "1-0",
+          speed: "blitz",
+          timeControl: "180+2",
+          move: { ply: 1, uci: "e2e4", san: "e4" },
+        })),
+      }),
+    ).not.toBeNull();
   });
 
   test("rejects a response without the player whose moves are listed", () => {
@@ -123,6 +184,7 @@ describe("parsePositionMovesResponse", () => {
         positionKey: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
         games: 0,
         moves: [],
+        recentGames: [],
       }),
     ).toBeNull();
   });

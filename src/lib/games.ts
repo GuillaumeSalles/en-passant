@@ -72,11 +72,24 @@ export type PositionMoveStat = {
   blackWinRate: number;
 };
 
+export type RecentPositionGame = {
+  id: string;
+  source: string;
+  createdAt: number;
+  white: { name: string; rating: number | null };
+  black: { name: string; rating: number | null };
+  result: "1-0" | "0-1" | "1/2-1/2";
+  speed: string;
+  timeControl: string;
+  move: { ply: number; uci: string; san: string };
+};
+
 export type PositionMoves = {
   positionKey: string;
   playedBy: "user" | "opponent";
   games: number;
   moves: PositionMoveStat[];
+  recentGames: RecentPositionGame[];
 };
 
 export type PositionMovesResult =
@@ -290,18 +303,68 @@ function parsePositionMove(value: unknown): PositionMoveStat | null {
   return { uci, san, games, whiteWins, draws, blackWins, whiteWinRate, drawRate, blackWinRate };
 }
 
+function parseRecentPositionGame(value: unknown): RecentPositionGame | null {
+  if (!isRecord(value)) return null;
+  const id = value["id"];
+  const source = value["source"];
+  const createdAt = value["createdAt"];
+  const white = value["white"];
+  const black = value["black"];
+  const result = value["result"];
+  const speed = value["speed"];
+  const timeControl = value["timeControl"];
+  const move = value["move"];
+  if (
+    typeof id !== "string" ||
+    id.length === 0 ||
+    typeof source !== "string" ||
+    source.length === 0 ||
+    !isNonNegativeInteger(createdAt) ||
+    !isRecord(white) ||
+    typeof white["name"] !== "string" ||
+    nullableNumber(white["rating"]) === undefined ||
+    !isRecord(black) ||
+    typeof black["name"] !== "string" ||
+    nullableNumber(black["rating"]) === undefined ||
+    (result !== "1-0" && result !== "0-1" && result !== "1/2-1/2") ||
+    typeof speed !== "string" ||
+    typeof timeControl !== "string" ||
+    !isRecord(move) ||
+    !isNonNegativeInteger(move["ply"]) ||
+    move["ply"] < 1 ||
+    typeof move["uci"] !== "string" ||
+    typeof move["san"] !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    source,
+    createdAt,
+    white: { name: white["name"], rating: nullableNumber(white["rating"]) ?? null },
+    black: { name: black["name"], rating: nullableNumber(black["rating"]) ?? null },
+    result,
+    speed,
+    timeControl,
+    move: { ply: move["ply"], uci: move["uci"], san: move["san"] },
+  };
+}
+
 export function parsePositionMovesResponse(value: unknown): PositionMoves | null {
   if (!isRecord(value)) return null;
   const currentPositionKey = value["positionKey"];
   const playedBy = value["playedBy"];
   const games = value["games"];
   const rawMoves = value["moves"];
+  const rawRecentGames = value["recentGames"];
   if (
     typeof currentPositionKey !== "string" ||
     !isPositionKey(currentPositionKey) ||
     (playedBy !== "user" && playedBy !== "opponent") ||
     !isNonNegativeInteger(games) ||
-    !Array.isArray(rawMoves)
+    !Array.isArray(rawMoves) ||
+    !Array.isArray(rawRecentGames)
   ) {
     return null;
   }
@@ -309,7 +372,15 @@ export function parsePositionMovesResponse(value: unknown): PositionMoves | null
   if (moves.some((move) => move === null)) return null;
   const parsedMoves = moves.filter((move) => move !== null);
   if (parsedMoves.reduce((total, move) => total + move.games, 0) !== games) return null;
-  return { positionKey: currentPositionKey, playedBy, games, moves: parsedMoves };
+  const recentGames = rawRecentGames.map(parseRecentPositionGame);
+  if (recentGames.some((game) => game === null)) return null;
+  return {
+    positionKey: currentPositionKey,
+    playedBy,
+    games,
+    moves: parsedMoves,
+    recentGames: recentGames.filter((game) => game !== null),
+  };
 }
 
 function parseStoredGameResponse(value: unknown): StoredGame | null {
