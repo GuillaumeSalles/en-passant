@@ -1,10 +1,11 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "@solidjs/router";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { TimeControl } from "@/components/TimeControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import {
   loadGames,
@@ -275,6 +276,27 @@ export function Games() {
       gameImport?.status === "running"
     );
   });
+  const currentImportDisplayTotal = createMemo(() => {
+    const gameImport = currentImport();
+    if (gameImport === null || gameImport.totalGames === null) return null;
+    return Math.max(gameImport.totalGames, gameImport.processedGames);
+  });
+  const currentImportProgress = createMemo(() => {
+    const gameImport = currentImport();
+    const totalGames = currentImportDisplayTotal();
+    if (gameImport === null || totalGames === null || totalGames === 0) {
+      return null;
+    }
+    return gameImport.processedGames / totalGames;
+  });
+
+  async function refreshGamesInBackground(): Promise<void> {
+    requestId += 1;
+    const currentRequestId = requestId;
+    const result = await loadGames();
+    if (currentRequestId !== requestId || !result.ok) return;
+    setState({ status: "success", games: result.games, total: result.total });
+  }
 
   createEffect(
     () => ({
@@ -295,18 +317,18 @@ export function Games() {
             if (!result.ok) return;
             setImportState({ status: "ready", import: result.import });
             if (
-              previous?.status !== "completed" &&
               result.import?.id === importId &&
-              result.import.status === "completed"
+              (result.import.processedGames !== previous?.processedGames ||
+                (result.import.status === "completed" && previous?.status !== "completed"))
             ) {
-              setRefreshVersion((version) => version + 1);
+              void refreshGamesInBackground();
             }
           })
           .finally(() => {
             polling = false;
           });
       }, 2500);
-      onCleanup(() => window.clearInterval(interval));
+      return () => window.clearInterval(interval);
     },
   );
 
@@ -432,10 +454,29 @@ export function Games() {
                   <p>Waiting to import {gameImport().account}…</p>
                 </Show>
                 <Show when={gameImport().status === "running"}>
-                  <p>
-                    Importing {gameImport().account} — {gameImport().processedGames} finished games
-                    processed. You can leave this page.
-                  </p>
+                  <>
+                    <p>
+                      Importing {gameImport().account} — {gameImport().processedGames}
+                      <Show when={currentImportDisplayTotal()}>
+                        {(totalGames) => <> of {totalGames()}</>}
+                      </Show>{" "}
+                      finished games processed. You can leave this page.
+                    </p>
+                    <Show when={currentImportProgress()}>
+                      {(progress) => (
+                        <div
+                          class="mt-2 rounded-full bg-muted"
+                          role="progressbar"
+                          aria-label={`Importing ${gameImport().account}`}
+                          aria-valuemin="0"
+                          aria-valuemax={currentImportDisplayTotal() ?? undefined}
+                          aria-valuenow={gameImport().processedGames}
+                        >
+                          <ProgressBar progress={progress()} />
+                        </div>
+                      )}
+                    </Show>
+                  </>
                 </Show>
                 <Show when={gameImport().status === "completed"}>
                   <p>Import complete — {gameImport().processedGames} finished games processed.</p>

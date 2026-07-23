@@ -55,6 +55,7 @@ describe("trusted game API contracts", () => {
       kind: "backfill",
       status: "queued",
       processedGames: 0,
+      totalGames: null,
       error: null,
       createdAt: "2026-07-23T00:00:00.000Z",
       startedAt: null,

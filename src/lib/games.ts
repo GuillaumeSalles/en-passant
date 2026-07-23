@@ -98,6 +98,7 @@ export type GameImportState = {
   kind: "backfill" | "poll";
   status: "queued" | "running" | "completed" | "failed";
   processedGames: number;
+  totalGames: number | null;
   error:
     | "lichess-user-not-found"
     | "lichess-unavailable"

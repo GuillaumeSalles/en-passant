@@ -8,38 +8,49 @@ test("keeps games visible while an asynchronous Lichess import progresses", asyn
   let polls = 0;
 
   await page.route("**/api/games", async (route) => {
+    const existingGame = {
+      id: "lichess-existing",
+      source: "lichess",
+      sourceGameId: "existing",
+      importedAccount: "PlayerOne",
+      userColor: "white",
+      opponentName: "Existing Opponent",
+      opponentRating: 1810,
+      userRating: 1800,
+      whiteName: "PlayerOne",
+      blackName: "Existing Opponent",
+      whiteRating: 1800,
+      blackRating: 1810,
+      winner: "white",
+      result: "1-0",
+      speed: "blitz",
+      perf: "blitz",
+      rated: true,
+      timeControl: "180+2",
+      createdAt: 1_765_000_000_000,
+      lastMoveAt: 1_765_000_120_000,
+      opening: null,
+      pgn: "1. e4 e5 1-0",
+      importedAt: "2026-07-13T00:00:00.000Z",
+      latestRepertoireMove: null,
+    };
+    const games =
+      polls === 0
+        ? [existingGame]
+        : [
+            existingGame,
+            {
+              ...existingGame,
+              id: "lichess-new",
+              sourceGameId: "new",
+              opponentName: "Newly Imported Opponent",
+            },
+          ];
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        total: 1,
-        games: [
-          {
-            id: "lichess-existing",
-            source: "lichess",
-            sourceGameId: "existing",
-            importedAccount: "PlayerOne",
-            userColor: "white",
-            opponentName: "Existing Opponent",
-            opponentRating: 1810,
-            userRating: 1800,
-            whiteName: "PlayerOne",
-            blackName: "Existing Opponent",
-            whiteRating: 1800,
-            blackRating: 1810,
-            winner: "white",
-            result: "1-0",
-            speed: "blitz",
-            perf: "blitz",
-            rated: true,
-            timeControl: "180+2",
-            createdAt: 1_765_000_000_000,
-            lastMoveAt: 1_765_000_120_000,
-            opening: null,
-            pgn: "1. e4 e5 1-0",
-            importedAt: "2026-07-13T00:00:00.000Z",
-            latestRepertoireMove: null,
-          },
-        ],
+        total: games.length,
+        games,
       }),
     });
   });
@@ -50,6 +61,7 @@ test("keeps games visible while an asynchronous Lichess import progresses", asyn
       account: "PlayerOne",
       kind: "backfill",
       processedGames: 0,
+      totalGames: 142,
       error: null,
       createdAt: "2026-07-23T00:00:00.000Z",
       startedAt: null,
@@ -101,8 +113,17 @@ test("keeps games visible while an asynchronous Lichess import progresses", asyn
 
   await expect(page.getByText("Waiting to import PlayerOne…")).toBeVisible();
   await expect(page.getByText("Existing Opponent")).toBeVisible();
-  await expect(page.getByText(/100 finished games processed/)).toBeVisible();
+  await expect(page.getByText(/100 of 142 finished games processed/)).toBeVisible();
+  await expect(page.getByText("Newly Imported Opponent")).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Importing PlayerOne" })).toHaveAttribute(
+    "aria-valuenow",
+    "100",
+  );
   await expect(page.getByText(/Import complete — 142 finished games processed/)).toBeVisible();
+  await page.waitForTimeout(500);
+  const settledPolls = polls;
+  await page.waitForTimeout(3000);
+  expect(polls).toBe(settledPolls);
 });
 
 test("shows the latest repertoire move on an imported game", async ({ page }) => {
