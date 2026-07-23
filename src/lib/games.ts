@@ -9,6 +9,16 @@ export type LatestRepertoireMove = {
   chapter: { handle: string; name: string };
 };
 
+export type RepertoireMistake = {
+  ply: number;
+  positionKey: string;
+  playedSan: string;
+  expectedSan: string;
+  uciPath: string;
+  repertoire: { handle: string; name: string };
+  chapter: { handle: string; name: string };
+};
+
 export type StoredGame = {
   id: string;
   source: string;
@@ -37,6 +47,7 @@ export type StoredGame = {
   pgn: string;
   importedAt: string;
   latestRepertoireMove: LatestRepertoireMove | null;
+  repertoireMistake: RepertoireMistake | null;
 };
 
 export type GamesResult =
@@ -84,6 +95,20 @@ export type PositionMoves = {
 
 export type PositionMovesResult =
   | { ok: true; data: PositionMoves }
+  | { ok: false; reason: "unauthorized" | "unavailable" };
+
+export type TrainingMistakeLink = {
+  chapterId: string;
+  uciPath: string;
+  game: {
+    id: string;
+    createdAt: number;
+    opponentName: string;
+  };
+};
+
+export type TrainingMistakeLinksResult =
+  | { ok: true; links: TrainingMistakeLink[] }
   | { ok: false; reason: "unauthorized" | "unavailable" };
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>;
@@ -222,6 +247,25 @@ export async function loadPositionMoves(
 
   const data = await readJson<PositionMoves>(response);
   return { ok: true, data };
+}
+
+export async function loadTrainingMistakeLinks(
+  options: { fetcher?: Fetcher } = {},
+): Promise<TrainingMistakeLinksResult> {
+  const fetcher = options.fetcher ?? fetch;
+  let response: Response;
+  try {
+    response = await fetcher("/api/games/training-mistakes", {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+  if (response.status === 401) return { ok: false, reason: "unauthorized" };
+  if (!response.ok) return { ok: false, reason: "unavailable" };
+  const { links } = await readJson<{ links: TrainingMistakeLink[] }>(response);
+  return { ok: true, links };
 }
 
 function gameImportErrorResult(response: Response): GameImportResult {

@@ -1,7 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { getVariationMoveIds } from "./training";
 import { normalizePgn } from "./pgnTree";
-import { getTrainingLines, isAlternativeTrainingMove, trainingLineId } from "./trainingLines";
+import {
+  getTrainingLineByUciPath,
+  getTrainingLines,
+  getTrainingLinesWithScheduledPaths,
+  isAlternativeTrainingMove,
+  trainingLineId,
+  trainingLineIdFromUciPath,
+  trainingLineUciPathFromId,
+} from "./trainingLines";
 
 describe("training lines", () => {
   test("uses a stable URL-safe id derived from the moves", () => {
@@ -30,6 +38,17 @@ describe("training lines", () => {
     );
 
     expect(labels).toEqual(["e4 e5", "d4 d5"]);
+  });
+
+  test("resolves a scheduled partial line and gives it a stable URL", () => {
+    const pgn = normalizePgn("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *");
+    const uciPath = "e2e4 e7e5 g1f3";
+    const partial = getTrainingLineByUciPath(pgn, "white", uciPath);
+
+    expect(partial).toMatchObject({ uciPath, plyCount: 3, terminalMoveId: 2 });
+    expect(partial?.id).toBe(trainingLineIdFromUciPath(uciPath));
+    expect(trainingLineUciPathFromId(partial?.id ?? "")).toBe(uciPath);
+    expect(getTrainingLinesWithScheduledPaths(pgn, "white", [uciPath])).toHaveLength(2);
   });
 
   test("marks only branches on the repertoire user's turns as alternative lines", () => {

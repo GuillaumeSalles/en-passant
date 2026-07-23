@@ -31,9 +31,13 @@ export type {
   TrainingState,
 } from "./app-state/types";
 export {
+  getTrainingLineByUciPath,
   getTrainingLines,
+  getTrainingLinesWithScheduledPaths,
   isAlternativeTrainingMove,
   trainingLineId,
+  trainingLineIdFromUciPath,
+  trainingLineUciPathFromId,
   type TrainingLine,
 } from "./app-state/trainingLines";
 export { getScheduledTrainingLines, type ScheduledTrainingLine } from "./app-state/trainingQueue";

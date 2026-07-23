@@ -1,5 +1,5 @@
 import { getVariationMoveIds } from "./training";
-import { getTrainingLines, type TrainingLine } from "./trainingLines";
+import { getTrainingLineByUciPath, type TrainingLine } from "./trainingLines";
 import type { Chapter, NormalizedPgn, Repertoire, TrainingLineReview } from "./types";
 import { isTrainingReviewDue, trainingLineReviewKey } from "./spacedRepetition";
 
@@ -30,9 +30,7 @@ export function getScheduledTrainingLines(
     const pgn = pgns[chapter.pgnId];
     if (pgn === undefined) continue;
 
-    const line = getTrainingLines(pgn, repertoire.orientation).find(
-      (candidate) => candidate.uciPath === review.uciPath,
-    );
+    const line = getTrainingLineByUciPath(pgn, repertoire.orientation, review.uciPath);
     if (line === undefined) continue;
 
     const label = getVariationMoveIds(pgn, line.terminalMoveId)

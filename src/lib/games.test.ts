@@ -4,6 +4,7 @@ import {
   loadGames,
   loadLichessImport,
   loadPositionMoves,
+  loadTrainingMistakeLinks,
   startLichessImport,
 } from "./games";
 
@@ -44,6 +45,21 @@ describe("trusted game API contracts", () => {
     });
 
     expect(result).toEqual({ ok: true, data });
+  });
+
+  test("loads imported games associated with scheduled mistake lines", async () => {
+    const links = [
+      {
+        chapterId: "chapter",
+        uciPath: "e2e4 e7e5 g1f3",
+        game: { id: "lichess-game", createdAt: 123, opponentName: "Opponent" },
+      },
+    ];
+    const result = await loadTrainingMistakeLinks({
+      fetcher: async () => jsonResponse({ links }),
+    });
+
+    expect(result).toEqual({ ok: true, links });
   });
 
   test("starts an asynchronous Lichess import without a game limit", async () => {
