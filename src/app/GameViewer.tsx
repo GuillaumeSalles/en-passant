@@ -18,6 +18,7 @@ import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { MovesTree, type MoveIndicator } from "@/components/MovesTree";
 import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
+import { TimeControl } from "@/components/TimeControl";
 import { useSquareHighlights } from "@/components/useSquareHighlights";
 import { useStore } from "@/app/AppStateProvider";
 import { StoreState } from "@/lib/createStore";
@@ -81,7 +82,7 @@ function GameViewerTitle(props: { game: StoredGame }) {
     <div class="min-w-0">
       <h1 class="truncate text-base font-medium">{titleForGame(props.game)}</h1>
       <div class="truncate text-xs text-muted-foreground">
-        {props.game.result} · {props.game.speed} · {props.game.timeControl}
+        {props.game.result} · {props.game.speed} · <TimeControl value={props.game.timeControl} />
       </div>
     </div>
   );

@@ -102,7 +102,8 @@ test("shows move results and hides the total row when there is only one next mov
   expect(recentLinks).toHaveLength(2);
   expect(recentLinks[0]?.getAttribute("href")).toBe("/app/games/lichess-newest");
   expect(recentLinks[1]?.getAttribute("href")).toBe("/app/games/chesscom-older");
-  expect(recentLinks[0]?.textContent).toBe("Player One (1800) – Opponent One (1810)180+21-0");
+  expect(recentLinks[0]?.textContent).toBe("Player One (1800) – Opponent One (1810)3+21-0");
+  expect(recentLinks[0]?.getAttribute("aria-label")).toContain(", 3+2, 1-0");
 
   const requestedUrl = String(fetcher.mock.calls[0]?.[0]);
   expect(requestedUrl).toContain("/api/games/position-moves?");

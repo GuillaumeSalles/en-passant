@@ -11,6 +11,7 @@ import {
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import { importedGamePath } from "@/lib/routes";
 import { EVAL_BAR_DARK_CLASS, EVAL_BAR_LIGHT_CLASS } from "./EvalBar";
+import { formatTimeControl, TimeControl } from "./TimeControl";
 import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
 
 type LoadState =
@@ -130,13 +131,16 @@ function RecentGames(props: { games: RecentPositionGame[] }) {
             <A
               href={importedGamePath(game.id)}
               class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-sm px-2 py-1.5 text-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              aria-label={`${playerName(game.white)} versus ${playerName(game.black)}, ${game.timeControl}, ${game.result}`}
+              aria-label={`${playerName(game.white)} versus ${playerName(game.black)}, ${formatTimeControl(game.timeControl)}, ${game.result}`}
               data-recent-position-game={game.id}
             >
               <span class="truncate font-medium">
                 {playerName(game.white)} – {playerName(game.black)}
               </span>
-              <span class="whitespace-nowrap text-muted-foreground">{game.timeControl}</span>
+              <TimeControl
+                value={game.timeControl}
+                class="whitespace-nowrap text-muted-foreground"
+              />
               <span class="whitespace-nowrap font-mono">{game.result}</span>
             </A>
           )}

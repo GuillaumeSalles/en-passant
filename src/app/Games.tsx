@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "@solidjs/router";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
+import { TimeControl } from "@/components/TimeControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
@@ -122,7 +123,10 @@ function GamesTable(props: { games: StoredGame[] }) {
                 </td>
                 <td class="px-3 py-2">
                   <div>{formatSpeed(game.speed)}</div>
-                  <div class="text-xs text-muted-foreground">{game.timeControl}</div>
+                  <TimeControl
+                    value={game.timeControl}
+                    class="block text-xs text-muted-foreground"
+                  />
                 </td>
                 <td class="max-w-72 px-3 py-2">
                   <Show when={game.opening} fallback={<span class="text-muted-foreground">-</span>}>
