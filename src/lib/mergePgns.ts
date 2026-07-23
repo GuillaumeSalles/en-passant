@@ -9,16 +9,32 @@ type MutableMergePgn = {
   rootMoveIds: number[];
   moves: Record<number, Move>;
   moveIdCounter: number;
+  movesByParentAndSan: Map<number | null, Map<string, number>>;
 };
 
 export function mergePgns(firstPgn: string, secondPgn: string): string {
-  const first = normalizePgn(firstPgn);
-  const second = normalizePgn(secondPgn);
-  const merged = clonePgn(first);
+  const merger = new PgnMerger(firstPgn);
+  merger.add(secondPgn);
+  return merger.toPgn();
+}
 
-  mergeMoveList(merged, merged.rootMoveIds, second, second.rootMoveIds, null);
+export class PgnMerger {
+  readonly #tags: PgnTags;
+  readonly #merged: MutableMergePgn;
 
-  return addTags(parseTags(firstPgn), toPgn(merged));
+  constructor(firstPgn: string) {
+    this.#tags = parseTags(firstPgn);
+    this.#merged = clonePgn(normalizePgn(firstPgn));
+  }
+
+  add(pgn: string): void {
+    const source = normalizePgn(pgn);
+    mergeMoveList(this.#merged, source, source.rootMoveIds, null);
+  }
+
+  toPgn(): string {
+    return addTags(this.#tags, toPgn(this.#merged));
+  }
 }
 
 function parseTags(pgn: string): PgnTags {
@@ -45,11 +61,18 @@ function clonePgn(pgn: NormalizedPgn): MutableMergePgn {
     moves[move.id] = cloneMove(move);
   }
 
-  return {
+  const merged = {
     rootMoveIds: [...pgn.rootMoveIds],
     moves,
     moveIdCounter: pgn.moveIdCounter,
+    movesByParentAndSan: new Map<number | null, Map<string, number>>(),
   };
+  indexMoveList(merged, null, merged.rootMoveIds);
+  for (const move of Object.values(merged.moves)) {
+    indexMoveList(merged, move.id, move.next);
+  }
+
+  return merged;
 }
 
 function cloneMove(move: Move): Move {
@@ -63,24 +86,28 @@ function cloneMove(move: Move): Move {
 
 function mergeMoveList(
   target: MutableMergePgn,
-  targetMoveIds: number[],
   source: NormalizedPgn,
   sourceMoveIds: number[],
   previousMoveId: number | null,
 ): void {
+  const targetMoveIds =
+    previousMoveId === null ? target.rootMoveIds : requireTargetMove(target, previousMoveId).next;
+  const movesBySan = requireMoveIndex(target, previousMoveId);
+
   for (const sourceMoveId of sourceMoveIds) {
     const sourceMove = requireMove(source, sourceMoveId);
-    const matchingMoveId = findMoveBySan(target, targetMoveIds, sourceMove.san);
+    const matchingMoveId = movesBySan.get(sourceMove.san);
 
-    if (matchingMoveId === null) {
+    if (matchingMoveId === undefined) {
       const copiedMoveId = copyMoveTree(target, source, sourceMoveId, previousMoveId);
       targetMoveIds.push(copiedMoveId);
+      movesBySan.set(sourceMove.san, copiedMoveId);
       continue;
     }
 
     const matchingMove = requireTargetMove(target, matchingMoveId);
     mergeMoveAnnotations(matchingMove, sourceMove);
-    mergeMoveList(target, matchingMove.next, source, sourceMove.next, matchingMoveId);
+    mergeMoveList(target, source, sourceMove.next, matchingMoveId);
   }
 }
 
@@ -102,8 +129,33 @@ function requireTargetMove(pgn: MutableMergePgn, moveId: number): Move {
   return move;
 }
 
-function findMoveBySan(pgn: MutableMergePgn, moveIds: number[], san: string): number | null {
-  return moveIds.find((moveId) => pgn.moves[moveId]?.san === san) ?? null;
+function indexMoveList(
+  pgn: MutableMergePgn,
+  previousMoveId: number | null,
+  moveIds: number[],
+): void {
+  const movesBySan = new Map<string, number>();
+  for (const moveId of moveIds) {
+    const move = requireTargetMove(pgn, moveId);
+    if (!movesBySan.has(move.san)) {
+      movesBySan.set(move.san, moveId);
+    }
+  }
+  pgn.movesByParentAndSan.set(previousMoveId, movesBySan);
+}
+
+function requireMoveIndex(
+  pgn: MutableMergePgn,
+  previousMoveId: number | null,
+): Map<string, number> {
+  const movesBySan = pgn.movesByParentAndSan.get(previousMoveId);
+  if (movesBySan === undefined) {
+    const created = new Map<string, number>();
+    pgn.movesByParentAndSan.set(previousMoveId, created);
+    return created;
+  }
+
+  return movesBySan;
 }
 
 function mergeMoveAnnotations(targetMove: Move, sourceMove: Move): void {
@@ -137,10 +189,15 @@ function copyMoveTree(
     prev: previousMoveId,
     next: [],
   };
+  const copiedNextMovesBySan = requireMoveIndex(target, copiedMoveId);
 
   for (const sourceNextMoveId of sourceMove.next) {
     const copiedNextMoveId = copyMoveTree(target, source, sourceNextMoveId, copiedMoveId);
     requireTargetMove(target, copiedMoveId).next.push(copiedNextMoveId);
+    const copiedNextMove = requireTargetMove(target, copiedNextMoveId);
+    if (!copiedNextMovesBySan.has(copiedNextMove.san)) {
+      copiedNextMovesBySan.set(copiedNextMove.san, copiedNextMoveId);
+    }
   }
 
   return copiedMoveId;

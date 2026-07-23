@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { mergePgns } from "./mergePgns";
+import { mergePgns, PgnMerger } from "./mergePgns";
 
 describe("mergePgns", () => {
   test("keeps metadata from the first PGN", () => {
@@ -48,5 +48,19 @@ describe("mergePgns", () => {
     const merged = mergePgns("1. d4 d5 (1... Nf6) 2. c4 *", "1. d4 Nf6 2. c4 *");
 
     expect(merged).toBe("1. d4 d5 (1... Nf6 2. c4) 2. c4 *");
+  });
+
+  test("merges many PGNs without reparsing or serializing the accumulated tree", () => {
+    const merger = new PgnMerger(`[Event "Opening"]
+
+1. e4 e5 2. Nf3 *`);
+
+    merger.add("1. e4 c5 2. Nf3 *");
+    merger.add("1. d4 d5 2. c4 *");
+    merger.add("1. e4 c5 2. Nc3 *");
+
+    expect(merger.toPgn()).toBe(`[Event "Opening"]
+
+1. e4 (1. d4 d5 2. c4) 1... e5 (1... c5 2. Nf3 (2. Nc3)) 2. Nf3 *`);
   });
 });
