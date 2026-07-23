@@ -5,7 +5,7 @@ import {
   type Context,
   deleteMove,
   getChapterPgn,
-  getTrainingLines,
+  getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
   isAlternativeTrainingMove,
   isMoveValid,
@@ -23,6 +23,7 @@ import {
   selectTraining,
   selectTrainingSessionStats,
   selectTrainingVariationIsEmpty,
+  trainingLineUciPathFromId,
   type EvalMove,
 } from "@/lib/AppState";
 import type { StoreState } from "@/lib/createStore";
@@ -129,7 +130,12 @@ export function useVariationTrainingFlow(
   const lines = createMemo(() => {
     const pgn = chapterPgn();
     if (pgn === null) return [];
-    const sourceLines = getTrainingLines(pgn, orientation());
+    const scheduledPaths = Object.entries(reviews())
+      .filter(([key, review]) => key === trainingLineScheduleKey(state, ctx(), review.uciPath))
+      .map(([, review]) => review.uciPath);
+    const requestedPath = trainingLineUciPathFromId(props.lineId);
+    if (requestedPath !== null) scheduledPaths.push(requestedPath);
+    const sourceLines = getTrainingLinesWithScheduledPaths(pgn, orientation(), scheduledPaths);
     return prioritizeDueTrainingLines(
       sourceLines,
       Object.fromEntries(

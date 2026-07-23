@@ -14,14 +14,19 @@ import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider
 import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
 import {
   getChapterPgn,
-  getTrainingLines,
+  getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
   isTrainingReviewDue,
   movePositionKey,
   prioritizeDueTrainingLines,
   selectOrientation,
 } from "@/lib/AppState";
-import { learningLinePath, repertoireMovePath, trainingLinePath } from "@/lib/routes";
+import {
+  importedGamePath,
+  learningLinePath,
+  repertoireMovePath,
+  trainingLinePath,
+} from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
@@ -29,6 +34,7 @@ import { ensureTrainingSession } from "@/mutations/trainingSession";
 import { trainingLineScheduleKey } from "@/mutations/learningSession";
 import { useState } from "@/app/AppStateProvider";
 import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
+import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
 
 export function TrainingLines(props: {
   repertoireHandle: string;
@@ -47,11 +53,8 @@ export function TrainingLines(props: {
   const reviews = useSelector((state) => state.training.reviews);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
   const [now, setNow] = createSignal(Date.now());
+  const mistakeLinks = useTrainingMistakeLinks();
 
-  const sourceLines = createMemo(() => {
-    const pgn = chapterPgn();
-    return pgn === null ? [] : getTrainingLines(pgn, orientation());
-  });
   const reviewKey = (uciPath: string) =>
     trainingLineScheduleKey(
       state,
@@ -62,6 +65,14 @@ export function TrainingLines(props: {
       },
       uciPath,
     );
+  const sourceLines = createMemo(() => {
+    const pgn = chapterPgn();
+    if (pgn === null) return [];
+    const scheduledPaths = Object.entries(reviews())
+      .filter(([key, review]) => key === reviewKey(review.uciPath))
+      .map(([, review]) => review.uciPath);
+    return getTrainingLinesWithScheduledPaths(pgn, orientation(), scheduledPaths);
+  });
   const reviewForLine = (uciPath: string) => {
     const key = reviewKey(uciPath);
     return key === null ? undefined : reviews()[key];
@@ -162,6 +173,8 @@ export function TrainingLines(props: {
               const review = () => reviewForLine(line.uciPath);
               const isLearned = () => review() !== undefined;
               const isDue = () => isLineDue(line.uciPath);
+              const mistakeLink = () =>
+                mistakeLinks()[trainingMistakeLinkKey(review()?.chapterId ?? "", line.uciPath)];
               return (
                 <>
                   <Show when={index() > 0}>
@@ -194,6 +207,16 @@ export function TrainingLines(props: {
                       <div class="mt-1 truncate text-sm text-muted-foreground">
                         {lineLabel(line.terminalMoveId)}
                       </div>
+                      <Show when={mistakeLink()}>
+                        {(link) => (
+                          <A
+                            class="mt-0.5 block truncate text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                            href={importedGamePath(link().game.id)}
+                          >
+                            Review game vs {link().game.opponentName}
+                          </A>
+                        )}
+                      </Show>
                     </div>
                     <div class="flex flex-none items-center gap-2">
                       <Button

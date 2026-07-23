@@ -8,6 +8,7 @@ import {
   selectAnimation,
   selectFen,
   selectOrientation,
+  trainingLineIdFromUciPath,
   updateEvaluation,
 } from "@/lib/AppState";
 import { Button } from "@/components/ui/button";
@@ -24,11 +25,13 @@ import { useStore } from "@/app/AppStateProvider";
 import { StoreState } from "@/lib/createStore";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import { loadGame, type StoredGame } from "@/lib/games";
-import { APP_ROOT, repertoireMovePath } from "@/lib/routes";
+import { APP_ROOT, repertoireMovePath, trainingLinePath } from "@/lib/routes";
 import { Engine } from "@/lib/engine";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
+import { useRouteContext } from "@/lib/useRouteContext";
+import { syncRepertoireFromBackend } from "@/storage/backendSync";
 
 type LoadState =
   | { status: "idle" }
@@ -130,6 +133,7 @@ function GameViewerMessage(props: { title: string; action?: "signin" | "games" }
 export function GameViewer(props: { gameId: string }) {
   useGlobalShortcuts({ allowEditing: false });
   const store = useStore();
+  const route = useRouteContext();
   const [state, setState] = createSignal<LoadState>({ status: "idle" });
   const currentFen = useSelector(selectFen);
   const orientation = useSelector(selectOrientation);
@@ -177,6 +181,9 @@ export function GameViewer(props: { gameId: string }) {
         if (result.ok) {
           resetImportedGameState(store.state, result.game);
           setState({ status: "success", game: result.game });
+          if (result.game.repertoireMistake != null) {
+            void syncRepertoireFromBackend(store.state, route()).catch(() => undefined);
+          }
         } else if (result.reason === "not-found") {
           setState({ status: "not-found" });
         } else {
@@ -216,19 +223,41 @@ export function GameViewer(props: { gameId: string }) {
       ply: match.ply,
     };
   });
+  const repertoireMistake = createMemo(() => {
+    const mistake = game()?.repertoireMistake;
+    if (mistake === null || mistake === undefined) return null;
+    const lineId = trainingLineIdFromUciPath(mistake.uciPath);
+    if (lineId === null) return null;
+    return {
+      ...mistake,
+      href: trainingLinePath(mistake.repertoire.handle, mistake.chapter.handle, lineId),
+    };
+  });
   const moveIndicators = createMemo<Record<number, MoveIndicator>>(() => {
     const currentGame = game();
     const coverage = repertoireCoverage();
-    if (currentGame === null || coverage === null) return {};
+    const mistake = repertoireMistake();
+    if (currentGame === null) return {};
 
-    const gameMoveId = mainLineMoveIdAtPly(currentGame, coverage.ply);
-    if (gameMoveId === null) return {};
+    const indicators: Record<number, MoveIndicator> = {};
+    if (coverage !== null) {
+      const gameMoveId = mainLineMoveIdAtPly(currentGame, coverage.ply);
+      if (gameMoveId !== null) {
+        indicators[gameMoveId] = {
+          label: "Latest position found in one of your repertoires",
+        };
+      }
+    }
+    if (mistake !== null) {
+      const gameMoveId = mainLineMoveIdAtPly(currentGame, mistake.ply);
+      if (gameMoveId !== null) {
+        indicators[gameMoveId] = {
+          label: `Repertoire expected ${numberedSan(mistake.ply, mistake.expectedSan)}`,
+        };
+      }
+    }
 
-    return {
-      [gameMoveId]: {
-        label: "Latest position found in one of your repertoires",
-      },
-    };
+    return indicators;
   });
   const currentErrorMessage = createMemo(() => {
     const current = state();
@@ -289,6 +318,31 @@ export function GameViewer(props: { gameId: string }) {
           }
           panelChildren={
             <>
+              <Show when={repertoireMistake()}>
+                {(mistake) => (
+                  <>
+                    <div
+                      data-repertoire-mistake
+                      class="flex items-center justify-between gap-3 bg-amber-500/10 px-3 py-2 text-xs"
+                    >
+                      <span class="min-w-0">
+                        You played{" "}
+                        <span class="font-semibold">
+                          {numberedSan(mistake().ply, mistake().playedSan)}
+                        </span>
+                        ; your repertoire has{" "}
+                        <span class="font-semibold">
+                          {numberedSan(mistake().ply, mistake().expectedSan)}
+                        </span>
+                      </span>
+                      <Button class="flex-none" size="sm" href={mistake().href}>
+                        Train
+                      </Button>
+                    </div>
+                    <HorizontalDashedDivider animation="none" />
+                  </>
+                )}
+              </Show>
               <Show when={repertoireCoverage()}>
                 {(coverage) => (
                   <>

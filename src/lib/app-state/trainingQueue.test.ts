@@ -65,4 +65,24 @@ describe("training queue", () => {
       ),
     ).toEqual([]);
   });
+
+  test("resolves an imported mistake as a partial repertoire line", () => {
+    const partial = review("e2e4 e7e5 g1f3", 0);
+    const lines = getScheduledTrainingLines(
+      { [repertoire.id]: repertoire },
+      { [chapter.id]: chapter },
+      { [chapter.pgnId]: normalizePgn("1. e4 e5 2. Nf3 Nc6 3. Bb5 *") },
+      {
+        [trainingLineReviewKey(partial.repertoireId, partial.chapterId, partial.uciPath)]: partial,
+      },
+      150,
+    );
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      label: "e4 e5 Nf3",
+      isDue: true,
+      line: { uciPath: "e2e4 e7e5 g1f3", plyCount: 3 },
+    });
+  });
 });

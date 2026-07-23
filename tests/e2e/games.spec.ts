@@ -164,6 +164,15 @@ test("shows the latest repertoire move on an imported game", async ({ page }) =>
             repertoire: { handle: "white", name: "White repertoire" },
             chapter: { handle: "italian", name: "Italian Game" },
           },
+          repertoireMistake: {
+            ply: 5,
+            positionKey: "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -",
+            playedSan: "Bc4",
+            expectedSan: "Bb5",
+            uciPath: "e2e4 e7e5 g1f3 b8c6 f1b5",
+            repertoire: { handle: "white", name: "White repertoire" },
+            chapter: { handle: "italian", name: "Italian Game" },
+          },
         },
       }),
     });
@@ -174,8 +183,14 @@ test("shows the latest repertoire move on an imported game", async ({ page }) =>
   const move = page.getByRole("button", { name: "Move Nc6" });
   const indicator = move.locator('[data-move-indicator="repertoire"]');
   const coverageBanner = page.locator("[data-repertoire-coverage]");
+  const mistakeBanner = page.locator("[data-repertoire-mistake]");
   await expect(page.locator('[aria-label="Evaluation bar"]')).toBeVisible();
   await expect(coverageBanner).toContainText("Last repertoire move 2... Nc6");
+  await expect(mistakeBanner).toContainText("You played 3. Bc4; your repertoire has 3. Bb5");
+  await expect(mistakeBanner.getByRole("link", { name: "Train" })).toHaveAttribute(
+    "href",
+    /\/app\/repertoires\/white\/italian\/train\/v1-/,
+  );
   await expect(
     coverageBanner.getByRole("link", { name: "White repertoire / Italian Game" }),
   ).toHaveAttribute(
