@@ -114,6 +114,8 @@ test("shows move results and hides the total row when there is only one next mov
   expect((resultBar.children[2] as HTMLElement).style.width).toBe("16.7%");
   expect(resultBar.children[0]?.className).toContain("bg-neutral-200");
   expect(resultBar.children[0]?.className).toContain("dark:bg-neutral-100");
+  expect(resultBar.children[1]?.className).toContain("bg-neutral-600");
+  expect(resultBar.children[1]?.className).toContain("text-white");
   expect(resultBar.children[2]?.className).toContain("bg-neutral-900");
   expect(resultBar.children[2]?.className).toContain("dark:bg-neutral-800");
   expect(resultBar.textContent).toBe("50%33.3%16.7%");
@@ -187,6 +189,47 @@ test("shows the total row when there are multiple next moves", async () => {
       name: "Total results: 1 white win (50%), 0 draws (0%), 1 black win (50%)",
     }),
   ).not.toBeNull();
+});
+
+test("hides result text when a segment is below fifteen percent", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        positionKey: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
+        playedBy: "user",
+        games: 100,
+        moves: [
+          {
+            uci: "e2e4",
+            san: "e4",
+            games: 100,
+            whiteWins: 71,
+            draws: 15,
+            blackWins: 14,
+            whiteWinRate: 0.71,
+            drawRate: 0.15,
+            blackWinRate: 0.14,
+          },
+        ],
+        recentGames: [],
+      }),
+    ),
+  );
+
+  render(() => (
+    <MemoryRouter
+      root={() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />}
+    >
+      <Route path="/" component={() => null} />
+    </MemoryRouter>
+  ));
+
+  const resultBar = await screen.findByRole("img", {
+    name: "e4 results: 71 white wins (71%), 15 draws (15%), 14 black wins (14%)",
+  });
+  expect(resultBar.textContent).toBe("71%15%");
+  expect(resultBar.children[2]?.getAttribute("title")).toBe("Black wins: 14 (14%)");
 });
 
 test("hides the section for anonymous users", async () => {
