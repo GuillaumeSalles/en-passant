@@ -1,15 +1,18 @@
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { A } from "@solidjs/router";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { TimeControl } from "@/components/TimeControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import { authStatus, currentAuthUser } from "@/lib/authSession";
 import {
-  importRecentLichessGames,
   loadGames,
+  loadLichessImport,
+  startLichessImport,
   type GameColor,
+  type GameImportState,
   type GameSort,
   type StoredGame,
 } from "@/lib/games";
@@ -19,9 +22,15 @@ import { Repeat2, Upload } from "@/components/Icons";
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; games: StoredGame[]; imported?: number }
+  | { status: "success"; games: StoredGame[]; total: number }
   | { status: "signed-out" }
   | { status: "error"; message: string };
+
+type ImportLoadState =
+  | { status: "idle"; import: null }
+  | { status: "loading"; import: GameImportState | null }
+  | { status: "ready"; import: GameImportState | null }
+  | { status: "error"; import: GameImportState | null; message: string };
 
 type ColorFilter = "all" | GameColor;
 
@@ -45,13 +54,16 @@ function errorMessage(reason: string): string {
   if (reason === "unauthorized") {
     return "Sign in to import games.";
   }
-  if (reason === "not-found") {
-    return "That Lichess handle was not found.";
-  }
-  if (reason === "lichess-auth-required") {
-    return "The Lichess token is not configured.";
-  }
   return "Lichess games are unavailable right now.";
+}
+
+function importErrorMessage(error: GameImportState["error"]): string {
+  if (error === "lichess-user-not-found") return "That Lichess handle was not found.";
+  if (error === "invalid-lichess-response")
+    return "Lichess returned game data that could not be imported.";
+  if (error === "queue-delivery-failed")
+    return "The import could not be scheduled. Please try again.";
+  return "Lichess is unavailable right now. Please try again later.";
 }
 
 function openAuthDialog(): void {
@@ -156,12 +168,17 @@ function GamesTable(props: { games: StoredGame[] }) {
 
 export function Games() {
   const [state, setState] = createSignal<LoadState>({ status: "idle" });
+  const [importState, setImportState] = createSignal<ImportLoadState>({
+    status: "idle",
+    import: null,
+  });
   const [handle, setHandle] = createSignal("");
   const [timeControl, setTimeControl] = createSignal("all");
   const [color, setColor] = createSignal<ColorFilter>("all");
   const [sort, setSort] = createSignal<GameSort>("desc");
   const [refreshVersion, setRefreshVersion] = createSignal(0);
   let requestId = 0;
+  let importRequestId = 0;
 
   createEffect(
     () => ({
@@ -179,6 +196,7 @@ export function Games() {
       }
       if (userId === null) {
         setState({ status: "signed-out" });
+        setImportState({ status: "idle", import: null });
         return;
       }
 
@@ -189,9 +207,28 @@ export function Games() {
         }
 
         if (result.ok) {
-          setState({ status: "success", games: result.games });
+          setState({ status: "success", games: result.games, total: result.total });
         } else {
           setState({ status: "error", message: errorMessage(result.reason) });
+        }
+      });
+
+      importRequestId += 1;
+      const currentImportRequestId = importRequestId;
+      setImportState({ status: "loading", import: untrack(importState).import });
+      loadLichessImport().then((result) => {
+        if (currentImportRequestId !== importRequestId) return;
+        if (result.ok) {
+          setImportState({ status: "ready", import: result.import });
+          if (result.import !== null && untrack(handle).trim() === "") {
+            setHandle(result.import.account);
+          }
+        } else {
+          setImportState({
+            status: "error",
+            import: null,
+            message: errorMessage(result.reason),
+          });
         }
       });
     },
@@ -201,9 +238,9 @@ export function Games() {
     const current = state();
     return current.status === "success" ? current.games : [];
   });
-  const importCount = createMemo(() => {
+  const totalGames = createMemo(() => {
     const current = state();
-    return current.status === "success" ? (current.imported ?? null) : null;
+    return current.status === "success" ? current.total : 0;
   });
   const currentErrorMessage = createMemo(() => {
     const current = state();
@@ -226,6 +263,75 @@ export function Games() {
       );
   });
 
+  const currentImport = createMemo(() => importState().import);
+  const currentImportLoadError = createMemo(() => {
+    const current = importState();
+    return current.status === "error" ? current.message : null;
+  });
+  const importIsActive = createMemo(() => {
+    const gameImport = currentImport();
+    return (
+      importState().status === "loading" ||
+      gameImport?.status === "queued" ||
+      gameImport?.status === "running"
+    );
+  });
+  const currentImportDisplayTotal = createMemo(() => {
+    const gameImport = currentImport();
+    if (gameImport === null || gameImport.totalGames === null) return null;
+    return Math.max(gameImport.totalGames, gameImport.processedGames);
+  });
+  const currentImportProgress = createMemo(() => {
+    const gameImport = currentImport();
+    const totalGames = currentImportDisplayTotal();
+    if (gameImport === null || totalGames === null || totalGames === 0) {
+      return null;
+    }
+    return gameImport.processedGames / totalGames;
+  });
+
+  async function refreshGamesInBackground(): Promise<void> {
+    requestId += 1;
+    const currentRequestId = requestId;
+    const result = await loadGames();
+    if (currentRequestId !== requestId || !result.ok) return;
+    setState({ status: "success", games: result.games, total: result.total });
+  }
+
+  createEffect(
+    () => ({
+      active: importIsActive(),
+      importId: currentImport()?.id ?? null,
+      userId: currentAuthUser()?.id ?? null,
+    }),
+    ({ active, importId, userId }) => {
+      if (!active || importId === null || userId === null) return;
+
+      let polling = false;
+      const interval = window.setInterval(() => {
+        if (polling) return;
+        polling = true;
+        const previous = untrack(currentImport);
+        loadLichessImport()
+          .then((result) => {
+            if (!result.ok) return;
+            setImportState({ status: "ready", import: result.import });
+            if (
+              result.import?.id === importId &&
+              (result.import.processedGames !== previous?.processedGames ||
+                (result.import.status === "completed" && previous?.status !== "completed"))
+            ) {
+              void refreshGamesInBackground();
+            }
+          })
+          .finally(() => {
+            polling = false;
+          });
+      }, 2500);
+      return () => window.clearInterval(interval);
+    },
+  );
+
   async function importGames(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     const trimmedHandle = handle().trim();
@@ -233,22 +339,20 @@ export function Games() {
       return;
     }
 
-    requestId += 1;
-    const currentRequestId = requestId;
-    setState({ status: "loading" });
-    const result = await importRecentLichessGames(trimmedHandle);
-    if (currentRequestId !== requestId) {
-      return;
-    }
+    importRequestId += 1;
+    const currentImportRequestId = importRequestId;
+    setImportState({ status: "loading", import: currentImport() });
+    const result = await startLichessImport(trimmedHandle);
+    if (currentImportRequestId !== importRequestId) return;
 
     if (result.ok) {
-      if (result.imported === undefined) {
-        setState({ status: "success", games: result.games });
-      } else {
-        setState({ status: "success", games: result.games, imported: result.imported });
-      }
+      setImportState({ status: "ready", import: result.import });
     } else {
-      setState({ status: "error", message: errorMessage(result.reason) });
+      setImportState({
+        status: "error",
+        import: currentImport(),
+        message: errorMessage(result.reason),
+      });
     }
   }
 
@@ -270,9 +374,9 @@ export function Games() {
               onInput={(event) => setHandle(event.currentTarget.value)}
             />
           </label>
-          <Button type="submit" disabled={state().status === "loading" || handle().trim() === ""}>
+          <Button type="submit" disabled={importIsActive() || handle().trim() === ""}>
             <Upload />
-            Import
+            {currentImport()?.status === "failed" ? "Retry" : "Import"}
           </Button>
         </form>
         <div class="grid grid-cols-3 gap-2 sm:flex sm:items-end">
@@ -340,13 +444,58 @@ export function Games() {
       </Show>
       <Show when={state().status === "success"}>
         <div class="flex min-h-0 flex-1 flex-col">
+          <Show when={currentImport()}>
+            {(gameImport) => (
+              <div
+                class="mx-4 mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm"
+                aria-live="polite"
+              >
+                <Show when={gameImport().status === "queued"}>
+                  <p>Waiting to import {gameImport().account}…</p>
+                </Show>
+                <Show when={gameImport().status === "running"}>
+                  <>
+                    <p>
+                      Importing {gameImport().account} — {gameImport().processedGames}
+                      <Show when={currentImportDisplayTotal()}>
+                        {(totalGames) => <> of {totalGames()}</>}
+                      </Show>{" "}
+                      finished games processed. You can leave this page.
+                    </p>
+                    <Show when={currentImportProgress()}>
+                      {(progress) => (
+                        <div
+                          class="mt-2 rounded-full bg-muted"
+                          role="progressbar"
+                          aria-label={`Importing ${gameImport().account}`}
+                          aria-valuemin="0"
+                          aria-valuemax={currentImportDisplayTotal() ?? undefined}
+                          aria-valuenow={gameImport().processedGames}
+                        >
+                          <ProgressBar progress={progress()} />
+                        </div>
+                      )}
+                    </Show>
+                  </>
+                </Show>
+                <Show when={gameImport().status === "completed"}>
+                  <p>Import complete — {gameImport().processedGames} finished games processed.</p>
+                </Show>
+                <Show when={gameImport().status === "failed"}>
+                  <p class="text-destructive">{importErrorMessage(gameImport().error)}</p>
+                </Show>
+              </div>
+            )}
+          </Show>
+          <Show when={currentImportLoadError()}>
+            <div class="mx-4 mt-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm text-destructive">
+              {currentImportLoadError()}
+            </div>
+          </Show>
           <div class="flex flex-none items-center justify-between px-4 py-2 text-xs text-muted-foreground">
             <span>
-              {visibleGames().length} of {allGames().length} games
+              Showing {visibleGames().length} of {totalGames()} games
             </span>
-            <Show when={importCount() !== null}>
-              <span>{importCount()} imported</span>
-            </Show>
           </div>
           <GamesTable games={visibleGames()} />
         </div>
