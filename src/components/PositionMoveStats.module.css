@@ -1,0 +1,11 @@
+.PositionMoveStats {
+  max-height: 450px;
+}
+
+@media (min-width: 80rem) {
+  .PositionMoveStats[data-resized="true"] {
+    height: var(--position-move-stats-height);
+    max-height: none;
+    flex-shrink: 0;
+  }
+}

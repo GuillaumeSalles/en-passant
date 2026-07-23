@@ -204,6 +204,29 @@ test("shows the signed-in user's move statistics for the selected position", asy
   await openRepertoire(page);
 
   const stats = page.getByRole("region", { name: "Your games" });
+  const resizeHandle = page.getByRole("separator", {
+    name: "Resize moves and your games panels",
+  });
+  await expect(resizeHandle).toBeVisible();
+  await resizeHandle.hover();
+  await expect(resizeHandle.locator("[data-resize-line]")).not.toHaveCSS("animation-name", "none");
+  const statsHeightBeforeResize = (await stats.boundingBox())?.height;
+  await resizeHandle.focus();
+  await resizeHandle.press("ArrowDown");
+  const statsHeightAfterResize = (await stats.boundingBox())?.height;
+  expect(statsHeightBeforeResize).toBeDefined();
+  expect(statsHeightAfterResize).toBeDefined();
+  expect(statsHeightAfterResize).toBeLessThan(statsHeightBeforeResize ?? 0);
+  const handleBox = await resizeHandle.boundingBox();
+  expect(handleBox).not.toBeNull();
+  if (handleBox !== null) {
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 40, { steps: 4 });
+    await page.mouse.up();
+  }
+  const statsHeightAfterDrag = (await stats.boundingBox())?.height;
+  expect(statsHeightAfterDrag).toBeLessThan(statsHeightAfterResize ?? 0);
   await expect(stats.getByRole("cell", { name: "62.5% of games, 5 games" })).toBeVisible();
   await expect(
     stats.getByRole("img", {

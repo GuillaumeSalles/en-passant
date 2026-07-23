@@ -1,5 +1,5 @@
 import { MemoryRouter, Route } from "@solidjs/router";
-import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, test, vi } from "vitest";
 import { STARTING_FEN } from "@/lib/chess";
 import { PositionMoveStats } from "./PositionMoveStats";
@@ -79,8 +79,29 @@ test("shows move results and hides the total row when there is only one next mov
 
   await waitFor(() => expect(screen.getByText("e4")).not.toBeNull());
   const section = screen.getByRole("region", { name: "Your games" });
-  expect(section.className).toContain("max-h-[450px]");
-  expect(section.className).toContain("overflow-y-auto");
+  expect(section.className).toContain("overflow-hidden");
+  const separator = screen.getByRole("separator", {
+    name: "Resize moves and your games panels",
+  });
+  expect(separator.getAttribute("aria-orientation")).toBe("horizontal");
+  vi.spyOn(section, "getBoundingClientRect").mockReturnValue({
+    bottom: 300,
+    height: 300,
+    left: 0,
+    right: 400,
+    top: 0,
+    width: 400,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  const globalShortcut = vi.fn();
+  window.addEventListener("keydown", globalShortcut);
+  fireEvent.keyDown(separator, { key: "ArrowDown" });
+  window.removeEventListener("keydown", globalShortcut);
+  expect(globalShortcut).not.toHaveBeenCalled();
+  await waitFor(() => expect(section.getAttribute("data-resized")).toBe("true"));
+  expect(section.style.getPropertyValue("--position-move-stats-height")).toBe("276px");
   expect(screen.getByRole("heading", { name: "Your games" })).not.toBeNull();
   expect(screen.getByRole("button", { name: "Play e4" })).not.toBeNull();
   expect(screen.getByRole("cell", { name: "100% of games, 6 games" })).not.toBeNull();

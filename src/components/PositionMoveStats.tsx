@@ -13,6 +13,11 @@ import { importedGamePath } from "@/lib/routes";
 import { EVAL_BAR_DARK_CLASS, EVAL_BAR_LIGHT_CLASS } from "./EvalBar";
 import { formatTimeControl, TimeControl } from "./TimeControl";
 import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
+import { HorizontalResizeHandle } from "./ui/HorizontalResizeHandle";
+import styles from "./PositionMoveStats.module.css";
+
+const MIN_GAMES_PANEL_HEIGHT = 144;
+const MIN_MOVES_PANEL_HEIGHT = 96;
 
 type LoadState =
   | { status: "loading" }
@@ -156,11 +161,32 @@ export function PositionMoveStats(props: {
   onMove: (move: PositionMoveStat) => void;
 }) {
   const [state, setState] = createSignal<LoadState>({ status: "loading" });
+  const [panelHeight, setPanelHeight] = createSignal<number | null>(null);
   const data = createMemo(() => {
     const current = state();
     return current.status === "success" ? current.data : null;
   });
   let requestId = 0;
+  let sectionRef: HTMLElement | undefined;
+
+  function resizePanel(delta: number) {
+    if (sectionRef === undefined) return;
+
+    const currentHeight = sectionRef.getBoundingClientRect().height;
+    const movesTree = sectionRef.parentElement?.querySelector<HTMLElement>("[data-moves-tree]");
+    const movesHeight = movesTree?.getBoundingClientRect().height ?? MIN_MOVES_PANEL_HEIGHT;
+    const maximumHeight = currentHeight + Math.max(0, movesHeight - MIN_MOVES_PANEL_HEIGHT);
+    const nextHeight = Math.min(
+      maximumHeight,
+      Math.max(MIN_GAMES_PANEL_HEIGHT, currentHeight + delta),
+    );
+    setPanelHeight(Math.round(nextHeight));
+  }
+
+  const sectionStyle = createMemo(() => {
+    const height = panelHeight();
+    return height === null ? {} : { "--position-move-stats-height": `${height}px` };
+  });
 
   createEffect(
     () => ({
@@ -197,116 +223,122 @@ export function PositionMoveStats(props: {
   return (
     <Show when={authStatus() !== "signed-out" && state().status !== "signed-out"}>
       <section
+        ref={sectionRef}
         aria-labelledby="position-move-stats-title"
-        class="flex max-h-[450px] flex-col overflow-y-auto"
+        class={`${styles["PositionMoveStats"]} flex flex-col overflow-hidden`}
+        data-resized={panelHeight() === null ? undefined : "true"}
+        style={sectionStyle()}
       >
-        <HorizontalDashedDivider direction="right-to-left" />
-        <div class="px-4 py-3">
-          <h2 id="position-move-stats-title" class="text-sm font-medium">
-            Your games
-          </h2>
-        </div>
-        <Show when={state().status === "loading"}>
-          <p class="px-4 pb-3 text-xs text-muted-foreground">Loading moves...</p>
-        </Show>
-        <Show when={state().status === "error"}>
-          <p class="px-4 pb-3 text-xs text-destructive">Move statistics are unavailable.</p>
-        </Show>
-        <Show when={data()}>
-          {(positionMoves) => (
-            <Show
-              when={positionMoves().moves.length > 0}
-              fallback={
-                <p class="px-4 pb-3 text-xs text-muted-foreground">
-                  You have no imported games in this position.
-                </p>
-              }
-            >
-              <div class="overflow-x-auto px-2 pb-2">
-                <table class="w-full border-collapse text-xs">
-                  <thead class="text-muted-foreground">
-                    <tr>
-                      <th class="px-2 py-1 text-left font-medium">Move</th>
-                      <th class="px-2 py-1 text-left font-medium">Games</th>
-                      <th class="px-2 py-1 text-left font-medium">
-                        <span class="sr-only">Results: white wins, draws, black wins</span>
-                        <span aria-hidden="true" class="flex items-center justify-end gap-2">
-                          <span class="flex items-center gap-1">
-                            <span
-                              class={`size-2 border border-neutral-400/50 ${EVAL_BAR_LIGHT_CLASS}`}
-                            />
-                            White
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class="size-2 bg-neutral-400 dark:bg-neutral-500" />
-                            Draw
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <span class={`size-2 ${EVAL_BAR_DARK_CLASS}`} />
-                            Black
-                          </span>
-                        </span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={positionMoves().moves}>
-                      {(move) => (
-                        <tr
-                          class="cursor-pointer transition-colors focus-within:bg-muted/50 hover:bg-muted/50"
-                          data-position-move={move.uci}
-                          onClick={() => props.onMove(move)}
-                        >
-                          <td class="p-0 font-medium">
-                            <button
-                              type="button"
-                              class="w-full px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                              aria-label={`Play ${move.san}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                props.onMove(move);
-                              }}
-                            >
-                              {move.san}
-                            </button>
-                          </td>
-                          <td
-                            class="px-2 py-1.5 tabular-nums"
-                            aria-label={`${moveFrequency(move.games, positionMoves().games)} of games, ${move.games} games`}
-                          >
-                            <span class="flex items-baseline justify-end gap-2 whitespace-nowrap">
-                              <span class="text-muted-foreground">
-                                {moveFrequency(move.games, positionMoves().games)}
-                              </span>
-                              <span>{move.games}</span>
+        <HorizontalDashedDivider class="xl:hidden" direction="right-to-left" />
+        <HorizontalResizeHandle onResize={resizePanel} />
+        <div class="min-h-0 overflow-y-auto">
+          <div class="px-4 py-3">
+            <h2 id="position-move-stats-title" class="text-sm font-medium">
+              Your games
+            </h2>
+          </div>
+          <Show when={state().status === "loading"}>
+            <p class="px-4 pb-3 text-xs text-muted-foreground">Loading moves...</p>
+          </Show>
+          <Show when={state().status === "error"}>
+            <p class="px-4 pb-3 text-xs text-destructive">Move statistics are unavailable.</p>
+          </Show>
+          <Show when={data()}>
+            {(positionMoves) => (
+              <Show
+                when={positionMoves().moves.length > 0}
+                fallback={
+                  <p class="px-4 pb-3 text-xs text-muted-foreground">
+                    You have no imported games in this position.
+                  </p>
+                }
+              >
+                <div class="overflow-x-auto px-2 pb-2">
+                  <table class="w-full border-collapse text-xs">
+                    <thead class="text-muted-foreground">
+                      <tr>
+                        <th class="px-2 py-1 text-left font-medium">Move</th>
+                        <th class="px-2 py-1 text-left font-medium">Games</th>
+                        <th class="px-2 py-1 text-left font-medium">
+                          <span class="sr-only">Results: white wins, draws, black wins</span>
+                          <span aria-hidden="true" class="flex items-center justify-end gap-2">
+                            <span class="flex items-center gap-1">
+                              <span
+                                class={`size-2 border border-neutral-400/50 ${EVAL_BAR_LIGHT_CLASS}`}
+                              />
+                              White
                             </span>
-                          </td>
-                          <td class="w-full px-2 py-1.5">
-                            <ResultBar
-                              san={move.san}
-                              whiteWins={move.whiteWins}
-                              draws={move.draws}
-                              blackWins={move.blackWins}
-                              whiteWinRate={move.whiteWinRate}
-                              drawRate={move.drawRate}
-                              blackWinRate={move.blackWinRate}
-                            />
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                  <Show when={positionMoves().moves.length > 1}>
-                    <tfoot>
-                      <TotalResultsRow positionMoves={positionMoves()} />
-                    </tfoot>
-                  </Show>
-                </table>
-                <RecentGames games={positionMoves().recentGames} />
-              </div>
-            </Show>
-          )}
-        </Show>
+                            <span class="flex items-center gap-1">
+                              <span class="size-2 bg-neutral-400 dark:bg-neutral-500" />
+                              Draw
+                            </span>
+                            <span class="flex items-center gap-1">
+                              <span class={`size-2 ${EVAL_BAR_DARK_CLASS}`} />
+                              Black
+                            </span>
+                          </span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={positionMoves().moves}>
+                        {(move) => (
+                          <tr
+                            class="cursor-pointer transition-colors focus-within:bg-muted/50 hover:bg-muted/50"
+                            data-position-move={move.uci}
+                            onClick={() => props.onMove(move)}
+                          >
+                            <td class="p-0 font-medium">
+                              <button
+                                type="button"
+                                class="w-full px-2 py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                                aria-label={`Play ${move.san}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  props.onMove(move);
+                                }}
+                              >
+                                {move.san}
+                              </button>
+                            </td>
+                            <td
+                              class="px-2 py-1.5 tabular-nums"
+                              aria-label={`${moveFrequency(move.games, positionMoves().games)} of games, ${move.games} games`}
+                            >
+                              <span class="flex items-baseline justify-end gap-2 whitespace-nowrap">
+                                <span class="text-muted-foreground">
+                                  {moveFrequency(move.games, positionMoves().games)}
+                                </span>
+                                <span>{move.games}</span>
+                              </span>
+                            </td>
+                            <td class="w-full px-2 py-1.5">
+                              <ResultBar
+                                san={move.san}
+                                whiteWins={move.whiteWins}
+                                draws={move.draws}
+                                blackWins={move.blackWins}
+                                whiteWinRate={move.whiteWinRate}
+                                drawRate={move.drawRate}
+                                blackWinRate={move.blackWinRate}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                    <Show when={positionMoves().moves.length > 1}>
+                      <tfoot>
+                        <TotalResultsRow positionMoves={positionMoves()} />
+                      </tfoot>
+                    </Show>
+                  </table>
+                  <RecentGames games={positionMoves().recentGames} />
+                </div>
+              </Show>
+            )}
+          </Show>
+        </div>
       </section>
     </Show>
   );
