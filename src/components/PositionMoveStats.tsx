@@ -29,6 +29,10 @@ function percentage(rate: number): string {
   return `${Math.round(rate * 1000) / 10}%`;
 }
 
+function visiblePercentage(rate: number): string {
+  return rate >= 0.15 ? percentage(rate) : "";
+}
+
 function moveFrequency(games: number, totalGames: number): string {
   return percentage(totalGames === 0 ? 0 : games / totalGames);
 }
@@ -84,15 +88,15 @@ function ResultBar(props: {
         style={{ width: percentage(props.whiteWinRate) }}
         title={`White wins: ${props.whiteWins} (${percentage(props.whiteWinRate)})`}
       >
-        {percentage(props.whiteWinRate)}
+        {visiblePercentage(props.whiteWinRate)}
       </div>
       <div
         aria-hidden="true"
-        class="flex items-center justify-center overflow-hidden whitespace-nowrap bg-neutral-400 text-[0.6rem] font-semibold tabular-nums text-neutral-950 dark:bg-neutral-500"
+        class="flex items-center justify-center overflow-hidden whitespace-nowrap bg-neutral-600 text-[0.6rem] font-semibold tabular-nums text-white"
         style={{ width: percentage(props.drawRate) }}
         title={`Draw: ${props.draws} (${percentage(props.drawRate)})`}
       >
-        {percentage(props.drawRate)}
+        {visiblePercentage(props.drawRate)}
       </div>
       <div
         aria-hidden="true"
@@ -100,7 +104,7 @@ function ResultBar(props: {
         style={{ width: percentage(props.blackWinRate) }}
         title={`Black wins: ${props.blackWins} (${percentage(props.blackWinRate)})`}
       >
-        {percentage(props.blackWinRate)}
+        {visiblePercentage(props.blackWinRate)}
       </div>
     </div>
   );
