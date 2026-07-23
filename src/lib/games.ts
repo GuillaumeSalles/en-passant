@@ -40,11 +40,8 @@ export type StoredGame = {
 };
 
 export type GamesResult =
-  | { ok: true; games: StoredGame[]; imported?: number }
-  | {
-      ok: false;
-      reason: "unauthorized" | "not-found" | "unavailable" | "lichess-auth-required";
-    };
+  | { ok: true; games: StoredGame[]; total: number }
+  | { ok: false; reason: "unauthorized" | "not-found" | "unavailable" };
 
 export type GameResult =
   | { ok: true; game: StoredGame }
@@ -90,10 +87,32 @@ export type PositionMovesResult =
   | { ok: false; reason: "unauthorized" | "unavailable" };
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>;
-type GamesResponse = { games: StoredGame[] };
+type GamesResponse = { games: StoredGame[]; total: number };
 type GameResponse = { game: StoredGame };
-type ImportGamesResponse = GamesResponse & { imported: number };
 type ErrorResponse = { error?: string };
+
+export type GameImportState = {
+  id: string;
+  source: "lichess";
+  account: string;
+  kind: "backfill" | "poll";
+  status: "queued" | "running" | "completed" | "failed";
+  processedGames: number;
+  error:
+    | "lichess-user-not-found"
+    | "lichess-unavailable"
+    | "invalid-lichess-response"
+    | "queue-delivery-failed"
+    | null;
+  createdAt: string;
+  startedAt: string | null;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
+export type GameImportResult =
+  | { ok: true; import: GameImportState | null }
+  | { ok: false; reason: "unauthorized" | "unavailable" };
 
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
@@ -108,15 +127,8 @@ function errorResult(response: Response, error: string | null): GamesResult {
   if (response.status === 401) {
     return { ok: false, reason: "unauthorized" };
   }
-  if (response.status === 404 && error === "lichess_user_not_found") {
+  if (response.status === 404 && error === "lichess_user_not_found")
     return { ok: false, reason: "not-found" };
-  }
-  if (
-    response.status === 503 &&
-    (error === "lichess_api_token_required" || error === "lichess_api_token_rejected")
-  ) {
-    return { ok: false, reason: "lichess-auth-required" };
-  }
   return { ok: false, reason: "unavailable" };
 }
 
@@ -155,8 +167,8 @@ export async function loadGames(
     return errorResult(response, await readError(response));
   }
 
-  const { games } = await readJson<GamesResponse>(response);
-  return { ok: true, games };
+  const { games, total } = await readJson<GamesResponse>(response);
+  return { ok: true, games, total };
 }
 
 export async function loadGame(
@@ -211,10 +223,17 @@ export async function loadPositionMoves(
   return { ok: true, data };
 }
 
-export async function importRecentLichessGames(
+function gameImportErrorResult(response: Response): GameImportResult {
+  return {
+    ok: false,
+    reason: response.status === 401 ? "unauthorized" : "unavailable",
+  };
+}
+
+export async function startLichessImport(
   handle: string,
-  options: { fetcher?: Fetcher; max?: number } = {},
-): Promise<GamesResult> {
+  options: { fetcher?: Fetcher } = {},
+): Promise<GameImportResult> {
   const fetcher = options.fetcher ?? fetch;
   let response: Response;
   try {
@@ -225,16 +244,35 @@ export async function importRecentLichessGames(
         accept: "application/json",
         "content-type": "application/json",
       },
-      body: JSON.stringify({ handle, max: options.max ?? 20 }),
+      body: JSON.stringify({ handle }),
     });
   } catch {
     return { ok: false, reason: "unavailable" };
   }
 
-  if (!response.ok) {
-    return errorResult(response, await readError(response));
-  }
+  if (!response.ok) return gameImportErrorResult(response);
+  return readJson<{ import: GameImportState }>(response).then((body) => ({
+    ok: true,
+    import: body.import,
+  }));
+}
 
-  const { games, imported } = await readJson<ImportGamesResponse>(response);
-  return { ok: true, games, imported };
+export async function loadLichessImport(
+  options: { fetcher?: Fetcher } = {},
+): Promise<GameImportResult> {
+  const fetcher = options.fetcher ?? fetch;
+  let response: Response;
+  try {
+    response = await fetcher("/api/game-imports/lichess", {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    });
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+  if (!response.ok) return gameImportErrorResult(response);
+  return readJson<{ import: GameImportState | null }>(response).then((body) => ({
+    ok: true,
+    import: body.import,
+  }));
 }

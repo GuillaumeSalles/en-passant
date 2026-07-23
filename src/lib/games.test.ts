@@ -1,9 +1,15 @@
 import { describe, expect, test } from "vitest";
-import { loadGame, loadGames, loadPositionMoves } from "./games";
+import {
+  loadGame,
+  loadGames,
+  loadLichessImport,
+  loadPositionMoves,
+  startLichessImport,
+} from "./games";
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { "content-type": "application/json" },
   });
 }
@@ -11,9 +17,9 @@ function jsonResponse(body: unknown): Response {
 describe("trusted game API contracts", () => {
   test("returns games without frontend field validation", async () => {
     const games = [{ id: "game-from-backend", addedContractField: true }];
-    const result = await loadGames({}, { fetcher: async () => jsonResponse({ games }) });
+    const result = await loadGames({}, { fetcher: async () => jsonResponse({ games, total: 42 }) });
 
-    expect(result).toEqual({ ok: true, games });
+    expect(result).toEqual({ ok: true, games, total: 42 });
   });
 
   test("returns a game without frontend field validation", async () => {
@@ -38,5 +44,39 @@ describe("trusted game API contracts", () => {
     });
 
     expect(result).toEqual({ ok: true, data });
+  });
+
+  test("starts an asynchronous Lichess import without a game limit", async () => {
+    let request: RequestInit | undefined;
+    const gameImport = {
+      id: "import-id",
+      source: "lichess",
+      account: "PlayerOne",
+      kind: "backfill",
+      status: "queued",
+      processedGames: 0,
+      error: null,
+      createdAt: "2026-07-23T00:00:00.000Z",
+      startedAt: null,
+      updatedAt: "2026-07-23T00:00:00.000Z",
+      completedAt: null,
+    } as const;
+    const result = await startLichessImport("PlayerOne", {
+      fetcher: async (_input, init) => {
+        request = init;
+        return jsonResponse({ import: gameImport }, 202);
+      },
+    });
+
+    expect(JSON.parse(String(request?.body))).toEqual({ handle: "PlayerOne" });
+    expect(result).toEqual({ ok: true, import: gameImport });
+  });
+
+  test("loads the current import state", async () => {
+    const result = await loadLichessImport({
+      fetcher: async () => jsonResponse({ import: null }),
+    });
+
+    expect(result).toEqual({ ok: true, import: null });
   });
 });

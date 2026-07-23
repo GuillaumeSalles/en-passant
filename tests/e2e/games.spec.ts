@@ -1,6 +1,110 @@
 import { expect, test } from "@playwright/test";
 import { mockSignedInUser } from "./helpers";
 
+test("keeps games visible while an asynchronous Lichess import progresses", async ({ page }) => {
+  const session = await mockSignedInUser(page);
+  session.signIn();
+  let started = false;
+  let polls = 0;
+
+  await page.route("**/api/games", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        total: 1,
+        games: [
+          {
+            id: "lichess-existing",
+            source: "lichess",
+            sourceGameId: "existing",
+            importedAccount: "PlayerOne",
+            userColor: "white",
+            opponentName: "Existing Opponent",
+            opponentRating: 1810,
+            userRating: 1800,
+            whiteName: "PlayerOne",
+            blackName: "Existing Opponent",
+            whiteRating: 1800,
+            blackRating: 1810,
+            winner: "white",
+            result: "1-0",
+            speed: "blitz",
+            perf: "blitz",
+            rated: true,
+            timeControl: "180+2",
+            createdAt: 1_765_000_000_000,
+            lastMoveAt: 1_765_000_120_000,
+            opening: null,
+            pgn: "1. e4 e5 1-0",
+            importedAt: "2026-07-13T00:00:00.000Z",
+            latestRepertoireMove: null,
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/game-imports/lichess", async (route) => {
+    const baseImport = {
+      id: "import-id",
+      source: "lichess",
+      account: "PlayerOne",
+      kind: "backfill",
+      processedGames: 0,
+      error: null,
+      createdAt: "2026-07-23T00:00:00.000Z",
+      startedAt: null,
+      updatedAt: "2026-07-23T00:00:00.000Z",
+      completedAt: null,
+    };
+    if (route.request().method() === "POST") {
+      started = true;
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: JSON.stringify({ import: { ...baseImport, status: "queued" } }),
+      });
+      return;
+    }
+    if (!started) {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ import: null }),
+      });
+      return;
+    }
+    polls += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        import:
+          polls === 1
+            ? {
+                ...baseImport,
+                status: "running",
+                processedGames: 100,
+                startedAt: "2026-07-23T00:00:01.000Z",
+              }
+            : {
+                ...baseImport,
+                status: "completed",
+                processedGames: 142,
+                completedAt: "2026-07-23T00:00:05.000Z",
+              },
+      }),
+    });
+  });
+
+  await page.goto("/app/games");
+  await expect(page.getByText("Existing Opponent")).toBeVisible();
+  await page.getByLabel("Lichess handle").fill("PlayerOne");
+  await page.getByRole("button", { name: "Import" }).click();
+
+  await expect(page.getByText("Waiting to import PlayerOne…")).toBeVisible();
+  await expect(page.getByText("Existing Opponent")).toBeVisible();
+  await expect(page.getByText(/100 finished games processed/)).toBeVisible();
+  await expect(page.getByText(/Import complete — 142 finished games processed/)).toBeVisible();
+});
+
 test("shows the latest repertoire move on an imported game", async ({ page }) => {
   const session = await mockSignedInUser(page);
   session.signIn();
