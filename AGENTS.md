@@ -8,6 +8,10 @@ Cloudflare Pages project `enpassant`.
 - Do not import backend source. Use HTTP contracts such as `/api/auth/*`,
   `/api/pgns/:id`, `POST /api/sync`, `/api/games/*`, and
   `/api/game-imports/:source`.
+- Treat successful backend responses as trusted, strictly defined HTTP
+  contracts. Type them at the request boundary; do not add frontend runtime
+  schema validation, field-by-field parsing, or checks of server-owned
+  invariants.
 - Do not use `any`; prefer generics, `unknown`, or explicit tuple inference.
 - Keep chess rules, PGN parsing, move tree mutation, NAG handling, and
   serialization testable outside UI components.

@@ -36,6 +36,7 @@ import {
 type EmailAuthStep = "email" | "code";
 
 type EmailOtpSignInResult = { ok: true; isNewUser: boolean } | { ok: false; message: string };
+type EmailOtpResponse = { isNewUser: boolean };
 type AuthButtonMenuSide = "bottom" | "top";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,10 +75,10 @@ async function signInWithEmailOtp(email: string, otp: string): Promise<EmailOtpS
     };
   }
 
-  const body = await response.json().catch(() => null);
+  const body = (await response.json()) as EmailOtpResponse;
   return {
     ok: true,
-    isNewUser: isRecord(body) && body["isNewUser"] === true,
+    isNewUser: body.isNewUser,
   };
 }
 
