@@ -94,6 +94,43 @@ describe("chess rules", () => {
     });
   });
 
+  test("accepts redundant SAN disambiguation when only one move is legal", () => {
+    const position = createChessPosition();
+    for (const san of [
+      "e4",
+      "c5",
+      "Nf3",
+      "Nc6",
+      "b4",
+      "cxb4",
+      "d4",
+      "d5",
+      "exd5",
+      "Qxd5",
+      "c4",
+      "bxc3",
+      "Nxc3",
+      "Qa5",
+      "Rb1",
+      "e6",
+      "Bd2",
+      "Qd8",
+      "Bb5",
+      "Bd6",
+      "Ne4",
+      "Bc7",
+      "O-O",
+    ]) {
+      applySan(position, san);
+    }
+
+    expect(applySan(position, "Nge7")).toMatchObject({
+      san: "Ne7",
+      from: "g8",
+      to: "e7",
+    });
+  });
+
   test("adds checkmate suffix", () => {
     const position = createChessPosition();
 

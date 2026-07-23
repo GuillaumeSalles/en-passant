@@ -170,9 +170,20 @@ export function positionKey(position: ChessPosition): string {
 
 export function applySan(position: ChessPosition, san: string): AppliedMove {
   const normalizedSan = normalizeSan(san);
-  const move = legalMoves(position).find(
+  const candidates = legalMoves(position);
+  const exactMove = candidates.find(
     (candidate) => normalizeSan(moveToSan(position, candidate)) === normalizedSan,
   );
+  const relaxedSan = normalizeRedundantDisambiguation(normalizedSan);
+  const relaxedMoves =
+    exactMove === undefined && relaxedSan !== normalizedSan
+      ? candidates.filter(
+          (candidate) =>
+            normalizeRedundantDisambiguation(normalizeSan(moveToSan(position, candidate))) ===
+            relaxedSan,
+        )
+      : [];
+  const move = exactMove ?? (relaxedMoves.length === 1 ? relaxedMoves[0] : undefined);
 
   if (move === undefined) {
     throw new Error(`Illegal SAN move "${san}" from ${fen(position)}`);
@@ -785,6 +796,10 @@ function normalizeSan(san: string): string {
     .replace(/[+#]$/g, "")
     .replace(/^0-0-0/, "O-O-O")
     .replace(/^0-0/, "O-O");
+}
+
+function normalizeRedundantDisambiguation(san: string): string {
+  return san.replace(/^([KQRBN])(?:[a-h][1-8]|[a-h]|[1-8])(?=x?[a-h][1-8](?:=[QRBN])?$)/, "$1");
 }
 
 function normalizePromotion(promotion?: string | null): PieceKind | null {
