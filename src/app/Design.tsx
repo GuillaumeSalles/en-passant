@@ -280,7 +280,7 @@ function OverlaySamples() {
           <DialogTrigger>
             <Button>Dialog</Button>
           </DialogTrigger>
-          <DialogContent class="max-w-sm">
+          <DialogContent class="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Load PGN</DialogTitle>
               <DialogDescription>Paste a PGN to load a game.</DialogDescription>

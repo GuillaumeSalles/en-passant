@@ -145,7 +145,7 @@ function DialogContent(props: { children: JSX.Element; class?: string }) {
           aria-describedby={ctx.descriptionId}
           tabindex={-1}
           class={cn(
-            "motion-dialog-content fixed left-[50%] top-[50%] z-[51] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
+            "motion-dialog-content fixed left-0 top-0 z-[51] grid h-[100dvh] w-full max-w-none gap-4 overflow-y-auto border-0 bg-background p-6 shadow-lg sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:border sm:rounded-lg",
             props.class,
           )}
           onClick={(e) => e.stopPropagation()}

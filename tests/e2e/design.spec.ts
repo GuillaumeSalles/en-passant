@@ -69,6 +69,23 @@ test("design context menus stay within the viewport near screen edges", async ({
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height - 7);
 });
 
+test("design dialogs fill the mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.goto("/design");
+
+  await page.getByRole("button", { name: "Dialog", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Load PGN" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS("width", "360px");
+  await expect(dialog).toHaveCSS("height", "640px");
+  await expect(dialog).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+
+  const box = await dialog.boundingBox();
+  expect(box?.x).toBe(0);
+  expect(box?.y).toBe(0);
+});
+
 test("shows the signup nudge on the design page", async ({ page }) => {
   await page.goto("/design");
 

@@ -203,7 +203,7 @@ export function AuthButton(
               Sign in
             </Button>
           </DialogTrigger>
-          <DialogContent class="max-w-sm">
+          <DialogContent class="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Sign in</DialogTitle>
               <DialogDescription>Use Google or your email.</DialogDescription>

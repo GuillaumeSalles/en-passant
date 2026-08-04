@@ -94,7 +94,7 @@ function AboutDialog(props: { buttonClass?: string | undefined } = {}) {
           About
         </Button>
       </DialogTrigger>
-      <DialogContent class="max-w-md gap-5">
+      <DialogContent class="gap-5 sm:max-w-md">
         <DialogHeader class="space-y-0 pr-6 text-left">
           <div class="flex items-center gap-3">
             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-border bg-muted/30">
