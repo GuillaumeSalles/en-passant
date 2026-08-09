@@ -6,6 +6,7 @@ import {
   collectUnexpectedConsole,
   emptyChanges,
   isRecord,
+  mockSignedOutAuth,
   mockSignedInUser,
   pgnSnapshot,
   seedIndexedDb,
@@ -570,6 +571,28 @@ test("mobile account menu opens above the username", async ({ page }) => {
     throw new Error("Expected account menu trigger and popup boxes to be available");
   }
   expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(triggerBox.y - 1);
+  expect(consoleMessages).toEqual([]);
+});
+
+test("mobile sign in dialog fills the viewport when opened from navigation", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSignedOutAuth(page);
+  await openAuthPage(page);
+
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  const drawer = page.locator('aside[aria-label="Navigation"]');
+  await drawer.getByRole("button", { name: "Sign in" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Sign in" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS("width", "390px");
+  await expect(dialog).toHaveCSS("height", "844px");
+  await expect(dialog).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+
+  const box = await dialog.boundingBox();
+  expect(box?.x).toBe(0);
+  expect(box?.y).toBe(0);
   expect(consoleMessages).toEqual([]);
 });
 

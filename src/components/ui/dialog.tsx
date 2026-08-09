@@ -134,7 +134,7 @@ function DialogContent(props: { children: JSX.Element; class?: string }) {
     <Show when={ctx.open()}>
       <>
         <div
-          class="motion-dialog-overlay fixed inset-0 z-50 bg-black/80"
+          class="motion-dialog-overlay fixed inset-0 z-50 h-[100dvh] w-[100dvw] bg-black/80"
           onClick={() => ctx.setOpen(false)}
         />
         <div
@@ -145,7 +145,7 @@ function DialogContent(props: { children: JSX.Element; class?: string }) {
           aria-describedby={ctx.descriptionId}
           tabindex={-1}
           class={cn(
-            "motion-dialog-content fixed left-0 top-0 z-[51] grid h-[100dvh] w-full max-w-none gap-4 overflow-y-auto border-0 bg-background p-6 shadow-lg sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:border sm:rounded-lg",
+            "motion-dialog-content fixed left-0 top-0 z-[51] grid h-[100dvh] w-[100dvw] max-w-none gap-4 overflow-y-auto border-0 bg-background p-6 shadow-lg sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-lg sm:border sm:rounded-lg",
             props.class,
           )}
           onClick={(e) => e.stopPropagation()}
