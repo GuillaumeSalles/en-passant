@@ -12,6 +12,7 @@ const mockedAuth = vi.hoisted(() => ({
 vi.mock("@/lib/authSession", () => ({
   authStatus: () => mockedAuth.status,
   currentAuthUser: () => mockedAuth.user,
+  handleUnauthorizedResponse: async (response: Response) => response.status === 401,
 }));
 
 afterEach(() => {

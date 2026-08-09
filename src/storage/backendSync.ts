@@ -9,7 +9,7 @@ import {
   type RepertoireSyncRequest,
   type RepertoireSyncResponse,
 } from "@/storage";
-import { isSignedIn, refreshAuthSession } from "@/lib/authSession";
+import { handleUnauthorizedResponse, isSignedIn, refreshAuthSession } from "@/lib/authSession";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
 
 type ApiError = {
@@ -65,6 +65,9 @@ async function syncRemoteChanges(
       body: creation.pgn,
     });
     if (!uploadResponse.ok) {
+      if (await handleUnauthorizedResponse(uploadResponse)) {
+        return null;
+      }
       throw new Error(await uploadResponse.text());
     }
     request = withoutInlinePgnCreation(syncRequest);
@@ -76,7 +79,7 @@ async function syncRemoteChanges(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(request),
   });
-  if (response.status === 401) {
+  if (await handleUnauthorizedResponse(response)) {
     return null;
   }
   if (!response.ok) {
@@ -96,7 +99,7 @@ export async function loadPgn(pgnId: string): Promise<string | undefined> {
   const response = await fetch(`/api/pgns/${encodeURIComponent(pgnId)}`, {
     credentials: "include",
   });
-  if (response.status === 401 || response.status === 404) return undefined;
+  if ((await handleUnauthorizedResponse(response)) || response.status === 404) return undefined;
   if (!response.ok) throw new Error(await response.text());
 
   const revision = response.headers.get("x-pgn-revision");

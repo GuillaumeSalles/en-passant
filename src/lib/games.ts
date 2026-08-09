@@ -1,3 +1,5 @@
+import { handleUnauthorizedResponse } from "@/lib/authSession";
+
 export type GameColor = "white" | "black";
 export type GameSort = "asc" | "desc";
 
@@ -150,9 +152,6 @@ async function readError(response: Response): Promise<string | null> {
 }
 
 function errorResult(response: Response, error: string | null): GamesResult {
-  if (response.status === 401) {
-    return { ok: false, reason: "unauthorized" };
-  }
   if (response.status === 404 && error === "lichess_user_not_found")
     return { ok: false, reason: "not-found" };
   return { ok: false, reason: "unavailable" };
@@ -190,6 +189,9 @@ export async function loadGames(
   }
 
   if (!response.ok) {
+    if (await handleUnauthorizedResponse(response)) {
+      return { ok: false, reason: "unauthorized" };
+    }
     return errorResult(response, await readError(response));
   }
 
@@ -212,7 +214,7 @@ export async function loadGame(
     return { ok: false, reason: "unavailable" };
   }
 
-  if (response.status === 401) {
+  if (await handleUnauthorizedResponse(response)) {
     return { ok: false, reason: "unauthorized" };
   }
   if (response.status === 404) {
@@ -242,7 +244,9 @@ export async function loadPositionMoves(
   } catch {
     return { ok: false, reason: "unavailable" };
   }
-  if (response.status === 401) return { ok: false, reason: "unauthorized" };
+  if (await handleUnauthorizedResponse(response)) {
+    return { ok: false, reason: "unauthorized" };
+  }
   if (!response.ok) return { ok: false, reason: "unavailable" };
 
   const data = await readJson<PositionMoves>(response);
@@ -262,17 +266,12 @@ export async function loadTrainingMistakeLinks(
   } catch {
     return { ok: false, reason: "unavailable" };
   }
-  if (response.status === 401) return { ok: false, reason: "unauthorized" };
+  if (await handleUnauthorizedResponse(response)) {
+    return { ok: false, reason: "unauthorized" };
+  }
   if (!response.ok) return { ok: false, reason: "unavailable" };
   const { links } = await readJson<{ links: TrainingMistakeLink[] }>(response);
   return { ok: true, links };
-}
-
-function gameImportErrorResult(response: Response): GameImportResult {
-  return {
-    ok: false,
-    reason: response.status === 401 ? "unauthorized" : "unavailable",
-  };
 }
 
 export async function startLichessImport(
@@ -295,7 +294,12 @@ export async function startLichessImport(
     return { ok: false, reason: "unavailable" };
   }
 
-  if (!response.ok) return gameImportErrorResult(response);
+  if (!response.ok) {
+    if (await handleUnauthorizedResponse(response)) {
+      return { ok: false, reason: "unauthorized" };
+    }
+    return { ok: false, reason: "unavailable" };
+  }
   return readJson<{ import: GameImportState }>(response).then((body) => ({
     ok: true,
     import: body.import,
@@ -315,7 +319,12 @@ export async function loadLichessImport(
   } catch {
     return { ok: false, reason: "unavailable" };
   }
-  if (!response.ok) return gameImportErrorResult(response);
+  if (!response.ok) {
+    if (await handleUnauthorizedResponse(response)) {
+      return { ok: false, reason: "unauthorized" };
+    }
+    return { ok: false, reason: "unavailable" };
+  }
   return readJson<{ import: GameImportState | null }>(response).then((body) => ({
     ok: true,
     import: body.import,

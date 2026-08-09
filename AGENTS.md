@@ -47,6 +47,15 @@ Cloudflare Pages project `enpassant`.
 - Add abstractions only when they remove real duplication, isolate a real
   boundary, or simplify reactivity.
 
+## Authenticated Storage Boundary
+
+- IndexedDB data owned by an authenticated user must be deleted when that
+  session is explicitly ended, expires, is revoked, changes users, or an
+  authenticated API returns `401`. Reload after deletion so stale in-memory
+  state cannot recreate the database.
+- Preserve anonymous IndexedDB data when no authenticated-user marker exists.
+  Do not treat transient network or server failures as confirmed sign-out.
+
 ## Tests And Checks
 
 - Full check: `npm run check`

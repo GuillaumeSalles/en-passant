@@ -25,6 +25,7 @@ type AuthPageOptions = {
   localName?: string;
   localPgn?: string;
   dirty?: boolean;
+  authenticatedUserId?: string;
 };
 
 async function dragPiece(page: Page, from: string, to: string): Promise<void> {
@@ -76,6 +77,11 @@ async function openAuthPage(page: Page, options: AuthPageOptions = {}) {
       },
     ],
   });
+  if (options.authenticatedUserId !== undefined) {
+    await page.evaluate((userId) => {
+      window.localStorage.setItem("en_passant_signed_in", userId);
+    }, options.authenticatedUserId);
+  }
 
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
 }
@@ -505,8 +511,59 @@ test("loads a backend session without a local signed-in marker", async ({ page }
   await expect.poll(() => syncRequests).toBeGreaterThan(0);
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
+    .toBe("player-user");
+  expect(consoleMessages).toEqual([]);
+});
+
+test("expired sessions clear authenticated IndexedDB data before anonymous bootstrap", async ({
+  page,
+}) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  await mockSignedOutAuth(page);
+
+  await openAuthPage(page, {
+    localName: "Expired Account Cache",
+    localPgn: "1. c4 e5 *",
+    dirty: true,
+    authenticatedUserId: "player-user",
+  });
+
+  await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
+  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
+  await expect(page.getByText("Expired Account Cache")).toBeHidden();
+  expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
     .toBeNull();
   expect(consoleMessages).toEqual([]);
+});
+
+test("authenticated API rejection immediately clears IndexedDB data", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  const auth = await mockSignedInUser(page);
+  auth.signIn();
+
+  await openAuthPage(page);
+  await expect(page.getByText("Player One")).toBeVisible();
+  await page.getByRole("button", { name: "Move to last main line move" }).click();
+
+  auth.signOut();
+  await dragPiece(page, "g1", "f3");
+
+  await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
+  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
+  expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
+    .toBeNull();
+  expect(consoleMessages.some((message) => message.includes("/api/sync:0"))).toBe(true);
+  expect(
+    consoleMessages.filter(
+      (message) =>
+        !message.includes("401 (Unauthorized)") ||
+        (!message.includes("/api/sync:0") && !message.includes("/api/games/position-moves?")),
+    ),
+  ).toEqual([]);
 });
 
 test("sends a played move as a path-addressed PGN mutation", async ({ page }) => {

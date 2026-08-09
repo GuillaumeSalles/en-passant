@@ -1,5 +1,10 @@
 import { createSignal } from "solid-js";
 import { authClient } from "@/lib/authClient";
+import {
+  discardAuthenticatedLocalData,
+  readRememberedAuthenticatedUserId,
+  rememberAuthenticatedUser,
+} from "@/lib/authSessionPersistence";
 
 export type AuthUser = {
   id: string;
@@ -21,6 +26,7 @@ type SessionUser = {
 
 const [currentAuthUser, setCurrentAuthUser] = createSignal<AuthUser | null>(null);
 const [authStatus, setAuthStatus] = createSignal<AuthStatus>("loading");
+let sessionEndPromise: Promise<void> | null = null;
 
 export { authStatus, currentAuthUser };
 
@@ -45,20 +51,68 @@ export async function refreshAuthSession(): Promise<AuthUser | null> {
   const { data, error } = await authClient.getSession();
   if (error !== null) {
     if (error.status === 401) {
-      clearAuthSession();
+      await clearAuthSessionAndLocalData();
     }
     return currentAuthUser();
   }
 
   const user = mapSessionUser(data?.user);
+  if (user === null) {
+    await clearAuthSessionAndLocalData();
+    return null;
+  }
+
+  const rememberedUserId = readRememberedAuthenticatedUserId();
+  const activeUserId = currentAuthUser()?.id ?? null;
+  if (
+    (rememberedUserId !== null && rememberedUserId !== user.id) ||
+    (activeUserId !== null && activeUserId !== user.id)
+  ) {
+    await clearAuthSessionAndLocalData();
+    return null;
+  }
+
+  rememberAuthenticatedUser(user.id);
   setCurrentAuthUser(user);
-  setAuthStatus(user === null ? "signed-out" : "signed-in");
+  setAuthStatus("signed-in");
   return user;
 }
 
 export function clearAuthSession(): void {
   setCurrentAuthUser(null);
   setAuthStatus("signed-out");
+}
+
+export async function clearAuthSessionAndLocalData(): Promise<void> {
+  const shouldDiscardLocalData =
+    currentAuthUser() !== null || readRememberedAuthenticatedUserId() !== null;
+  clearAuthSession();
+
+  if (sessionEndPromise !== null) {
+    await sessionEndPromise;
+    return;
+  }
+  if (!shouldDiscardLocalData) {
+    return;
+  }
+
+  const discardPromise = discardAuthenticatedLocalData();
+  sessionEndPromise = discardPromise;
+  try {
+    await discardPromise;
+  } finally {
+    if (sessionEndPromise === discardPromise) {
+      sessionEndPromise = null;
+    }
+  }
+}
+
+export async function handleUnauthorizedResponse(response: Response): Promise<boolean> {
+  if (response.status !== 401) {
+    return false;
+  }
+  await clearAuthSessionAndLocalData();
+  return true;
 }
 
 export function startAuthSessionRenewal(

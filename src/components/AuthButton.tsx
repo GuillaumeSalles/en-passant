@@ -3,7 +3,12 @@ import { ChevronDown, LogIn, LogOut } from "./Icons";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { clearAuthSession, currentAuthUser, refreshAuthSession } from "@/lib/authSession";
+import {
+  clearAuthSession,
+  clearAuthSessionAndLocalData,
+  currentAuthUser,
+  refreshAuthSession,
+} from "@/lib/authSession";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -20,7 +25,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deleteIndexedDbDatabase } from "@/storage";
 import { authClient } from "@/lib/authClient";
 import {
   authCallbackUrl,
@@ -185,9 +189,7 @@ export function AuthButton(
     authClient
       .signOut()
       .then(async () => {
-        clearAuthSession();
-        await deleteIndexedDbDatabase();
-        window.location.reload();
+        await clearAuthSessionAndLocalData();
       })
       .catch(() => undefined);
   }
