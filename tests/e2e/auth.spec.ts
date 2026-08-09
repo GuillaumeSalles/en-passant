@@ -26,7 +26,6 @@ type AuthPageOptions = {
   localPgn?: string;
   dirty?: boolean;
   authenticatedUserId?: string;
-  indexedDbAuthenticatedUserId?: string;
 };
 
 async function indexedDbAuthenticatedUserId(page: Page): Promise<string | null> {
@@ -98,13 +97,8 @@ async function openAuthPage(page: Page, options: AuthPageOptions = {}) {
         dirty,
       },
     ],
-    authenticatedUserId: options.indexedDbAuthenticatedUserId,
+    authenticatedUserId: options.authenticatedUserId,
   });
-  if (options.authenticatedUserId !== undefined) {
-    await page.evaluate((userId) => {
-      window.localStorage.setItem("en_passant_signed_in", userId);
-    }, options.authenticatedUserId);
-  }
 
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
 }
@@ -182,10 +176,10 @@ test("requests an email code and signs in with it", async ({ page }) => {
 
   await expect(page.getByText("Player One")).toBeVisible();
   await expect.poll(() => syncRequests).toBeGreaterThan(0);
+  await expect.poll(() => indexedDbAuthenticatedUserId(page)).toBe("player-user");
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
-    .toBe("player-user");
-  await expect.poll(() => indexedDbAuthenticatedUserId(page)).toBe("player-user");
+    .toBeNull();
   expect(startRequestBody).toEqual({ email: "player@example.com", type: "sign-in" });
   expect(verifyRequestBody).toEqual({
     email: "player@example.com",
@@ -497,7 +491,7 @@ test("existing Google account sign in discards local repertoire data and loads s
   );
 });
 
-test("loads a backend session without a local signed-in marker", async ({ page }) => {
+test("records an active backend session owner in IndexedDB", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   let syncRequests = 0;
   const auth = await mockSignedInUser(
@@ -519,7 +513,7 @@ test("loads a backend session without a local signed-in marker", async ({ page }
   });
   auth.signIn();
 
-  await openAuthPage(page, { indexedDbAuthenticatedUserId: "player-user" });
+  await openAuthPage(page);
 
   await expect(page.getByText("Player One")).toBeVisible();
   const avatar = page.locator(`img[src="${PLAYER_AVATAR_URL}"]`);
@@ -536,9 +530,6 @@ test("loads a backend session without a local signed-in marker", async ({ page }
   await expect(page.getByText("Feedback")).toHaveCount(0);
   await expect(page.getByText("Sign out")).toBeVisible();
   await expect.poll(() => syncRequests).toBeGreaterThan(0);
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
-    .toBe("player-user");
   await expect.poll(() => indexedDbAuthenticatedUserId(page)).toBe("player-user");
   expect(consoleMessages).toEqual([]);
 });
@@ -554,39 +545,12 @@ test("expired sessions clear authenticated IndexedDB data before anonymous boots
     localPgn: "1. c4 e5 *",
     dirty: true,
     authenticatedUserId: "player-user",
-    indexedDbAuthenticatedUserId: "player-user",
   });
 
   await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
   await expect(page.getByText("Demo repertoire").first()).toBeVisible();
   await expect(page.getByText("Expired Account Cache")).toBeHidden();
   expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
-    .toBeNull();
-  expect(consoleMessages).toEqual([]);
-});
-
-test("expired sessions clear IndexedDB when its ownership marker is the only one left", async ({
-  page,
-}) => {
-  const consoleMessages = collectUnexpectedConsole(page);
-  await mockSignedOutAuth(page);
-
-  await openAuthPage(page, {
-    localName: "Orphaned Account Cache",
-    localPgn: "1. Nf3 d5 *",
-    dirty: true,
-    indexedDbAuthenticatedUserId: "player-user",
-  });
-
-  await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
-  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
-  await expect(page.getByText("Orphaned Account Cache")).toBeHidden();
-  expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
-    .toBeNull();
   expect(consoleMessages).toEqual([]);
 });
 
@@ -605,9 +569,6 @@ test("authenticated API rejection immediately clears IndexedDB data", async ({ p
   await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
   await expect(page.getByText("Demo repertoire").first()).toBeVisible();
   expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
-  await expect
-    .poll(() => page.evaluate(() => localStorage.getItem("en_passant_signed_in")))
-    .toBeNull();
   expect(consoleMessages.some((message) => message.includes("/api/sync:0"))).toBe(true);
   expect(
     consoleMessages.filter(

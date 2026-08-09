@@ -55,9 +55,8 @@ Cloudflare Pages project `enpassant`.
   state cannot recreate the database.
 - Preserve anonymous IndexedDB data when no authenticated-user marker exists.
   Do not treat transient network or server failures as confirmed sign-out.
-- Store the authenticated user id in both localStorage and IndexedDB metadata.
-  Reconcile the two markers against the server session before accepting local
-  data, and restore a missing marker only when the surviving marker matches.
+- Store the authenticated user id alongside its data in IndexedDB metadata and
+  compare it with the server session before accepting or syncing local data.
 
 ## Tests And Checks
 

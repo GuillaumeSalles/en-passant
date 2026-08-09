@@ -2,8 +2,7 @@ import { createSignal } from "solid-js";
 import { authClient } from "@/lib/authClient";
 import {
   discardAuthenticatedLocalData,
-  hasRememberedAuthenticatedUser,
-  readRememberedAuthenticatedUserIds,
+  readRememberedAuthenticatedUserId,
   rememberAuthenticatedUser,
 } from "@/lib/authSessionPersistence";
 
@@ -63,9 +62,9 @@ export async function refreshAuthSession(): Promise<AuthUser | null> {
     return null;
   }
 
-  let rememberedUserIds;
+  let rememberedUserId;
   try {
-    rememberedUserIds = await readRememberedAuthenticatedUserIds();
+    rememberedUserId = await readRememberedAuthenticatedUserId();
   } catch {
     clearAuthSession();
     await discardAuthenticatedLocalData();
@@ -73,9 +72,7 @@ export async function refreshAuthSession(): Promise<AuthUser | null> {
   }
   const activeUserId = currentAuthUser()?.id ?? null;
   if (
-    (rememberedUserIds.localStorageUserId !== null &&
-      rememberedUserIds.localStorageUserId !== user.id) ||
-    (rememberedUserIds.indexedDbUserId !== null && rememberedUserIds.indexedDbUserId !== user.id) ||
+    (rememberedUserId !== null && rememberedUserId !== user.id) ||
     (activeUserId !== null && activeUserId !== user.id)
   ) {
     await clearAuthSessionAndLocalData();
@@ -102,8 +99,14 @@ export async function clearAuthSessionAndLocalData(): Promise<void> {
     return;
   }
   const discardPromise = (async () => {
-    if (!hadActiveUser && !(await hasRememberedAuthenticatedUser())) {
-      return;
+    if (!hadActiveUser) {
+      try {
+        if ((await readRememberedAuthenticatedUserId()) === null) {
+          return;
+        }
+      } catch {
+        // If ownership cannot be read, fail closed and discard the database.
+      }
     }
     await discardAuthenticatedLocalData();
   })();
