@@ -1,5 +1,5 @@
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, lazy, Loading, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, lazy, Loading, onSettled, Show } from "solid-js";
 import { Router, Route } from "@solidjs/router";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { AppStateProvider, useState } from "@/app/AppStateProvider";
@@ -23,6 +23,7 @@ import { GitHub, Info, X, XLogo } from "@/components/Icons";
 import { isSafariBrowser } from "@/lib/browser";
 import { APP_ROOT, firstRepertoireChapterPath } from "@/lib/routes";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
+import { startAuthSessionRenewal } from "@/lib/authSession";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
@@ -163,6 +164,8 @@ function AboutDialog(props: { buttonClass?: string | undefined } = {}) {
 function AppShell(props: { children?: JSX.Element }) {
   const [isDrawerOpen, setIsDrawerOpen] = createSignal(false);
   const location = useLocation();
+
+  onSettled(() => startAuthSessionRenewal());
 
   const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
 
