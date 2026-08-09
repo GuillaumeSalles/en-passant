@@ -294,6 +294,7 @@ export async function seedIndexedDb(
     pgns: PgnRecord[];
     trainingLineSchedules?: TrainingLineScheduleRecord[];
     clearLocalStorage?: boolean;
+    authenticatedUserId?: string;
   },
 ): Promise<void> {
   const preparedRecords = {
@@ -343,7 +344,7 @@ export async function seedIndexedDb(
 
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(
-          ["repertoires", "chapters", "pgns", "training-line-schedules"],
+          ["repertoires", "chapters", "pgns", "training-line-schedules", "metadata"],
           "readwrite",
         );
         transaction.onerror = () => reject(transaction.error);
@@ -363,6 +364,11 @@ export async function seedIndexedDb(
         for (const schedule of records.trainingLineSchedules) {
           const key = `${schedule.repertoireId}/${schedule.chapterId}/${schedule.uciPath}`;
           transaction.objectStore("training-line-schedules").put(schedule, key);
+        }
+        if (records.authenticatedUserId !== undefined) {
+          transaction
+            .objectStore("metadata")
+            .put(records.authenticatedUserId, "authenticated-user-id");
         }
       });
     },

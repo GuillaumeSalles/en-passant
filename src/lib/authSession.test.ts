@@ -1,12 +1,23 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+type RememberedAuthenticatedUserIds = {
+  localStorageUserId: string | null;
+  indexedDbUserId: string | null;
+};
+
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
 const persistenceMocks = vi.hoisted(() => ({
   discardAuthenticatedLocalData: vi.fn(async () => undefined),
-  readRememberedAuthenticatedUserId: vi.fn<() => string | null>(() => null),
-  rememberAuthenticatedUser: vi.fn(),
+  hasRememberedAuthenticatedUser: vi.fn(async () => false),
+  readRememberedAuthenticatedUserIds: vi.fn<() => Promise<RememberedAuthenticatedUserIds>>(
+    async () => ({
+      localStorageUserId: null,
+      indexedDbUserId: null,
+    }),
+  ),
+  rememberAuthenticatedUser: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/lib/authClient", () => ({
@@ -31,8 +42,13 @@ afterEach(() => {
   vi.useRealTimers();
   authMocks.getSession.mockReset();
   persistenceMocks.discardAuthenticatedLocalData.mockClear();
-  persistenceMocks.readRememberedAuthenticatedUserId.mockReset();
-  persistenceMocks.readRememberedAuthenticatedUserId.mockReturnValue(null);
+  persistenceMocks.hasRememberedAuthenticatedUser.mockReset();
+  persistenceMocks.hasRememberedAuthenticatedUser.mockResolvedValue(false);
+  persistenceMocks.readRememberedAuthenticatedUserIds.mockReset();
+  persistenceMocks.readRememberedAuthenticatedUserIds.mockResolvedValue({
+    localStorageUserId: null,
+    indexedDbUserId: null,
+  });
   persistenceMocks.rememberAuthenticatedUser.mockClear();
   clearAuthSession();
 });
@@ -90,7 +106,7 @@ describe("auth session state", () => {
   });
 
   test("discards authenticated local data when a remembered session has expired", async () => {
-    persistenceMocks.readRememberedAuthenticatedUserId.mockReturnValue("player-user");
+    persistenceMocks.hasRememberedAuthenticatedUser.mockResolvedValue(true);
     authMocks.getSession.mockResolvedValueOnce({ data: null, error: null });
 
     await refreshAuthSession();
@@ -110,7 +126,7 @@ describe("auth session state", () => {
   });
 
   test("treats authenticated API 401 responses as a session boundary", async () => {
-    persistenceMocks.readRememberedAuthenticatedUserId.mockReturnValue("player-user");
+    persistenceMocks.hasRememberedAuthenticatedUser.mockResolvedValue(true);
 
     const unauthorized = await handleUnauthorizedResponse(new Response(null, { status: 401 }));
 
@@ -120,8 +136,6 @@ describe("auth session state", () => {
   });
 
   test("ignores non-authentication API failures", async () => {
-    persistenceMocks.readRememberedAuthenticatedUserId.mockReturnValue("player-user");
-
     const unauthorized = await handleUnauthorizedResponse(new Response(null, { status: 503 }));
 
     expect(unauthorized).toBe(false);
@@ -129,7 +143,11 @@ describe("auth session state", () => {
   });
 
   test("discards local data before switching authenticated users", async () => {
-    persistenceMocks.readRememberedAuthenticatedUserId.mockReturnValue("other-user");
+    persistenceMocks.hasRememberedAuthenticatedUser.mockResolvedValue(true);
+    persistenceMocks.readRememberedAuthenticatedUserIds.mockResolvedValue({
+      localStorageUserId: "other-user",
+      indexedDbUserId: "other-user",
+    });
     authMocks.getSession.mockResolvedValueOnce({
       data: {
         user: {
@@ -147,6 +165,88 @@ describe("auth session state", () => {
     expect(user).toBeNull();
     expect(persistenceMocks.discardAuthenticatedLocalData).toHaveBeenCalledOnce();
     expect(persistenceMocks.rememberAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
+  test("restores local storage when IndexedDB still identifies the active user", async () => {
+    persistenceMocks.readRememberedAuthenticatedUserIds.mockResolvedValue({
+      localStorageUserId: null,
+      indexedDbUserId: "player-user",
+    });
+    authMocks.getSession.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: "player-user",
+          email: "player@example.com",
+          name: "Player One",
+          image: null,
+        },
+      },
+      error: null,
+    });
+
+    const user = await refreshAuthSession();
+
+    expect(user?.id).toBe("player-user");
+    expect(persistenceMocks.rememberAuthenticatedUser).toHaveBeenCalledWith("player-user");
+    expect(persistenceMocks.discardAuthenticatedLocalData).not.toHaveBeenCalled();
+  });
+
+  test("restores IndexedDB ownership when local storage identifies the active user", async () => {
+    persistenceMocks.readRememberedAuthenticatedUserIds.mockResolvedValue({
+      localStorageUserId: "player-user",
+      indexedDbUserId: null,
+    });
+    authMocks.getSession.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: "player-user",
+          email: "player@example.com",
+          name: "Player One",
+          image: null,
+        },
+      },
+      error: null,
+    });
+
+    const user = await refreshAuthSession();
+
+    expect(user?.id).toBe("player-user");
+    expect(persistenceMocks.rememberAuthenticatedUser).toHaveBeenCalledWith("player-user");
+    expect(persistenceMocks.discardAuthenticatedLocalData).not.toHaveBeenCalled();
+  });
+
+  test("discards data when only IndexedDB identifies a different user", async () => {
+    persistenceMocks.hasRememberedAuthenticatedUser.mockResolvedValue(true);
+    persistenceMocks.readRememberedAuthenticatedUserIds.mockResolvedValue({
+      localStorageUserId: null,
+      indexedDbUserId: "other-user",
+    });
+    authMocks.getSession.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: "player-user",
+          email: "player@example.com",
+          name: "Player One",
+          image: null,
+        },
+      },
+      error: null,
+    });
+
+    const user = await refreshAuthSession();
+
+    expect(user).toBeNull();
+    expect(persistenceMocks.discardAuthenticatedLocalData).toHaveBeenCalledOnce();
+    expect(persistenceMocks.rememberAuthenticatedUser).not.toHaveBeenCalled();
+  });
+
+  test("discards signed-out data when only the IndexedDB marker survives", async () => {
+    persistenceMocks.hasRememberedAuthenticatedUser.mockResolvedValue(true);
+    authMocks.getSession.mockResolvedValueOnce({ data: null, error: null });
+
+    await refreshAuthSession();
+
+    expect(persistenceMocks.discardAuthenticatedLocalData).toHaveBeenCalledOnce();
   });
 });
 

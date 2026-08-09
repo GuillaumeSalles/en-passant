@@ -2,7 +2,8 @@ import { createSignal } from "solid-js";
 import { authClient } from "@/lib/authClient";
 import {
   discardAuthenticatedLocalData,
-  readRememberedAuthenticatedUserId,
+  hasRememberedAuthenticatedUser,
+  readRememberedAuthenticatedUserIds,
   rememberAuthenticatedUser,
 } from "@/lib/authSessionPersistence";
 
@@ -62,17 +63,26 @@ export async function refreshAuthSession(): Promise<AuthUser | null> {
     return null;
   }
 
-  const rememberedUserId = readRememberedAuthenticatedUserId();
+  let rememberedUserIds;
+  try {
+    rememberedUserIds = await readRememberedAuthenticatedUserIds();
+  } catch {
+    clearAuthSession();
+    await discardAuthenticatedLocalData();
+    return null;
+  }
   const activeUserId = currentAuthUser()?.id ?? null;
   if (
-    (rememberedUserId !== null && rememberedUserId !== user.id) ||
+    (rememberedUserIds.localStorageUserId !== null &&
+      rememberedUserIds.localStorageUserId !== user.id) ||
+    (rememberedUserIds.indexedDbUserId !== null && rememberedUserIds.indexedDbUserId !== user.id) ||
     (activeUserId !== null && activeUserId !== user.id)
   ) {
     await clearAuthSessionAndLocalData();
     return null;
   }
 
-  rememberAuthenticatedUser(user.id);
+  await rememberAuthenticatedUser(user.id);
   setCurrentAuthUser(user);
   setAuthStatus("signed-in");
   return user;
@@ -84,19 +94,19 @@ export function clearAuthSession(): void {
 }
 
 export async function clearAuthSessionAndLocalData(): Promise<void> {
-  const shouldDiscardLocalData =
-    currentAuthUser() !== null || readRememberedAuthenticatedUserId() !== null;
+  const hadActiveUser = currentAuthUser() !== null;
   clearAuthSession();
 
   if (sessionEndPromise !== null) {
     await sessionEndPromise;
     return;
   }
-  if (!shouldDiscardLocalData) {
-    return;
-  }
-
-  const discardPromise = discardAuthenticatedLocalData();
+  const discardPromise = (async () => {
+    if (!hadActiveUser && !(await hasRememberedAuthenticatedUser())) {
+      return;
+    }
+    await discardAuthenticatedLocalData();
+  })();
   sessionEndPromise = discardPromise;
   try {
     await discardPromise;

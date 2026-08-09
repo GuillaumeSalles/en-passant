@@ -16,6 +16,7 @@ const CHAPTERS_STORE_NAME = "chapters";
 const PGNS_STORE_NAME = "pgns";
 const TRAINING_LINE_SCHEDULES_STORE_NAME = "training-line-schedules";
 const METADATA_STORE_NAME = "metadata";
+const AUTHENTICATED_USER_ID_METADATA_KEY = "authenticated-user-id";
 const REQUIRED_STORE_NAMES = [
   REPERTOIRE_STORE_NAME,
   CHAPTERS_STORE_NAME,
@@ -879,6 +880,25 @@ export async function deleteIndexedDbDatabase(): Promise<void> {
       finish(resolve);
     };
   });
+}
+
+export async function getIndexedDbAuthenticatedUserId(): Promise<string | null> {
+  const db = await init();
+  const transaction = db.transaction([METADATA_STORE_NAME], "readonly");
+  const value = await waitForTransaction(
+    transaction,
+    get<unknown>(transaction.objectStore(METADATA_STORE_NAME), AUTHENTICATED_USER_ID_METADATA_KEY),
+  );
+  return typeof value === "string" ? value : null;
+}
+
+export async function setIndexedDbAuthenticatedUserId(userId: string): Promise<void> {
+  const db = await init();
+  const transaction = db.transaction([METADATA_STORE_NAME], "readwrite");
+  await waitForTransaction(
+    transaction,
+    put(transaction.objectStore(METADATA_STORE_NAME), AUTHENTICATED_USER_ID_METADATA_KEY, userId),
+  );
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
