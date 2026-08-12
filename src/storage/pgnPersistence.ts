@@ -12,3 +12,11 @@ export function saveLatestPgnMutation(
 ): Promise<void> {
   return pgnSaveQueue.savePgnMutation(id, pgn, mutation);
 }
+
+export function saveLatestPgnMutations(
+  id: string,
+  pgn: string,
+  mutations: PgnMutation[],
+): Promise<void> {
+  return pgnSaveQueue.savePgnMutations(id, pgn, mutations);
+}

@@ -20,11 +20,11 @@ function createIdlePromise(): { idle: Promise<void>; resolveIdle: () => void } {
   return { idle, resolveIdle };
 }
 
-function createEntry(pgn: string, mutation: PgnMutation): QueueEntry {
+function createEntry(pgn: string, mutations: PgnMutation[]): QueueEntry {
   const { idle, resolveIdle } = createIdlePromise();
   return {
     latestPgn: pgn,
-    pendingMutations: [mutation],
+    pendingMutations: mutations,
     isRunning: false,
     idle,
     resolveIdle,
@@ -58,11 +58,13 @@ export function createPgnMutationSaveQueue(writePgn: PgnWriter, afterWrite: Afte
     entry.resolveIdle();
   }
 
-  function savePgnMutation(id: string, pgn: string, mutation: PgnMutation): Promise<void> {
+  function savePgnMutations(id: string, pgn: string, mutations: PgnMutation[]): Promise<void> {
+    if (mutations.length === 0) return Promise.resolve();
+
     const existing = entries.get(id);
     if (existing !== undefined) {
       existing.latestPgn = pgn;
-      existing.pendingMutations.push(mutation);
+      existing.pendingMutations.push(...mutations);
       if (!existing.isRunning) {
         const { idle, resolveIdle } = createIdlePromise();
         existing.idle = idle;
@@ -72,13 +74,18 @@ export function createPgnMutationSaveQueue(writePgn: PgnWriter, afterWrite: Afte
       return existing.idle;
     }
 
-    const entry = createEntry(pgn, mutation);
+    const entry = createEntry(pgn, mutations);
     entries.set(id, entry);
     void drain(id, entry);
     return entry.idle;
   }
 
+  function savePgnMutation(id: string, pgn: string, mutation: PgnMutation): Promise<void> {
+    return savePgnMutations(id, pgn, [mutation]);
+  }
+
   return {
     savePgnMutation,
+    savePgnMutations,
   };
 }

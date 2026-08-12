@@ -1,4 +1,5 @@
 import { normalizePgn, toPgn } from "./app-state/pgnTree";
+import { createReactiveNormalizedPgn } from "./app-state/reactivePgn";
 import type { Move, NormalizedPgn } from "./app-state/types";
 
 type PgnTags = {
@@ -18,13 +19,19 @@ export function mergePgns(firstPgn: string, secondPgn: string): string {
   return merger.toPgn();
 }
 
+export function mergeNormalizedPgn(firstPgn: NormalizedPgn, secondPgn: string): NormalizedPgn {
+  const merger = new PgnMerger(firstPgn);
+  merger.add(secondPgn);
+  return merger.toNormalizedPgn();
+}
+
 export class PgnMerger {
   readonly #tags: PgnTags;
   readonly #merged: MutableMergePgn;
 
-  constructor(firstPgn: string) {
-    this.#tags = parseTags(firstPgn);
-    this.#merged = clonePgn(normalizePgn(firstPgn));
+  constructor(firstPgn: string | NormalizedPgn) {
+    this.#tags = typeof firstPgn === "string" ? parseTags(firstPgn) : { lines: [] };
+    this.#merged = clonePgn(typeof firstPgn === "string" ? normalizePgn(firstPgn) : firstPgn);
   }
 
   add(pgn: string): void {
@@ -34,6 +41,11 @@ export class PgnMerger {
 
   toPgn(): string {
     return addTags(this.#tags, toPgn(this.#merged));
+  }
+
+  toNormalizedPgn(): NormalizedPgn {
+    const cloned = clonePgn(this.#merged);
+    return createReactiveNormalizedPgn(cloned);
   }
 }
 
@@ -180,8 +192,7 @@ function copyMoveTree(
   previousMoveId: number | null,
 ): number {
   const sourceMove = requireMove(source, sourceMoveId);
-  const copiedMoveId = target.moveIdCounter;
-  target.moveIdCounter += 1;
+  const copiedMoveId = nextAvailableMoveId(target);
 
   target.moves[copiedMoveId] = {
     ...cloneMove(sourceMove),
@@ -201,4 +212,13 @@ function copyMoveTree(
   }
 
   return copiedMoveId;
+}
+
+function nextAvailableMoveId(target: MutableMergePgn): number {
+  let moveId = target.moveIdCounter;
+  while (target.moves[moveId] !== undefined) {
+    moveId += 1;
+  }
+  target.moveIdCounter = moveId + 1;
+  return moveId;
 }

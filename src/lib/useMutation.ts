@@ -7,7 +7,7 @@ import { useNavigate } from "@solidjs/router";
 import { untrack } from "solid-js";
 import { isSignedIn } from "@/lib/authSession";
 import { recordCachedMoveAdditions } from "@/lib/signupNudge";
-import { saveLatestPgnMutation } from "@/storage/pgnPersistence";
+import { saveLatestPgnMutation, saveLatestPgnMutations } from "@/storage/pgnPersistence";
 import { queueRepertoireSync } from "@/storage/backendSync";
 
 export type MoveSound = "Move" | "Capture";
@@ -16,6 +16,7 @@ export type MutationEffect =
   | { type: "play-sound"; sound: MoveSound }
   | { type: "record-cached-move" }
   | { type: "persist-pgn-mutation"; pgnId: string; pgn: string; mutation: PgnMutation }
+  | { type: "persist-pgn-mutations"; pgnId: string; pgn: string; mutations: PgnMutation[] }
   | { type: "persist-training-line-schedule"; schedule: TrainingLineReview };
 
 export type MutationResult = void | MutationEffect | MutationEffect[];
@@ -45,6 +46,8 @@ function runMutationEffects(result: MutationResult): void {
       recordCachedMoveAdditions(1);
     } else if (effect.type === "persist-pgn-mutation") {
       void saveLatestPgnMutation(effect.pgnId, effect.pgn, effect.mutation);
+    } else if (effect.type === "persist-pgn-mutations") {
+      void saveLatestPgnMutations(effect.pgnId, effect.pgn, effect.mutations);
     } else if (effect.type === "persist-training-line-schedule") {
       void storage.saveTrainingLineSchedule(effect.schedule).then(queueRepertoireSync);
     }

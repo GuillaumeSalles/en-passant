@@ -40,6 +40,18 @@ const nf3: PgnMutation = {
 };
 
 describe("createPgnMutationSaveQueue", () => {
+  test("persists a bulk mutation as one atomic batch", async () => {
+    const writePgn = vi.fn().mockResolvedValue(undefined);
+    const afterWrite = vi.fn();
+    const queue = createPgnMutationSaveQueue(writePgn, afterWrite);
+
+    await queue.savePgnMutations("chapter-pgn", "1. e4 e5 2. Nf3 *", [e4, e5, nf3]);
+
+    expect(writePgn).toHaveBeenCalledOnce();
+    expect(writePgn).toHaveBeenCalledWith("chapter-pgn", "1. e4 e5 2. Nf3 *", [e4, e5, nf3]);
+    expect(afterWrite).toHaveBeenCalledOnce();
+  });
+
   test("serializes writes without dropping mutations", async () => {
     const firstWrite = deferred<void>();
     const secondWrite = deferred<void>();

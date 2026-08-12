@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { mergePgns, PgnMerger } from "./mergePgns";
+import { normalizePgn } from "./AppState";
+import { mergeNormalizedPgn, mergePgns, PgnMerger } from "./mergePgns";
 
 describe("mergePgns", () => {
   test("keeps metadata from the first PGN", () => {
@@ -62,5 +63,26 @@ describe("mergePgns", () => {
     expect(merger.toPgn()).toBe(`[Event "Opening"]
 
 1. e4 (1. d4 d5 2. c4) 1... e5 (1... c5 2. Nf3 (2. Nc3)) 2. Nf3 *`);
+  });
+
+  test("preserves existing move ids when the counter points at an occupied id", () => {
+    const parsed = normalizePgn("1. e4 e5 *");
+    const e4 = parsed.moves[0];
+    const e5 = parsed.moves[1];
+    if (e4 === undefined || e5 === undefined) throw new Error("Expected parsed moves");
+
+    const existing = {
+      rootMoveIds: [0],
+      moves: {
+        0: { ...e4, next: [2] },
+        2: { ...e5, id: 2, prev: 0 },
+      },
+      moveIdCounter: 2,
+    };
+
+    const merged = mergeNormalizedPgn(existing, "1. e4 c5 *");
+
+    expect(merged.moves[2]?.san).toBe("e5");
+    expect(Object.values(merged.moves).find((move) => move.san === "c5")?.id).not.toBe(2);
   });
 });

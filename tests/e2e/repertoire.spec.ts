@@ -610,6 +610,38 @@ test("repertoire page renders without console warnings", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("merges a pasted PGN into the current chapter", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  await openRepertoire(page, "1. e4 e5 2. Nf3 *");
+
+  const mergeButton = page.getByRole("button", { name: "Merge pgn" });
+  const trainButton = page.getByRole("link", { name: "Train", exact: true });
+  await expect(mergeButton).toBeVisible();
+  const mergeBox = await mergeButton.boundingBox();
+  const trainBox = await trainButton.boundingBox();
+  if (mergeBox === null || trainBox === null) throw new Error("Expected chapter actions");
+  expect(mergeBox.x).toBeLessThan(trainBox.x);
+
+  await mergeButton.click();
+  const dialog = page.getByRole("dialog", { name: "Merge PGN" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("textarea")).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+
+  await mergeButton.click();
+  await expect(dialog).toBeVisible();
+  await dialog.locator("textarea").fill("1. e4! {Take the center.} c5 2. Nf3 d6 *");
+  await dialog.getByRole("button", { name: "Merge", exact: true }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('[data-san="c5"]')).toBeVisible();
+  await expect(page.locator('[data-san="d6"]')).toBeVisible();
+  await expect(page.locator('[aria-label="Move e4"] [data-nag="1"]')).toHaveText("!");
+  await expect.poll(() => firstStoredPgn(page)).toContain("(1... c5 2. Nf3 d6)");
+  expect(consoleMessages).toEqual([]);
+});
+
 test("app root redirects to the first chapter of the first repertoire", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

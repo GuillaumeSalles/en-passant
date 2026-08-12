@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogFooter,
   Dialog,
+  DialogClose,
   DialogTrigger,
   DialogContent,
   DialogTitle,
@@ -25,6 +26,7 @@ export function LoadPGNDialog(props: {
   title?: string;
   description?: string;
   submitLabel?: string;
+  cancelLabel?: string;
   state?: LoadPgnDialogState;
 }) {
   const [pgn, setPgn] = createSignal("");
@@ -71,7 +73,7 @@ export function LoadPGNDialog(props: {
   }
 
   return (
-    <Dialog state={{ open: open(), onOpenChange: setOpen }}>
+    <Dialog state={{ open, onOpenChange: setOpen }}>
       <Show when={props.trigger !== null}>
         <DialogTrigger>{trigger()}</DialogTrigger>
       </Show>
@@ -99,6 +101,13 @@ export function LoadPGNDialog(props: {
             <p id={errorId} role="alert" class="min-w-0 flex-1 text-left text-sm text-destructive">
               {error()}
             </p>
+          </Show>
+          <Show when={props.cancelLabel !== undefined}>
+            <DialogClose>
+              <Button type="button" variant="outline">
+                {props.cancelLabel}
+              </Button>
+            </DialogClose>
           </Show>
           <Button type="submit" disabled={submitting()} onClick={submitPgn}>
             {props.submitLabel ?? "Load"}

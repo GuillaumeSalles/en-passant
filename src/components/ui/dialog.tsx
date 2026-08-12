@@ -19,7 +19,7 @@ type DialogContextType = {
 };
 
 type DialogState = {
-  open: boolean;
+  open: boolean | (() => boolean);
   onOpenChange: (open: boolean) => void;
 };
 
@@ -34,7 +34,12 @@ function Dialog(props: { children: JSX.Element; state?: DialogState }) {
   const [uncontrolled, setUncontrolled] = createSignal(false);
   const id = createUniqueId();
   const state = () => props.state;
-  const open = () => state()?.open ?? uncontrolled();
+  const open = () => {
+    const controlledOpen = state()?.open;
+    return typeof controlledOpen === "function"
+      ? controlledOpen()
+      : (controlledOpen ?? uncontrolled());
+  };
   const setOpen = (v: boolean) => {
     const controlledState = state();
     if (controlledState === undefined) {

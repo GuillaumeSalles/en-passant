@@ -7,6 +7,7 @@ import {
   type AppliedMoveAnimation,
 } from "@/lib/chess";
 import type { MutationEffect, MutationResult } from "@/lib/useMutation";
+import { mergeNormalizedPgn } from "@/lib/mergePgns";
 import { applyNagToList } from "./nags";
 import { toPgn } from "./pgnTree";
 import {
@@ -140,6 +141,70 @@ function pgnMutationEffect(
 
 function compactEffects(...effects: MutationResult[]): MutationEffect[] {
   return effects.flatMap((effect) => effect ?? []);
+}
+
+function annotationsEqual(left: MoveAnnotations, right: MoveAnnotations): boolean {
+  return (
+    left.commentBefore === right.commentBefore &&
+    left.commentAfter === right.commentAfter &&
+    left.nags.length === right.nags.length &&
+    left.nags.every((nag, index) => nag === right.nags[index])
+  );
+}
+
+function mergedPgnMutations(original: NormalizedPgn, merged: NormalizedPgn): PgnMutation[] {
+  const mutations: PgnMutation[] = [];
+
+  function visit(moveIds: number[], parentPath: MovePath): void {
+    for (const moveId of moveIds) {
+      const move = requireMove(merged.moves, moveId);
+      const annotations = moveAnnotations(move);
+      const originalMove = original.moves[moveId];
+
+      if (originalMove === undefined) {
+        mutations.push({
+          type: "addMove",
+          parentPath,
+          move: uci(move),
+          annotations,
+        });
+      } else if (!annotationsEqual(moveAnnotations(originalMove), annotations)) {
+        mutations.push({
+          type: "setAnnotations",
+          path: [...parentPath, uci(move)],
+          annotations,
+        });
+      }
+
+      visit(move.next, [...parentPath, uci(move)]);
+    }
+  }
+
+  visit(merged.rootMoveIds, []);
+  return mutations;
+}
+
+export function mergeChapterPgn(state: MutableAppState, ctx: Context, pgn: string): MutationResult {
+  const currentPgn = getPgn(state, ctx);
+  const pgnId = getPgnId(state, ctx);
+  if (currentPgn === null || pgnId === null) return;
+
+  const mergedPgn = mergeNormalizedPgn(currentPgn, pgn);
+  const mutations = mergedPgnMutations(currentPgn, mergedPgn);
+  const serializedPgn = toPgn(mergedPgn);
+
+  state.set("pgns", {
+    ...state.pgns,
+    [pgnId]: { status: "success", data: mergedPgn },
+  });
+
+  if (mutations.length === 0) return;
+  return {
+    type: "persist-pgn-mutations",
+    pgnId,
+    pgn: serializedPgn,
+    mutations,
+  };
 }
 
 function nextBoardAnimation(animation: AppliedMoveAnimation): BoardAnimation {

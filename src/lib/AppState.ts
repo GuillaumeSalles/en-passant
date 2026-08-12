@@ -102,6 +102,7 @@ export {
   flipBoard,
   forward,
   isMoveValid,
+  mergeChapterPgn,
   moveFromChessboard,
   moveFromEvalMove,
   moveToLastMainLineMove,
