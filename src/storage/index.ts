@@ -7,6 +7,7 @@ import {
 import type { PgnMutation } from "@/lib/AppState";
 import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
+import { publishRecordChanges, type StorageRecordRef } from "./recordChanges";
 
 const DB_NAME = "en-passant";
 const DB_VERSION = 4;
@@ -366,6 +367,7 @@ export async function savePgnMutation(
       deletedAt: null,
     } satisfies StoredPgn),
   );
+  publishRecordChanges([{ kind: "pgn", id }]);
 }
 
 export async function createRepertoireAndChapter(
@@ -426,6 +428,11 @@ export async function createRepertoireAndChapter(
       } satisfies StoredPgn),
     ]),
   );
+  publishRecordChanges([
+    { kind: "repertoire", id: repertoire.id },
+    { kind: "chapter", id: chapter.id },
+    { kind: "pgn", id: chapter.pgnId },
+  ]);
 }
 
 export async function getPgn(pgnId: string): Promise<string | undefined> {
@@ -458,6 +465,7 @@ export async function cacheRemotePgn(pgnId: string, revision: string, pgn: strin
       pgn,
     } satisfies StoredPgn),
   );
+  publishRecordChanges([{ kind: "pgn", id: pgnId }]);
 }
 
 export async function deleteChapter(chapterId: string, pgnId: string): Promise<void> {
@@ -497,6 +505,10 @@ export async function deleteChapter(chapterId: string, pgnId: string): Promise<v
     );
   }
   await waitForTransaction(writeTransaction, Promise.all(requests));
+  publishRecordChanges([
+    ...(chapter === undefined ? [] : [{ kind: "chapter", id: chapterId } as const]),
+    ...(pgn === undefined ? [] : [{ kind: "pgn", id: pgnId } as const]),
+  ]);
 }
 
 export async function deleteRepertoire(repertoireId: string): Promise<void> {
@@ -517,6 +529,7 @@ export async function deleteRepertoire(repertoireId: string): Promise<void> {
     writeTransaction,
     put(store, repertoireId, { ...repertoire, updatedAt: deletedAt, deletedAt, dirty: true }),
   );
+  publishRecordChanges([{ kind: "repertoire", id: repertoireId }]);
 }
 
 export async function updateRepertoire(repertoire: NewSerializedRepertoire): Promise<void> {
@@ -527,6 +540,7 @@ export async function updateRepertoire(repertoire: NewSerializedRepertoire): Pro
     transaction,
     put(store, repertoire.id, withLocalChange(limitRepertoire(repertoire), nowIso())),
   );
+  publishRecordChanges([{ kind: "repertoire", id: repertoire.id }]);
 }
 
 export async function updateChapter(chapter: SerializedChapter): Promise<void> {
@@ -537,6 +551,7 @@ export async function updateChapter(chapter: SerializedChapter): Promise<void> {
     transaction,
     put(store, chapter.id, withLocalChange(limitChapter(chapter), nowIso())),
   );
+  publishRecordChanges([{ kind: "chapter", id: chapter.id }]);
 }
 
 export async function saveTrainingLineSchedule(schedule: TrainingLineReview): Promise<void> {
@@ -551,6 +566,9 @@ export async function saveTrainingLineSchedule(schedule: TrainingLineReview): Pr
       dirty: true,
     } satisfies StoredTrainingLineSchedule),
   );
+  publishRecordChanges([
+    { kind: "training-line-schedule", id: trainingLineScheduleStorageKey(schedule) },
+  ]);
 }
 
 export async function getAllTrainingLineSchedules(): Promise<TrainingLineReview[]> {
@@ -584,6 +602,10 @@ export async function createChapter(chapter: SerializedChapter, pgn: string): Pr
       } satisfies StoredPgn),
     ]),
   );
+  publishRecordChanges([
+    { kind: "chapter", id: chapter.id },
+    { kind: "pgn", id: chapter.pgnId },
+  ]);
 }
 
 export async function getAllRepertoires(): Promise<NewSerializedRepertoire[]> {
@@ -845,6 +867,28 @@ export async function applyRepertoireSyncResponse(
     ]),
   );
   setLastSyncedAt(response.cursor);
+
+  const changedRecords: StorageRecordRef[] = [
+    ...appliedChanges.repertoires.map((repertoire) => ({
+      kind: "repertoire" as const,
+      id: repertoire.id,
+    })),
+    ...appliedChanges.chapters.map((chapter) => ({ kind: "chapter" as const, id: chapter.id })),
+    ...appliedChanges.pgns.map((pgn) => ({ kind: "pgn" as const, id: pgn.id })),
+    ...appliedChanges.trainingLineSchedules.map((schedule) => ({
+      kind: "training-line-schedule" as const,
+      id: trainingLineScheduleStorageKey(schedule),
+    })),
+  ];
+  if (
+    response.acknowledgedPgn !== null &&
+    !changedRecords.some(
+      (record) => record.kind === "pgn" && record.id === response.acknowledgedPgn?.id,
+    )
+  ) {
+    changedRecords.push({ kind: "pgn", id: response.acknowledgedPgn.id });
+  }
+  publishRecordChanges(changedRecords);
 
   return appliedChanges;
 }

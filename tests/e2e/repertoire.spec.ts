@@ -1411,6 +1411,28 @@ test("renames a repertoire and redirects to its clean handle", async ({ page }) 
   expect(consoleMessages).toEqual([]);
 });
 
+test("shows committed repertoire changes in another tab", async ({ page, context }) => {
+  const firstTabConsoleMessages = collectUnexpectedConsole(page);
+  await openRepertoire(page);
+
+  const secondTab = await context.newPage();
+  const secondTabConsoleMessages = collectUnexpectedConsole(secondTab);
+  await mockSignedOutAuth(secondTab);
+  await secondTab.goto("/app/repertoires/untitled-repertoire/chapter-1");
+  await expectRepertoireReady(secondTab);
+
+  await page.getByRole("button", { name: "Actions for Untitled Repertoire" }).click();
+  await page.getByText("Rename").click();
+  const input = page.getByLabel("Repertoire name");
+  await input.fill("King Pawn Ideas");
+  await page.mouse.click(500, 20);
+
+  await expect(secondTab.getByText("King Pawn Ideas").first()).toBeVisible();
+  await expect(secondTab.getByText("Untitled Repertoire")).toHaveCount(0);
+  expect(firstTabConsoleMessages).toEqual([]);
+  expect(secondTabConsoleMessages).toEqual([]);
+});
+
 test("renames a chapter and redirects to its clean handle", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
