@@ -689,6 +689,47 @@ test("signing out clears local repertoire data", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("signing out closes authenticated storage and reloads every open tab", async ({
+  page,
+  context,
+}) => {
+  const firstTabConsoleMessages = collectUnexpectedConsole(page);
+  const firstTabAuth = await mockSignedInUser(page);
+  firstTabAuth.signIn();
+  await openAuthPage(page);
+  await expect(page.getByText("Player One")).toBeVisible();
+
+  const secondTab = await context.newPage();
+  const secondTabConsoleMessages = collectUnexpectedConsole(secondTab);
+  const secondTabAuth = await mockSignedInUser(secondTab);
+  secondTabAuth.signIn();
+  await secondTab.goto("/app/repertoires/untitled-repertoire/chapter-1");
+  await expect(secondTab.getByText("Player One")).toBeVisible();
+  await expect(secondTab.getByText("Untitled Repertoire").first()).toBeVisible();
+
+  await page.route("**/api/auth/sign-out", async (route) => {
+    firstTabAuth.signOut();
+    secondTabAuth.signOut();
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ success: true }),
+    });
+  });
+
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByText("Sign out").click();
+
+  await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
+  await expect(secondTab).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
+  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
+  await expect(secondTab.getByText("Demo repertoire").first()).toBeVisible();
+  expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
+  expect(await storedRepertoireHandles(secondTab)).toEqual(["demo-repertoire"]);
+  expect(firstTabConsoleMessages).toEqual([]);
+  expect(secondTabConsoleMessages).toEqual([]);
+});
+
 test("can go back from code entry to another email", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   let requestBody: unknown = null;

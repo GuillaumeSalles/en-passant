@@ -7,7 +7,14 @@ import {
 import type { PgnMutation } from "@/lib/AppState";
 import { createDemoRepertoireSeed } from "@/lib/demoRepertoire";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
-import { publishRecordChanges, type StorageRecordRef } from "./recordChanges";
+import {
+  publishDatabaseClearFinished,
+  publishDatabaseClearRequested,
+  publishRecordChanges,
+  subscribeToDatabaseClearRequests,
+  subscribeToDatabaseClearResults,
+  type StorageRecordRef,
+} from "./recordChanges";
 
 const DB_NAME = "en-passant";
 const DB_VERSION = 4;
@@ -252,18 +259,14 @@ async function waitForTransaction<T>(
  */
 async function deleteDatabaseForReset(): Promise<void> {
   clearLastSyncedAt();
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(DB_NAME);
-    request.onerror = () => {
-      reject(new Error(`Failed to reset IndexedDB: ${request.error?.message}`));
-    };
-    request.onblocked = () => {
-      reject(new Error("Failed to reset IndexedDB: database deletion was blocked"));
-    };
-    request.onsuccess = () => {
-      resolve();
-    };
-  });
+  const requestId = beginCoordinatedDatabaseClear();
+  let succeeded = false;
+  try {
+    await requestDatabaseDeletion("reset");
+    succeeded = true;
+  } finally {
+    finishCoordinatedDatabaseClear(requestId, succeeded);
+  }
 }
 
 function hasRequiredStores(db: IDBDatabase): boolean {
@@ -894,19 +897,24 @@ export async function applyRepertoireSyncResponse(
 }
 
 export async function deleteIndexedDbDatabase(): Promise<void> {
-  const currentDbPromise = dbPromise;
-  dbPromise = null;
   clearLastSyncedAt();
-
-  if (currentDbPromise !== null) {
-    const db = await currentDbPromise;
-    db.close();
+  const requestId = beginCoordinatedDatabaseClear();
+  let succeeded = false;
+  try {
+    await closeCurrentDatabaseConnection();
+    await requestDatabaseDeletion("delete");
+    succeeded = true;
+  } finally {
+    finishCoordinatedDatabaseClear(requestId, succeeded);
   }
+}
 
-  await new Promise<void>((resolve, reject) => {
+function requestDatabaseDeletion(action: "delete" | "reset"): Promise<void> {
+  const actionLabel = action === "delete" ? "delete" : "reset";
+  return new Promise<void>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(DB_NAME);
     const blockedTimeout = window.setTimeout(() => {
-      reject(new Error("Failed to delete IndexedDB: database deletion was blocked"));
+      reject(new Error(`Failed to ${actionLabel} IndexedDB: database deletion was blocked`));
     }, 5_000);
 
     function finish(callback: () => void) {
@@ -915,7 +923,9 @@ export async function deleteIndexedDbDatabase(): Promise<void> {
     }
 
     request.onerror = () => {
-      finish(() => reject(new Error(`Failed to delete IndexedDB: ${request.error?.message}`)));
+      finish(() =>
+        reject(new Error(`Failed to ${actionLabel} IndexedDB: ${request.error?.message}`)),
+      );
     };
 
     request.onblocked = () => undefined;
@@ -924,6 +934,31 @@ export async function deleteIndexedDbDatabase(): Promise<void> {
       finish(resolve);
     };
   });
+}
+
+function beginCoordinatedDatabaseClear(): string {
+  const requestId = crypto.randomUUID();
+  pendingDatabaseClearRequests.add(requestId);
+  publishDatabaseClearRequested(requestId);
+  return requestId;
+}
+
+function finishCoordinatedDatabaseClear(requestId: string, succeeded: boolean): void {
+  pendingDatabaseClearRequests.delete(requestId);
+  publishDatabaseClearFinished(requestId, succeeded);
+}
+
+async function closeCurrentDatabaseConnection(): Promise<void> {
+  const currentDbPromise = dbPromise;
+  dbPromise = null;
+  if (currentDbPromise === null) return;
+
+  try {
+    const db = await currentDbPromise;
+    db.close();
+  } catch {
+    // A failed open does not prevent a fresh database deletion attempt.
+  }
 }
 
 export async function getIndexedDbAuthenticatedUserId(): Promise<string | null> {
@@ -946,8 +981,24 @@ export async function setIndexedDbAuthenticatedUserId(userId: string): Promise<v
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+const pendingDatabaseClearRequests = new Set<string>();
+
+subscribeToDatabaseClearRequests((requestId) => {
+  pendingDatabaseClearRequests.add(requestId);
+  void closeCurrentDatabaseConnection();
+});
+
+subscribeToDatabaseClearResults(({ requestId, succeeded }) => {
+  if (!pendingDatabaseClearRequests.delete(requestId)) return;
+  if (succeeded) {
+    window.location.reload();
+  }
+});
 
 function init() {
+  if (pendingDatabaseClearRequests.size > 0) {
+    return Promise.reject(new Error("IndexedDB is being cleared in another tab"));
+  }
   if (dbPromise !== null) {
     return dbPromise;
   }

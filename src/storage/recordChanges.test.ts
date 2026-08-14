@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
-import { createRecordChangeChannel, type RecordChangedMessage } from "./recordChanges";
+import { createRecordChangeChannel, type StorageBroadcastMessage } from "./recordChanges";
 
 class FakeBroadcastChannel {
-  readonly postMessage = vi.fn<(message: RecordChangedMessage) => void>();
+  readonly postMessage = vi.fn<(message: StorageBroadcastMessage) => void>();
   private readonly listeners = new Set<(event: MessageEvent<unknown>) => void>();
 
   addEventListener(_type: "message", listener: (event: MessageEvent<unknown>) => void): void {
@@ -29,7 +29,7 @@ describe("record change channel", () => {
       { kind: "pgn" as const, id: "pgn-1" },
     ];
 
-    channel.publish(records);
+    channel.publishRecordChanges(records);
 
     expect(broadcastChannel.postMessage).toHaveBeenCalledOnce();
     expect(broadcastChannel.postMessage).toHaveBeenCalledWith({
@@ -42,7 +42,7 @@ describe("record change channel", () => {
     const broadcastChannel = new FakeBroadcastChannel();
     const channel = createRecordChangeChannel(broadcastChannel);
     const listener = vi.fn();
-    const unsubscribe = channel.subscribe(listener);
+    const unsubscribe = channel.subscribeToRecordChanges(listener);
 
     broadcastChannel.receive({ type: "storage-reset", records: [] });
     broadcastChannel.receive({
@@ -63,5 +63,48 @@ describe("record change channel", () => {
       records: [{ kind: "chapter", id: "chapter-1" }],
     });
     expect(listener).toHaveBeenCalledOnce();
+  });
+
+  test("publishes and validates database clear coordination messages", () => {
+    const broadcastChannel = new FakeBroadcastChannel();
+    const channel = createRecordChangeChannel(broadcastChannel);
+    const requestListener = vi.fn();
+    const resultListener = vi.fn();
+    const unsubscribeFromRequests = channel.subscribeToDatabaseClearRequests(requestListener);
+    const unsubscribeFromResults = channel.subscribeToDatabaseClearResults(resultListener);
+
+    channel.publishDatabaseClearRequested("clear-1");
+    channel.publishDatabaseClearFinished("clear-1", true);
+
+    expect(broadcastChannel.postMessage).toHaveBeenNthCalledWith(1, {
+      type: "database-clear-requested",
+      requestId: "clear-1",
+    });
+    expect(broadcastChannel.postMessage).toHaveBeenNthCalledWith(2, {
+      type: "database-clear-finished",
+      requestId: "clear-1",
+      succeeded: true,
+    });
+
+    broadcastChannel.receive({ type: "database-clear-requested", requestId: 1 });
+    broadcastChannel.receive({
+      type: "database-clear-finished",
+      requestId: "clear-1",
+      succeeded: "yes",
+    });
+    broadcastChannel.receive({ type: "database-clear-requested", requestId: "clear-1" });
+    broadcastChannel.receive({
+      type: "database-clear-finished",
+      requestId: "clear-1",
+      succeeded: false,
+    });
+
+    expect(requestListener).toHaveBeenCalledOnce();
+    expect(requestListener).toHaveBeenCalledWith("clear-1");
+    expect(resultListener).toHaveBeenCalledOnce();
+    expect(resultListener).toHaveBeenCalledWith({ requestId: "clear-1", succeeded: false });
+
+    unsubscribeFromRequests();
+    unsubscribeFromResults();
   });
 });
