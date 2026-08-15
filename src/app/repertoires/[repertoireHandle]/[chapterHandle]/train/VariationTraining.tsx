@@ -3,6 +3,7 @@ import { MovesTree } from "@/components/MovesTree";
 import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
+import { useSquareHighlights } from "@/components/useSquareHighlights";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
@@ -29,6 +30,7 @@ export function VariationTraining(props: {
   );
 
   const flow = useVariationTrainingFlow(props);
+  const squareHighlights = useSquareHighlights();
 
   return (
     <Show when={flow.chapterPgn() !== null} fallback={null}>
@@ -52,7 +54,7 @@ export function VariationTraining(props: {
               onPieceDrop={flow.onPieceDrop}
               pieceToAnimate={flow.animation()}
               arrows={{}}
-              squareHighlights={{}}
+              squareHighlights={squareHighlights()}
               onHighlightSquare={() => {}}
               onDrawArrow={() => {}}
               onIntroComplete={flow.onIntroComplete}

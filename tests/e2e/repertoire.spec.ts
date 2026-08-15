@@ -850,6 +850,36 @@ test("black repertoire training starts after the automatic white move", async ({
   expect(consoleMessages).toEqual([]);
 });
 
+test("highlights the last move during training", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
+  await openFirstTrainingLine(page);
+
+  await dragPiece(page, "e2", "e4");
+  await expect(page.locator('[data-square="highlight-square-e2"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+  await expect(page.locator('[data-square="highlight-square-e4"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.locator('[data-square="highlight-square-e7"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+  await expect(page.locator('[data-square="highlight-square-e5"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+  await expect(page.locator('[data-highlight-kind="last-move"]')).toHaveCount(2);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("black repertoire learning waits for the board intro before the first white move", async ({
   page,
 }) => {
