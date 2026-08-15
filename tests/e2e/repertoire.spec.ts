@@ -1081,6 +1081,43 @@ test("retrying a failed training move animates the previous opponent move", asyn
   expect(consoleMessages).toEqual([]);
 });
 
+test("highlights demonstrated and opponent moves while learning", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const learnLink = page.locator("[data-training-line]").first().getByRole("link", {
+    name: "Learn",
+  });
+  await learnLink.click();
+
+  await expect(page.getByText("Watch this move.")).toBeVisible();
+  await expect(page.locator('[data-square="highlight-square-e2"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+  await expect(page.locator('[data-square="highlight-square-e4"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await expect(page.locator('[data-square="highlight-square-e7"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+  await expect(page.locator('[data-square="highlight-square-e5"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "last-move",
+  );
+  await expect(page.locator('[data-highlight-kind="last-move"]')).toHaveCount(2);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("learns a line with demonstrations, responses, and progressive comments", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

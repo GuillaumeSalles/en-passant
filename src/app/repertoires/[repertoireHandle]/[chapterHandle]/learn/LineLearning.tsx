@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MovesTree } from "@/components/MovesTree";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
+import { useSquareHighlights } from "@/components/useSquareHighlights";
 import {
   deleteMove,
   getChapterPgn,
@@ -70,6 +71,7 @@ export function LineLearning(props: {
   const orientation = useSelector(selectOrientation);
   const animation = useSelector(selectAnimation);
   const selectedMoveId = useSelector(selectSelectedMoveId);
+  const squareHighlights = useSquareHighlights();
   const [phase, setPhase] = createSignal<LearningPhase>("starting");
   const [wrongSquare, setWrongSquare] = createSignal<string | null>(null);
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
@@ -255,7 +257,7 @@ export function LineLearning(props: {
               onPieceDrop={phase() === "reinforcement" ? reinforcement.onPieceDrop : onPieceDrop}
               pieceToAnimate={animation()}
               arrows={{}}
-              squareHighlights={{}}
+              squareHighlights={squareHighlights()}
               onHighlightSquare={() => {}}
               onDrawArrow={() => {}}
               onIntroComplete={() => {
