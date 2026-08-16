@@ -3,6 +3,7 @@ import {
   completeTrainingLine,
   completeTrainingReplayMove,
   createFailedMoveReplayQueue,
+  discardTrainingLine,
   ensureTrainingSession,
   markTrainingMistake,
   prepareTrainingReplayMove,
@@ -305,6 +306,76 @@ describe("training session", () => {
       activeLineId: null,
       results: [],
     });
+  });
+
+  test("discards an active line attempt while retaining completed session results", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a", "line-b"],
+      lineId: "line-b",
+      variationIndex: 1,
+    });
+    prepareTrainingReplayMove(context.state, context.route, {
+      animateLastMove: true,
+      precedingMoves: [{ from: "e2", to: "e4", promotion: null, san: "e4" }],
+    });
+    const session = context.state.training.session;
+    if (session === null) throw new Error("Expected an active training session");
+    context.state.set("training", {
+      ...context.state.training,
+      status: "failure",
+      session: {
+        ...session,
+        currentMistakeCount: 2,
+        failedMoveIds: [3],
+        replayMoveIds: [3, 3],
+        results: [{ lineId: "line-a", mistakeCount: 0 }],
+      },
+    });
+
+    discardTrainingLine(context.state, context.route, {
+      repertoireHandle: repertoire.handle,
+      chapterHandle: chapter.handle,
+      lineId: "line-b",
+    });
+
+    expect(context.state.training).toMatchObject({
+      status: "in-progress",
+      variationIndex: 0,
+      variation: { rootMoveIds: [], moves: {} },
+      session: {
+        activeLineId: null,
+        currentMistakeCount: 0,
+        failedMoveIds: [],
+        replayMoveIds: [],
+        results: [{ lineId: "line-a", mistakeCount: 0 }],
+      },
+    });
+    expect(context.state.selectedMoveId).toBeNull();
+    expect(context.state.preselectedVariation).toBeNull();
+    expect(context.state.animation).toBeNull();
+  });
+
+  test("does not discard a newer active line from stale cleanup", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a", "line-b"],
+      lineId: "line-b",
+      variationIndex: 1,
+    });
+    prepareTrainingReplayMove(context.state, context.route, {
+      animateLastMove: false,
+      precedingMoves: [{ from: "d2", to: "d4", promotion: null, san: "d4" }],
+    });
+
+    discardTrainingLine(context.state, context.route, {
+      repertoireHandle: repertoire.handle,
+      chapterHandle: chapter.handle,
+      lineId: "line-a",
+    });
+
+    expect(context.state.training.session?.activeLineId).toBe("line-b");
+    expect(context.state.training.variation.rootMoveIds).toHaveLength(1);
   });
 
   test("replays failed moves in rounds until each has three successes", () => {

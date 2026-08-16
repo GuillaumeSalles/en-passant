@@ -106,6 +106,39 @@ export function startTrainingLine(
   state.set("animation", null);
 }
 
+export function discardTrainingLine(
+  state: StoreState<AppState>,
+  _ctx: Context,
+  details: { repertoireHandle: string; chapterHandle: string; lineId: string },
+): void {
+  const session = state.training.session;
+  if (
+    session === null ||
+    session.repertoireHandle !== details.repertoireHandle ||
+    session.chapterHandle !== details.chapterHandle ||
+    session.activeLineId !== details.lineId
+  ) {
+    return;
+  }
+
+  state.set("training", {
+    ...state.training,
+    status: "in-progress",
+    variationIndex: 0,
+    variation: emptyNormalizedPgn(),
+    session: {
+      ...session,
+      activeLineId: null,
+      currentMistakeCount: 0,
+      failedMoveIds: [],
+      replayMoveIds: [],
+    },
+  });
+  state.set("selectedMoveId", null);
+  state.set("preselectedVariation", null);
+  state.set("animation", null);
+}
+
 export function resetTrainingSession(state: StoreState<AppState>, ctx: Context): void {
   const session = state.training.session;
   if (

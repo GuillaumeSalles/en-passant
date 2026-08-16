@@ -12,7 +12,7 @@ import type { TrainingSessionSummary } from "@/lib/AppState";
 import { repertoirePath, trainingLinePath, trainingPath } from "@/lib/routes";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { useLoadPgn } from "@/lib/useLoadPgn";
-import { Show } from "solid-js";
+import { createMemo, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
 import { TrainingLines } from "./TrainingLines";
@@ -44,87 +44,89 @@ export function VariationTraining(props: {
           />
         }
       >
-        <WorkspaceLayout
-          title={<RepertoireBreadcrumb showTraining trainingLineId={props.lineId} />}
-          chessboard={
-            <Chessboard
-              boardOrientation={flow.orientation()}
-              position={flow.currentFen()}
-              canDrag={flow.canDrag()}
-              onPieceDrop={flow.onPieceDrop}
-              pieceToAnimate={flow.animation()}
-              arrows={{}}
-              squareHighlights={squareHighlights()}
-              onHighlightSquare={() => {}}
-              onDrawArrow={() => {}}
-              onIntroComplete={flow.onIntroComplete}
-              annotations={flow.annotations()}
-            />
-          }
-          evalBar={null}
-          panelChildren={
-            <>
-              <TrainingSessionStats result={flow.trainingSessionStats()} />
-              <ProgressBar progress={flow.progress()} />
-              <Show when={flow.chapterHasMoves()}>
-                <HorizontalDashedDivider
-                  animationKey="variation-training-instructions-top"
-                  direction="right-to-left"
-                />
-              </Show>
-              <div class="flex items-center justify-between gap-2 px-4 py-2">
-                <Show
-                  when={flow.chapterHasMoves()}
-                  fallback={
-                    <>
-                      <span>Nothing to train</span>
-                      <Button
-                        size="sm"
-                        href={repertoirePath(props.repertoireHandle, props.chapterHandle)}
+        <Show when={flow.isInitialized()}>
+          <WorkspaceLayout
+            title={<RepertoireBreadcrumb showTraining trainingLineId={props.lineId} />}
+            chessboard={
+              <Chessboard
+                boardOrientation={flow.orientation()}
+                position={flow.currentFen()}
+                canDrag={flow.canDrag()}
+                onPieceDrop={flow.onPieceDrop}
+                pieceToAnimate={flow.animation()}
+                arrows={{}}
+                squareHighlights={squareHighlights()}
+                onHighlightSquare={() => {}}
+                onDrawArrow={() => {}}
+                onIntroComplete={flow.onIntroComplete}
+                annotations={flow.annotations()}
+              />
+            }
+            evalBar={null}
+            panelChildren={
+              <>
+                <TrainingSessionStats result={flow.trainingSessionStats()} />
+                <ProgressBar progress={flow.progress()} />
+                <Show when={flow.chapterHasMoves()}>
+                  <HorizontalDashedDivider
+                    animationKey="variation-training-instructions-top"
+                    direction="right-to-left"
+                  />
+                </Show>
+                <div class="flex items-center justify-between gap-2 px-4 py-2">
+                  <Show
+                    when={flow.chapterHasMoves()}
+                    fallback={
+                      <>
+                        <span>Nothing to train</span>
+                        <Button
+                          size="sm"
+                          href={repertoirePath(props.repertoireHandle, props.chapterHandle)}
+                        >
+                          Back to chapter
+                        </Button>
+                      </>
+                    }
+                  >
+                    <span>{flow.instruction()}</span>
+                    <Show when={flow.isLineComplete()}>
+                      <Show
+                        when={flow.nextUntrainedLine()}
+                        fallback={
+                          <Button
+                            size="sm"
+                            href={trainingPath(props.repertoireHandle, props.chapterHandle)}
+                          >
+                            Back to lines
+                          </Button>
+                        }
                       >
-                        Back to chapter
-                      </Button>
-                    </>
-                  }
-                >
-                  <span>{flow.instruction()}</span>
-                  <Show when={flow.isLineComplete()}>
-                    <Show
-                      when={flow.nextUntrainedLine()}
-                      fallback={
-                        <Button
-                          size="sm"
-                          href={trainingPath(props.repertoireHandle, props.chapterHandle)}
-                        >
-                          Back to lines
-                        </Button>
-                      }
-                    >
-                      {(nextLine) => (
-                        <Button
-                          size="sm"
-                          href={trainingLinePath(
-                            props.repertoireHandle,
-                            props.chapterHandle,
-                            nextLine().id,
-                          )}
-                        >
-                          Next line
-                        </Button>
-                      )}
+                        {(nextLine) => (
+                          <Button
+                            size="sm"
+                            href={trainingLinePath(
+                              props.repertoireHandle,
+                              props.chapterHandle,
+                              nextLine().id,
+                            )}
+                          >
+                            Next line
+                          </Button>
+                        )}
+                      </Show>
                     </Show>
                   </Show>
-                </Show>
-              </div>
-              <HorizontalDashedDivider
-                animationKey="variation-training-moves"
-                direction="right-to-left"
-              />
-              <MovesTree readOnly={false} />
-              <PgnExplorerToolbar />
-            </>
-          }
-        />
+                </div>
+                <HorizontalDashedDivider
+                  animationKey="variation-training-moves"
+                  direction="right-to-left"
+                />
+                <MovesTree readOnly={false} />
+                <PgnExplorerToolbar />
+              </>
+            }
+          />
+        </Show>
       </Show>
     </Show>
   );
@@ -140,12 +142,15 @@ export default function VariationTrainingRoute() {
     getRepertoireHandle: () => params.repertoireHandle,
     getChapterHandle: () => params.chapterHandle,
   });
+  const scope = createMemo(() => ({
+    repertoireHandle: params.repertoireHandle,
+    chapterHandle: params.chapterHandle,
+    lineId: params.lineId,
+  }));
   return (
-    <VariationTraining
-      repertoireHandle={params.repertoireHandle}
-      chapterHandle={params.chapterHandle}
-      lineId={params.lineId}
-    />
+    <Show keyed when={scope()}>
+      {(currentScope) => <VariationTraining {...currentScope} />}
+    </Show>
   );
 }
 

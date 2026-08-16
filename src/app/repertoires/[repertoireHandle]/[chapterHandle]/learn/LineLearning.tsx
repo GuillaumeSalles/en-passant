@@ -314,12 +314,15 @@ export default function LineLearningRoute() {
     getRepertoireHandle: () => params.repertoireHandle,
     getChapterHandle: () => params.chapterHandle,
   });
+  const scope = createMemo(() => ({
+    repertoireHandle: params.repertoireHandle,
+    chapterHandle: params.chapterHandle,
+    lineId: params.lineId,
+  }));
   return (
-    <LineLearning
-      repertoireHandle={params.repertoireHandle}
-      chapterHandle={params.chapterHandle}
-      lineId={params.lineId}
-    />
+    <Show keyed when={scope()}>
+      {(currentScope) => <LineLearning {...currentScope} />}
+    </Show>
   );
 }
 

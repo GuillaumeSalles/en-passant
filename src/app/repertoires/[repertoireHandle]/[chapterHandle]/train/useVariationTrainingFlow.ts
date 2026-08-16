@@ -31,6 +31,7 @@ import { delay } from "@/lib/utils";
 import {
   completeTrainingLine,
   completeTrainingReplayMove,
+  discardTrainingLine,
   markTrainingMistake,
   prepareTrainingReplayMove,
   startTrainingLine,
@@ -110,6 +111,7 @@ export function useVariationTrainingFlow(
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
   const [phase, setPhase] = createSignal<VariationTrainingPhase>({ type: "initializing" });
   const [completedRepetitions, setCompletedRepetitions] = createSignal(0);
+  const [initializedScopeKey, setInitializedScopeKey] = createSignal<string | null>(null);
   const isEnabled = () => options.enabled?.() ?? true;
   const repetitions = () => Math.max(1, options.repetitions ?? 1);
 
@@ -120,6 +122,7 @@ export function useVariationTrainingFlow(
   const onSelectTrainingMoveSilently = useMutation(selectTrainingMoveSilently);
   const onUpdateTrainingStatus = useMutation(updateTrainingStatus);
   const onStartTrainingLine = useMutation(startTrainingLine);
+  const onDiscardTrainingLine = useMutation(discardTrainingLine);
   const onMarkTrainingMistake = useMutation(markTrainingMistake);
   const onPrepareTrainingReplayMove = useMutation(prepareTrainingReplayMove);
   const onCompleteTrainingLine = useMutation(completeTrainingLine, { context: true });
@@ -174,11 +177,18 @@ export function useVariationTrainingFlow(
     `${props.repertoireHandle}/${props.chapterHandle}/${props.lineId}/${orientation()}`;
 
   let flowVersion = 0;
+  let startedScope: {
+    key: string;
+    repertoireHandle: string;
+    chapterHandle: string;
+    lineId: string;
+  } | null = null;
   const beginFlowStep = () => ++flowVersion;
   const isCurrentFlowStep = (version: number, key: string) =>
     version === flowVersion && key === scopeKey();
   onCleanup(() => {
     flowVersion += 1;
+    if (startedScope !== null) onDiscardTrainingLine(startedScope);
   });
 
   function prepareReplayMove(targetMoveId: number): void {
@@ -239,7 +249,6 @@ export function useVariationTrainingFlow(
     }
   }
 
-  let startedScopeKey = "";
   createEffect(
     () => ({
       key: scopeKey(),
@@ -248,14 +257,34 @@ export function useVariationTrainingFlow(
       enabled: isEnabled(),
       orientation: orientation(),
       variationIndex: activeLineIndex(),
+      repertoireHandle: props.repertoireHandle,
+      chapterHandle: props.chapterHandle,
+      lineId: props.lineId,
     }),
-    ({ key, line, lineIds, enabled, orientation, variationIndex }) => {
-      if (!enabled || line === undefined || key === startedScopeKey) return;
-      startedScopeKey = key;
+    ({
+      key,
+      line,
+      lineIds,
+      enabled,
+      orientation,
+      variationIndex,
+      repertoireHandle,
+      chapterHandle,
+      lineId,
+    }) => {
+      if (!enabled || line === undefined || key === startedScope?.key) return;
+      if (startedScope !== null) onDiscardTrainingLine(startedScope);
       beginFlowStep();
       setCompletedRepetitions(0);
       setPhase({ type: "initializing" });
       onStartTrainingLine({ lineIds, lineId: line.id, variationIndex });
+      startedScope = {
+        key,
+        repertoireHandle,
+        chapterHandle,
+        lineId,
+      };
+      setInitializedScopeKey(key);
       if (orientation === "white") setPhase({ type: "awaiting-line-move", notice: null });
     },
   );
@@ -441,6 +470,7 @@ export function useVariationTrainingFlow(
     completedRepetitions,
     currentFen,
     instruction,
+    isInitialized: () => initializedScopeKey() === scopeKey(),
     isLineComplete: () => phase().type === "line-complete",
     lines,
     nextUntrainedLine,
