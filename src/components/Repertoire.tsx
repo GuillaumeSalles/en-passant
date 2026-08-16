@@ -11,15 +11,17 @@ import {
   getPgn,
   getNagGlyph,
   getNagMeaning,
-  HighlightKind,
   moveFromChessboard,
   moveFromEvalMove,
   selectAnimation,
   selectFen,
+  selectHighlights,
   selectNextMoveIds,
   selectOrientation,
   selectMove,
   selectedMove,
+  toggleArrowOnSelectedMove,
+  toggleSquareOnSelectedMove,
   updateEvaluation,
 } from "@/lib/AppState";
 import { MovesTree } from "./MovesTree";
@@ -36,7 +38,6 @@ import { useLoadPgn } from "@/lib/useLoadPgn";
 import { MutationContext, useMutation } from "@/lib/useMutation";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { RepertoireHeader } from "./RepertoireHeader";
-import { StoreState } from "@/lib/createStore";
 import { PositionMoveStats } from "./PositionMoveStats";
 
 function positionStatMove(uci: string, san: string): EvalMove | null {
@@ -64,39 +65,6 @@ function getArrows(
 ): { [fromTo: string]: ArrowKind } {
   if (!isEngineEnabled || !showBestMoveArrow) return arrows;
   return { ...arrows, ...getBestMoveArrow(evaluations) };
-}
-
-function drawArrow(
-  state: StoreState<AppState>,
-  _ctx: Context,
-  from: string,
-  to: string,
-  type: HighlightKind,
-): void {
-  const newArrows = { ...state.highlights.arrows };
-  const existingArrow = newArrows[from + to];
-  if (existingArrow === type) {
-    delete newArrows[from + to];
-  } else {
-    newArrows[from + to] = type;
-  }
-  state.set("highlights", { ...state.highlights, arrows: newArrows });
-}
-
-function highlightSquare(
-  state: StoreState<AppState>,
-  _ctx: Context,
-  square: string,
-  highlight: HighlightKind,
-): void {
-  const newSquares = { ...state.highlights.squares };
-  const existingHighlight = newSquares[square];
-  if (existingHighlight === highlight) {
-    delete newSquares[square];
-  } else {
-    newSquares[square] = highlight;
-  }
-  state.set("highlights", { ...state.highlights, squares: newSquares });
 }
 
 function updateNumberOfLines({ store }: MutationContext, numberOfLines: number) {
@@ -162,8 +130,8 @@ export function Repertoire(props: {
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromStats = useMutation(moveFromEvalMove);
   const onSelectMove = useMutation(selectMove);
-  const onDrawArrow = useMutation(drawArrow);
-  const onHighlightSquare = useMutation(highlightSquare);
+  const onDrawArrow = useMutation(toggleArrowOnSelectedMove);
+  const onHighlightSquare = useMutation(toggleSquareOnSelectedMove);
   const onUpdateNumberOfLines = useMutation(updateNumberOfLines, { context: true });
 
   useGlobalShortcuts();
@@ -223,9 +191,9 @@ export function Repertoire(props: {
 
   const nextMoveIds = useSelector(selectNextMoveIds);
 
-  const arrows = useSelector((state) =>
+  const arrows = useSelector((state, ctx) =>
     getArrows(
-      state.highlights.arrows,
+      selectHighlights(state, ctx).arrows,
       state.evaluations,
       state.engineSettings.isEnabled,
       state.engineSettings.showBestMoveArrow,

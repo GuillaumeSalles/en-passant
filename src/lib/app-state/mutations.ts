@@ -9,6 +9,7 @@ import {
 import type { MutationEffect, MutationResult } from "@/lib/useMutation";
 import { mergeNormalizedPgn } from "@/lib/mergePgns";
 import { applyNagToList } from "./nags";
+import { highlightsFromPgnMetadata, withPgnHighlightMetadata } from "./pgnHighlights";
 import { toPgn } from "./pgnTree";
 import {
   deletePgnMove,
@@ -37,6 +38,7 @@ import type {
   NormalizedPgn,
   Orientation,
   BoardAnimation,
+  HighlightKind,
   MoveAnnotations,
   MovePath,
   PgnMutation,
@@ -137,6 +139,75 @@ function pgnMutationEffect(
     pgn: toPgn(pgn),
     mutation,
   };
+}
+
+function updateSelectedMoveHighlights(
+  state: MutableAppState,
+  ctx: Context,
+  update: (highlights: ReturnType<typeof highlightsFromPgnMetadata>) => void,
+): MutationResult {
+  const pgn = getPgn(state, ctx);
+  const selectedMoveId = selectSelectedMoveId(state, ctx);
+  if (pgn === null || selectedMoveId === null) return;
+
+  const move = pgn.moves[selectedMoveId];
+  if (move === undefined) return;
+
+  const highlights = highlightsFromPgnMetadata(move.metadata);
+  update(highlights);
+  const updatedMove = {
+    ...move,
+    metadata: withPgnHighlightMetadata(move.metadata, highlights),
+  };
+  setPgnMove(pgn, updatedMove);
+  return pgnMutationEffect(state, ctx, pgn, {
+    type: "setAnnotations",
+    path: movePath(pgn, selectedMoveId),
+    annotations: moveAnnotations(updatedMove),
+  });
+}
+
+export function toggleArrowOnSelectedMove(
+  state: MutableAppState,
+  ctx: Context,
+  from: string,
+  to: string,
+  kind: HighlightKind,
+): MutationResult {
+  if (selectSelectedMoveId(state, ctx) === null) {
+    const arrows = { ...state.highlights.arrows };
+    const key = from + to;
+    if (arrows[key] === kind) delete arrows[key];
+    else arrows[key] = kind;
+    state.set("highlights", { ...state.highlights, arrows });
+    return;
+  }
+
+  return updateSelectedMoveHighlights(state, ctx, (highlights) => {
+    const key = from + to;
+    if (highlights.arrows[key] === kind) delete highlights.arrows[key];
+    else highlights.arrows[key] = kind;
+  });
+}
+
+export function toggleSquareOnSelectedMove(
+  state: MutableAppState,
+  ctx: Context,
+  square: string,
+  kind: HighlightKind,
+): MutationResult {
+  if (selectSelectedMoveId(state, ctx) === null) {
+    const squares = { ...state.highlights.squares };
+    if (squares[square] === kind) delete squares[square];
+    else squares[square] = kind;
+    state.set("highlights", { ...state.highlights, squares });
+    return;
+  }
+
+  return updateSelectedMoveHighlights(state, ctx, (highlights) => {
+    if (highlights.squares[square] === kind) delete highlights.squares[square];
+    else highlights.squares[square] = kind;
+  });
 }
 
 function compactEffects(...effects: MutationResult[]): MutationEffect[] {

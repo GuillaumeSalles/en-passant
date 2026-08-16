@@ -5,6 +5,7 @@ import {
   SquareHighlightKind,
   SquareHighlights,
   getPgn,
+  selectHighlights,
   selectSelectedMoveId,
 } from "@/lib/AppState";
 
@@ -37,7 +38,7 @@ export function useSquareHighlights(): Accessor<{ [square: string]: SquareHighli
     }
 
     return getSquaresHighlights(
-      state.highlights.squares,
+      selectHighlights(state, ctx).squares,
       pgn.moves,
       selectSelectedMoveId(state, ctx),
     );

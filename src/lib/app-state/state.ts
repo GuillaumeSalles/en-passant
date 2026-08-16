@@ -16,6 +16,7 @@ import type {
   TrainingLineReview,
 } from "./types";
 import { trainingLineReviewKey } from "./spacedRepetition";
+import { highlightsFromPgnMetadata } from "./pgnHighlights";
 
 type ChapterScope = {
   repertoire: Repertoire;
@@ -328,6 +329,11 @@ export function selectedMove(state: AppState, ctx: Context) {
   }
 
   return selectMoveById(state, ctx, selectedMoveId);
+}
+
+export function selectHighlights(state: AppState, ctx: Context) {
+  const move = selectedMove(state, ctx);
+  return move === null ? state.highlights : highlightsFromPgnMetadata(move.metadata);
 }
 
 export function selectMoveById(state: AppState, ctx: Context, moveId: number): Move | null {

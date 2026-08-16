@@ -84,6 +84,7 @@ export {
   selectAnimation,
   selectCurrentMove,
   selectFen,
+  selectHighlights,
   selectMoveById,
   selectNextMoveIds,
   selectOrientation,
@@ -114,7 +115,9 @@ export {
   setBoardOrientation,
   setNagOnSelectedMove,
   spacebar,
+  toggleArrowOnSelectedMove,
   toggleEngine,
+  toggleSquareOnSelectedMove,
   updateMoveCommentAfter,
   updateMoveCommentBefore,
 } from "./app-state/mutations";

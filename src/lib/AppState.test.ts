@@ -13,6 +13,7 @@ import {
   promoteVariation,
   selectedMove,
   selectFen,
+  selectHighlights,
   selectMove,
   toPgn,
   updateEvaluation,
@@ -31,6 +32,8 @@ import {
   selectPreselectedVariation,
   setNagOnSelectedMove,
   spacebar,
+  toggleArrowOnSelectedMove,
+  toggleSquareOnSelectedMove,
 } from "./AppState";
 import { STARTING_FEN } from "./chess";
 
@@ -300,6 +303,56 @@ test("keeps PGN metadata out of visible move comments", () => {
   expect(e4?.metadata).toEqual(["[%eval 0.23]", "[%cal Ge2e4]"]);
   expect(e4?.commentAfter).toBe("engine note");
   expect(toPgn(pgn)).toBe("1. e4 {[%eval 0.23] [%cal Ge2e4] engine note} *");
+});
+
+test("loads portable PGN arrows and square highlights for the selected move", () => {
+  const state = fromPgn("1. e4 {[%csl Ra4,Yd5,Gf6,Bh7] [%cal Ya2a4,Rc3d5,Ge2e4,Ba1a8]} e5 *");
+  const pgn = getPgn(state, ctx)!;
+  const e4 = Object.values(pgn.moves).find((move) => move.san === "e4")!;
+
+  selectMove(state, ctx, e4.id);
+
+  expect(selectHighlights(state, ctx)).toEqual({
+    squares: { a4: "normal", d5: "ctrl", f6: "shift", h7: "alt" },
+    arrows: { a2a4: "normal", c3d5: "ctrl", e2e4: "shift", a1a8: "alt" },
+  });
+});
+
+test("persists selected-position arrows and square highlights as PGN annotations", () => {
+  const state = fromPgn("1. e4 {[%eval 0.23] note} e5 *");
+  const pgn = getPgn(state, ctx)!;
+  const e4 = Object.values(pgn.moves).find((move) => move.san === "e4")!;
+  const e5 = Object.values(pgn.moves).find((move) => move.san === "e5")!;
+  selectMove(state, ctx, e4.id);
+
+  toggleArrowOnSelectedMove(state, ctx, "b1", "c3", "normal");
+  const result = toggleSquareOnSelectedMove(state, ctx, "d4", "shift");
+
+  expect(selectHighlights(state, ctx)).toEqual({
+    squares: { d4: "shift" },
+    arrows: { b1c3: "normal" },
+  });
+  expect(toPgn(pgn)).toBe("1. e4 {[%eval 0.23] [%csl Gd4] [%cal Yb1c3] note} e5 *");
+  expect(result).toMatchObject({
+    type: "persist-pgn-mutation",
+    pgn: "1. e4 {[%eval 0.23] [%csl Gd4] [%cal Yb1c3] note} e5 *",
+    mutation: {
+      type: "setAnnotations",
+      path: ["e2e4"],
+      annotations: {
+        commentAfter: "[%eval 0.23] [%csl Gd4] [%cal Yb1c3] note",
+      },
+    },
+  });
+
+  selectMove(state, ctx, e5.id);
+  expect(selectHighlights(state, ctx)).toEqual({ squares: {}, arrows: {} });
+  selectMove(state, ctx, e4.id);
+  expect(selectHighlights(state, ctx).arrows).toEqual({ b1c3: "normal" });
+
+  toggleArrowOnSelectedMove(state, ctx, "b1", "c3", "normal");
+  toggleSquareOnSelectedMove(state, ctx, "d4", "shift");
+  expect(toPgn(pgn)).toBe("1. e4 {[%eval 0.23] note} e5 *");
 });
 
 test("provides glyphs and meanings for NAGs up to 19", () => {

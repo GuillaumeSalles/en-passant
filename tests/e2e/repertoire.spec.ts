@@ -2035,6 +2035,40 @@ test("adds and toggles square highlights", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("persists move arrows and square highlights in PGN metadata", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await openRepertoire(page);
+  await page.locator('[data-san="e4"]').click();
+
+  await dragBetweenSquares(page, "b1", "c3", { button: "right" });
+  await dragBetweenSquares(page, "d4", "d4", { button: "right", steps: 1 });
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveAttribute("data-arrow-kind", "normal");
+  await expect(page.locator('[data-square="highlight-square-d4"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "normal",
+  );
+
+  await page.locator('[data-san="e5"]').click();
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveCount(0);
+  await expect(page.locator('[data-square="highlight-square-d4"]')).toHaveCount(0);
+
+  await page.locator('[data-san="e4"]').click();
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveCount(1);
+  await expect(page.locator('[data-square="highlight-square-d4"]')).toHaveCount(1);
+  await expect.poll(() => firstStoredPgn(page)).toContain("e4 {[%csl Rd4] [%cal Yb1c3]} e5");
+
+  await page.reload();
+  await expectRepertoireReady(page);
+  await page.locator('[data-san="e4"]').click();
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveAttribute("data-arrow-kind", "normal");
+  await expect(page.locator('[data-square="highlight-square-d4"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "normal",
+  );
+  expect(consoleMessages).toEqual([]);
+});
+
 test("keyboard shortcuts navigate moves and flip the board", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
