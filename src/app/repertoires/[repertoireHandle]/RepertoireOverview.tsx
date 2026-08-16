@@ -73,7 +73,7 @@ export function RepertoireOverview(props: { repertoireHandle: string }) {
         </Show>
       }
       reserveRightSlot
-      showMobileHeaderDivider={false}
+      showMobileHeaderDivider
     >
       <div class="mx-auto flex w-full max-w-5xl flex-col px-4 py-4">
         <div class="flex items-center justify-between gap-3">
