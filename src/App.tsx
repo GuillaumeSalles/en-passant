@@ -1,7 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, lazy, Loading, onSettled, Show } from "solid-js";
-import { Router, Route } from "@solidjs/router";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { createRouter, useLocation, useNavigate } from "@solidjs/router";
 import { AppStateProvider, useState } from "@/app/AppStateProvider";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
@@ -337,32 +336,37 @@ function Root(props: { children?: JSX.Element }) {
 }
 
 export default function App() {
-  return (
-    <Router root={Root}>
-      <Route path="/design" component={Design} />
-      <Route path="/debug" component={Debug} />
-      <Route path={APP_ROOT} component={AppRootRoute} />
-      <Route path={`${APP_ROOT}/games`} component={Games} />
-      <Route path={`${APP_ROOT}/training`} component={Training} />
-      <Route path={`${APP_ROOT}/games/:gameId`} component={GameViewer} />
-      <Route path={`${APP_ROOT}/repertoires/:repertoireHandle`} component={RepertoireOverview} />
-      <Route
-        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle`}
-        component={Repertoire}
-      />
-      <Route
-        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train`}
-        component={TrainingLines}
-      />
-      <Route
-        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`}
-        component={VariationTraining}
-      />
-      <Route
-        path={`${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/learn/:lineId`}
-        component={LineLearning}
-      />
-      <Route path="*" component={NotFound} />
-    </Router>
-  );
+  return <AppRouter>{Root}</AppRouter>;
 }
+
+const AppRouter = createRouter({
+  routes: [
+    { path: "/design", component: Design },
+    { path: "/debug", component: Debug },
+    { path: APP_ROOT, component: AppRootRoute },
+    { path: `${APP_ROOT}/games`, component: Games },
+    { path: `${APP_ROOT}/training`, component: Training },
+    { path: `${APP_ROOT}/games/:gameId`, component: GameViewer },
+    {
+      path: `${APP_ROOT}/repertoires/:repertoireHandle`,
+      component: RepertoireOverview,
+    },
+    {
+      path: `${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle`,
+      component: Repertoire,
+    },
+    {
+      path: `${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train`,
+      component: TrainingLines,
+    },
+    {
+      path: `${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`,
+      component: VariationTraining,
+    },
+    {
+      path: `${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/learn/:lineId`,
+      component: LineLearning,
+    },
+    { path: "*", component: NotFound },
+  ],
+});

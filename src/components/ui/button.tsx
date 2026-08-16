@@ -1,6 +1,5 @@
 import { omit, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { A } from "@solidjs/router";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +58,7 @@ function ButtonElement(props: ButtonElementProps) {
 
 function ButtonLink(props: ButtonLinkProps) {
   const rest = omit(props, "class", "variant", "size");
-  return <A class={buttonClass(props)} {...rest} />;
+  return <a class={buttonClass(props)} {...rest} />;
 }
 
 function Button(props: ButtonProps) {

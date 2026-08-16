@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
-import { A } from "@solidjs/router";
 import { createChessPosition, positionKey } from "@/lib/chess";
 import {
   loadPositionMoves,
@@ -137,7 +136,7 @@ function RecentGames(props: { games: RecentPositionGame[] }) {
       <div class="mt-1 border-t border-border pt-1" aria-label="Recent games">
         <For each={props.games}>
           {(game) => (
-            <A
+            <a
               href={importedGamePath(game.id)}
               class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-sm px-2 py-1.5 text-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               aria-label={`${playerName(game.white)} versus ${playerName(game.black)}, ${formatTimeControl(game.timeControl)}, ${game.result}`}
@@ -151,7 +150,7 @@ function RecentGames(props: { games: RecentPositionGame[] }) {
                 class="whitespace-nowrap text-muted-foreground"
               />
               <span class="whitespace-nowrap font-mono">{game.result}</span>
-            </A>
+            </a>
           )}
         </For>
       </div>

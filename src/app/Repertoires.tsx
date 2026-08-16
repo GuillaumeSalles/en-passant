@@ -8,7 +8,7 @@ import { useSelector } from "@/lib/useSelector";
 import { cn } from "@/lib/utils";
 import { handleFromName, uniqueHandle } from "@/lib/handles";
 import { Book, Brain, ChessPawn, Ellipsis, Plus } from "../components/Icons";
-import { A, useLocation } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
 import { MutationContext, useMutation } from "@/lib/useMutation";
 import {
   deleteChapter as deleteChapterFromStorage,
@@ -332,7 +332,7 @@ function TrainingSidebarLink() {
 
   return (
     <div class="px-2 pt-2">
-      <A
+      <a
         class={cn(
           "group flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-sm active:bg-sidebar-link-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           location.pathname === href ? "bg-sidebar-link-active" : "hover:bg-sidebar-link-hover",
@@ -341,7 +341,7 @@ function TrainingSidebarLink() {
       >
         <Brain class="h-4 w-4 flex-none stroke-zinc-400 group-hover:stroke-white" />
         <span>Training</span>
-      </A>
+      </a>
     </div>
   );
 }
@@ -627,12 +627,12 @@ function SidebarLink(props: {
     }
 
     return (
-      <A class={className} href={props.href}>
+      <a class={className} href={props.href}>
         {icon()}
         <span class="min-w-0 flex-1 truncate" title={props.name}>
           {props.name}
         </span>
-      </A>
+      </a>
     );
   }
 

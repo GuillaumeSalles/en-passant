@@ -1,4 +1,3 @@
-import { A } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
 import { getChapterName, getRepertoireName } from "@/lib/AppState";
 import {
@@ -41,35 +40,35 @@ export function RepertoireBreadcrumb(props: {
           aria-label="Breadcrumb"
           class="motion-page-title flex min-w-0 items-center gap-1 text-base font-normal"
         >
-          <A class={crumbLinkClass} href={repertoireOverviewPath(ctx().repertoireHandle)}>
+          <a class={crumbLinkClass} href={repertoireOverviewPath(ctx().repertoireHandle)}>
             {currentTitle()[0]}
-          </A>
+          </a>
           <span>·</span>
-          <A
+          <a
             class={crumbLinkClass}
             href={repertoirePath(ctx().repertoireHandle, ctx().chapterHandle)}
           >
             {currentTitle()[1]}
-          </A>
+          </a>
           <Show when={props.showTraining}>
             <span>·</span>
-            <A
+            <a
               class={crumbLinkClass}
               href={trainingPath(ctx().repertoireHandle, ctx().chapterHandle)}
             >
               Training
-            </A>
+            </a>
           </Show>
           <Show when={props.trainingLineId}>
             {(lineId) => (
               <>
                 <span>·</span>
-                <A
+                <a
                   class={crumbLinkClass}
                   href={trainingLinePath(ctx().repertoireHandle, ctx().chapterHandle, lineId())}
                 >
                   Line
-                </A>
+                </a>
               </>
             )}
           </Show>
@@ -77,12 +76,12 @@ export function RepertoireBreadcrumb(props: {
             {(lineId) => (
               <>
                 <span>·</span>
-                <A
+                <a
                   class={crumbLinkClass}
                   href={learningLinePath(ctx().repertoireHandle, ctx().chapterHandle, lineId())}
                 >
                   Learn line
-                </A>
+                </a>
               </>
             )}
           </Show>

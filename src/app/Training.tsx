@@ -1,4 +1,3 @@
-import { A } from "@solidjs/router";
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
@@ -143,22 +142,22 @@ export function Training() {
                         </div>
                         <div class="mt-1 truncate text-sm font-medium">{line.label}</div>
                         <div class="mt-0.5 truncate text-xs text-muted-foreground">
-                          <A
+                          <a
                             class="underline-offset-4 hover:text-foreground hover:underline"
                             href={trainingPath(line.repertoire.handle, line.chapter.handle)}
                           >
                             {line.repertoire.name} · {line.chapter.name}
-                          </A>
+                          </a>
                           <Show when={mistakeLink()}>
                             {(link) => (
                               <>
                                 {" · "}
-                                <A
+                                <a
                                   class="underline-offset-4 hover:text-foreground hover:underline"
                                   href={importedGamePath(link().game.id)}
                                 >
                                   Review game vs {link().game.opponentName}
-                                </A>
+                                </a>
                               </>
                             )}
                           </Show>

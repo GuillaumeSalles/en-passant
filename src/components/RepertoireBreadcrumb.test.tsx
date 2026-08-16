@@ -1,8 +1,8 @@
-import { MemoryRouter, Route } from "@solidjs/router";
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { afterEach, expect, test, vi } from "vitest";
 import type { JSX } from "@solidjs/web";
 import { RepertoireBreadcrumb } from "./RepertoireBreadcrumb";
+import { TestRouter } from "@/tests/TestRouter";
 
 const selectorValues = vi.hoisted(() => ({
   chapterName: null as string | null,
@@ -42,11 +42,7 @@ afterEach(() => {
 });
 
 function Wrapper(props: { children: JSX.Element }) {
-  return (
-    <MemoryRouter root={() => props.children}>
-      <Route path="/" component={() => null} />
-    </MemoryRouter>
-  );
+  return <TestRouter>{props.children}</TestRouter>;
 }
 
 function renderBreadcrumb(props: { trainingLineId: string | null } = { trainingLineId: null }) {

@@ -1,8 +1,8 @@
-import { MemoryRouter, Route } from "@solidjs/router";
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, test, vi } from "vitest";
 import { STARTING_FEN } from "@/lib/chess";
 import { PositionMoveStats } from "./PositionMoveStats";
+import { TestRouter } from "@/tests/TestRouter";
 
 const mockedAuth = vi.hoisted(() => ({
   status: "signed-in" as "signed-in" | "signed-out",
@@ -71,11 +71,9 @@ test("shows move results and hides the total row when there is only one next mov
   vi.stubGlobal("fetch", fetcher);
 
   render(() => (
-    <MemoryRouter
-      root={() => <PositionMoveStats fen={STARTING_FEN} color="black" onMove={onMove} />}
-    >
-      <Route path="/" component={() => null} />
-    </MemoryRouter>
+    <TestRouter>
+      <PositionMoveStats fen={STARTING_FEN} color="black" onMove={onMove} />
+    </TestRouter>
   ));
 
   await waitFor(() => expect(screen.getByText("e4")).not.toBeNull());
@@ -176,11 +174,9 @@ test("shows the total row when there are multiple next moves", async () => {
   );
 
   render(() => (
-    <MemoryRouter
-      root={() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />}
-    >
-      <Route path="/" component={() => null} />
-    </MemoryRouter>
+    <TestRouter>
+      <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />
+    </TestRouter>
   ));
 
   await waitFor(() => expect(screen.getByText("e4")).not.toBeNull());
@@ -219,11 +215,9 @@ test("hides result text when a segment is below fifteen percent", async () => {
   );
 
   render(() => (
-    <MemoryRouter
-      root={() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />}
-    >
-      <Route path="/" component={() => null} />
-    </MemoryRouter>
+    <TestRouter>
+      <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />
+    </TestRouter>
   ));
 
   const resultBar = await screen.findByRole("img", {
@@ -240,11 +234,9 @@ test("hides the section for anonymous users", async () => {
   vi.stubGlobal("fetch", fetcher);
 
   render(() => (
-    <MemoryRouter
-      root={() => <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />}
-    >
-      <Route path="/" component={() => null} />
-    </MemoryRouter>
+    <TestRouter>
+      <PositionMoveStats fen={STARTING_FEN} color="white" onMove={() => undefined} />
+    </TestRouter>
   ));
 
   await waitFor(() => {

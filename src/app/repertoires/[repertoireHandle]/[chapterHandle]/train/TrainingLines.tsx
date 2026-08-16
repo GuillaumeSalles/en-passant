@@ -1,4 +1,4 @@
-import { A, useParams } from "@solidjs/router";
+import { useParams } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { Ellipsis } from "@/components/Icons";
@@ -209,12 +209,12 @@ export function TrainingLines(props: {
                       </div>
                       <Show when={mistakeLink()}>
                         {(link) => (
-                          <A
+                          <a
                             class="mt-0.5 block truncate text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                             href={importedGamePath(link().game.id)}
                           >
                             Review game vs {link().game.opponentName}
-                          </A>
+                          </a>
                         )}
                       </Show>
                     </div>
@@ -267,7 +267,7 @@ export function TrainingLines(props: {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem disabled={false}>
-                              <A
+                              <a
                                 class="w-full"
                                 href={learningLinePath(
                                   props.repertoireHandle,
@@ -276,7 +276,7 @@ export function TrainingLines(props: {
                                 )}
                               >
                                 Learn again
-                              </A>
+                              </a>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

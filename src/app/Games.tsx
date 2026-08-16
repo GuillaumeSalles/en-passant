@@ -1,6 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
-import { A } from "@solidjs/router";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { TimeControl } from "@/components/TimeControl";
 import { Button } from "@/components/ui/button";
@@ -150,12 +149,12 @@ function GamesTable(props: { games: StoredGame[] }) {
                   </Show>
                 </td>
                 <td class="px-3 py-2 text-right">
-                  <A
+                  <a
                     class="font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     href={importedGamePath(game.id)}
                   >
                     Open
-                  </A>
+                  </a>
                 </td>
               </tr>
             )}

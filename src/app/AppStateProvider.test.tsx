@@ -2,19 +2,19 @@ import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, expect, test } from "vitest";
 import { AppStateProvider } from "./AppStateProvider";
 import { useSelector } from "@/lib/useSelector";
-import { MemoryRouter, Route } from "@solidjs/router";
 import type { JSX } from "@solidjs/web";
 import { flush } from "solid-js";
 import { useMutation } from "@/lib/useMutation";
 import { flipBoard, toggleEngine } from "@/lib/AppState";
+import { TestRouter } from "@/tests/TestRouter";
 
 afterEach(cleanup);
 
 function Wrapper(props: { children: JSX.Element }) {
   return (
-    <MemoryRouter root={() => <AppStateProvider>{props.children}</AppStateProvider>}>
-      <Route path="/" component={() => null} />
-    </MemoryRouter>
+    <TestRouter>
+      <AppStateProvider>{props.children}</AppStateProvider>
+    </TestRouter>
   );
 }
 

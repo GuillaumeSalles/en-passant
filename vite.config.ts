@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import solid from "vite-plugin-solid";
+import solid from "@solidjs/vite-plugin";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const localFunctionsOrigin = process.env.LOCAL_FUNCTIONS_ORIGIN ?? "http://localhost:8788";

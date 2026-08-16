@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
-import { A, useParams } from "@solidjs/router";
+import { useParams } from "@solidjs/router";
 import {
   AppState,
   Arrows,
@@ -354,12 +354,12 @@ export function GameViewer(props: { gameId: string }) {
                         Last repertoire move{" "}
                         <span class="font-semibold">{coverage().moveLabel}</span>
                       </span>
-                      <A
+                      <a
                         href={coverage().href}
                         class="flex-none font-semibold text-blue-500 hover:underline"
                       >
                         {coverage().description}
-                      </A>
+                      </a>
                     </div>
                     <HorizontalDashedDivider animation="none" />
                   </>
