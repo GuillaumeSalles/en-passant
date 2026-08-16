@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
+  clearTrainingQueueReview,
+  completeTrainingQueueReviewLine,
   completeTrainingLine,
   completeTrainingReplayMove,
   createFailedMoveReplayQueue,
   discardTrainingLine,
+  ensureTrainingQueueReview,
   ensureTrainingSession,
   markTrainingMistake,
   prepareTrainingReplayMove,
   resetTrainingSession,
+  startTrainingQueueReview,
   startTrainingLine,
 } from "@/mutations/trainingSession";
 import { createMutationContext } from "@/tests/mocks";
@@ -40,6 +44,20 @@ function scheduledLineKey(context: ReturnType<typeof createTrainingContext>): st
 }
 
 describe("training session", () => {
+  test("keeps queue progress in memory and clears it when review stops", () => {
+    const context = createTrainingContext();
+
+    startTrainingQueueReview(context.state, context.route, 2);
+    completeTrainingQueueReviewLine(context.state, context.route);
+    expect(context.state.training.reviewQueue).toEqual({ reviewed: 1, total: 2 });
+
+    ensureTrainingQueueReview(context.state, context.route, 2);
+    expect(context.state.training.reviewQueue).toEqual({ reviewed: 1, total: 3 });
+
+    clearTrainingQueueReview(context.state, context.route);
+    expect(context.state.training.reviewQueue).toBeNull();
+  });
+
   test("keeps results for unchanged lines when the chapter lines change", () => {
     const context = createTrainingContext();
     ensureTrainingSession(context.state, context.route, ["line-a", "line-b"]);

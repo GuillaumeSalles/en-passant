@@ -27,6 +27,7 @@ export type {
   SquareHighlights,
   TrainingLineResult,
   TrainingLineReview,
+  TrainingReviewQueue,
   TrainingSessionDraft,
   TrainingState,
 } from "./app-state/types";

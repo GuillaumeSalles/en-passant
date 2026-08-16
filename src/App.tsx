@@ -23,6 +23,8 @@ import { isSafariBrowser } from "@/lib/browser";
 import { APP_ROOT, firstRepertoireChapterPath } from "@/lib/routes";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { startAuthSessionRenewal } from "@/lib/authSession";
+import { useMutation } from "@/lib/useMutation";
+import { clearTrainingQueueReview } from "@/mutations/trainingSession";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
@@ -163,10 +165,18 @@ function AboutDialog(props: { buttonClass?: string | undefined } = {}) {
 function AppShell(props: { children?: JSX.Element }) {
   const [isDrawerOpen, setIsDrawerOpen] = createSignal(false);
   const location = useLocation();
+  const onClearTrainingQueueReview = useMutation(clearTrainingQueueReview);
 
   onSettled(() => startAuthSessionRenewal());
 
   const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
+
+  createEffect(
+    () => new URLSearchParams(location.search).get("review") === "due",
+    (isReviewingQueue) => {
+      if (!isReviewingQueue) onClearTrainingQueueReview();
+    },
+  );
 
   function closeDrawerAfterNavigation(event: MouseEvent) {
     const target = event.target;

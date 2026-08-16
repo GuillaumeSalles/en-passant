@@ -157,11 +157,19 @@ test("reviews every due line across chapters and stops before future lines", asy
   await expect(page).toHaveURL(
     /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
   );
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
   await dragPiece(page, "e2", "e4");
 
   await expect(page).toHaveURL(
     /\/app\/repertoires\/white-repertoire\/queens-pawn\/train\/v1-.*\?review=due$/,
   );
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+
+  await page.locator('a[href="/app/training"]').click();
+  await expect(page.getByText("1 due · 3 scheduled")).toBeVisible();
+  await page.getByRole("link", { name: "Review lines" }).click();
+  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+
   await dragPiece(page, "d2", "d4");
 
   await expect(page).toHaveURL("/app/training");

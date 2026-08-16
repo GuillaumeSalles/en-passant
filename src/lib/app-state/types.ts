@@ -164,6 +164,7 @@ export type AppState = {
     variationIndex: number;
     variation: NormalizedPgn;
     session: TrainingSessionDraft | null;
+    reviewQueue: TrainingReviewQueue | null;
     reviews: Record<string, TrainingLineReview>;
   };
   preselectedVariation: number | null;
@@ -178,6 +179,11 @@ export type TrainingState = "in-progress" | "failure" | "success" | "complete";
 export type TrainingLineResult = {
   lineId: string;
   mistakeCount: number;
+};
+
+export type TrainingReviewQueue = {
+  reviewed: number;
+  total: number;
 };
 
 export type TrainingLineReview = {

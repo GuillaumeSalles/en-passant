@@ -15,6 +15,45 @@ import type { TrainingLineReview } from "@/lib/AppState";
 
 export const FAILED_MOVE_SUCCESS_REPETITIONS = 3;
 
+export function startTrainingQueueReview(
+  state: StoreState<AppState>,
+  _ctx: Context,
+  total: number,
+): void {
+  state.set("training", {
+    ...state.training,
+    reviewQueue: { reviewed: 0, total },
+  });
+}
+
+export function ensureTrainingQueueReview(
+  state: StoreState<AppState>,
+  _ctx: Context,
+  remaining: number,
+): void {
+  const queue = state.training.reviewQueue;
+  const total = queue === null ? remaining : Math.max(queue.total, queue.reviewed + remaining);
+  if (queue !== null && queue.total === total) return;
+  state.set("training", {
+    ...state.training,
+    reviewQueue: { reviewed: queue?.reviewed ?? 0, total },
+  });
+}
+
+export function completeTrainingQueueReviewLine(state: StoreState<AppState>, _ctx: Context): void {
+  const queue = state.training.reviewQueue;
+  if (queue === null) return;
+  state.set("training", {
+    ...state.training,
+    reviewQueue: { ...queue, reviewed: Math.min(queue.reviewed + 1, queue.total) },
+  });
+}
+
+export function clearTrainingQueueReview(state: StoreState<AppState>, _ctx: Context): void {
+  if (state.training.reviewQueue === null) return;
+  state.set("training", { ...state.training, reviewQueue: null });
+}
+
 function createTrainingSessionDraft(ctx: Context, lineIds: string[]): TrainingSessionDraft {
   return {
     repertoireHandle: ctx.repertoireHandle,

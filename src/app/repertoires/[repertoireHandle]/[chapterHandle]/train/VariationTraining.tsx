@@ -17,9 +17,12 @@ import {
 } from "@/lib/routes";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { useLoadPgn } from "@/lib/useLoadPgn";
-import { createMemo, Show } from "solid-js";
+import { useMutation } from "@/lib/useMutation";
+import { createEffect, createMemo, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
+import { useState } from "@/app/AppStateProvider";
 import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
+import { completeTrainingQueueReviewLine } from "@/mutations/trainingSession";
 import { TrainingLines } from "./TrainingLines";
 import { useVariationTrainingFlow } from "./useVariationTrainingFlow";
 
@@ -30,15 +33,28 @@ export function VariationTraining(props: {
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const state = useState();
+  const onCompleteTrainingQueueReviewLine = useMutation(completeTrainingQueueReviewLine);
   useGlobalShortcuts();
   useLoadPgn(
     () => props.repertoireHandle,
     () => props.chapterHandle,
   );
+  const isReviewingQueue = () => new URLSearchParams(location.search).get("review") === "due";
+
+  createEffect(
+    () => ({ isReviewingQueue: isReviewingQueue(), reviewQueue: state.training.reviewQueue }),
+    ({ isReviewingQueue, reviewQueue }) => {
+      if (isReviewingQueue && reviewQueue === null) {
+        navigate(trainingQueueReviewPath(), { replace: true });
+      }
+    },
+  );
 
   const flow = useVariationTrainingFlow(props, {
     onLineComplete: () => {
-      if (new URLSearchParams(location.search).get("review") === "due") {
+      if (isReviewingQueue()) {
+        onCompleteTrainingQueueReviewLine();
         navigate(trainingQueueReviewPath(), { replace: true });
       }
     },
@@ -78,7 +94,10 @@ export function VariationTraining(props: {
             evalBar={null}
             panelChildren={
               <>
-                <TrainingSessionStats result={flow.trainingSessionStats()} />
+                <TrainingSessionStats
+                  result={flow.trainingSessionStats()}
+                  reviewQueue={state.training.reviewQueue}
+                />
                 <ProgressBar progress={flow.progress()} />
                 <Show when={flow.chapterHasMoves()}>
                   <HorizontalDashedDivider
@@ -167,12 +186,22 @@ export default function VariationTrainingRoute() {
   );
 }
 
-function TrainingSessionStats(props: { result: TrainingSessionSummary | null }) {
+function TrainingSessionStats(props: {
+  result: TrainingSessionSummary | null;
+  reviewQueue: { reviewed: number; total: number } | null;
+}) {
   return (
     <Show when={props.result}>
       {(result) => (
         <div class="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] text-center text-sm">
-          <StatCell label="Lines" value={`${result().tried}/${result().total}`} />
+          <StatCell
+            label="Lines"
+            value={
+              props.reviewQueue === null
+                ? `${result().tried}/${result().total}`
+                : `${props.reviewQueue.reviewed}/${props.reviewQueue.total}`
+            }
+          />
           <VerticalDashedDivider />
           <StatCell label="Clean" value={result().clean.toString()} />
           <VerticalDashedDivider />

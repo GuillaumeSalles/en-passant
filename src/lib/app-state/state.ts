@@ -56,6 +56,7 @@ export function emptyState(): AppState {
       variationIndex: 0,
       variation: emptyNormalizedPgn(),
       session: null,
+      reviewQueue: null,
       reviews: {},
     },
     highlights: {

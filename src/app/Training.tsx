@@ -16,7 +16,9 @@ import {
 } from "@/lib/routes";
 import { useLoadPgns } from "@/lib/useLoadPgn";
 import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapters";
+import { useMutation } from "@/lib/useMutation";
 import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
+import { ensureTrainingQueueReview, startTrainingQueueReview } from "@/mutations/trainingSession";
 
 function formatDueTime(dueAt: number, now: number): string {
   const difference = dueAt - now;
@@ -38,6 +40,8 @@ export function Training() {
   const state = useState();
   const location = useLocation();
   const navigate = useNavigate();
+  const onEnsureTrainingQueueReview = useMutation(ensureTrainingQueueReview);
+  const onStartTrainingQueueReview = useMutation(startTrainingQueueReview);
   const [now, setNow] = createSignal(Date.now());
   const clock = setInterval(() => setNow(Date.now()), 60_000);
   onCleanup(() => clearInterval(clock));
@@ -82,14 +86,19 @@ export function Training() {
   createEffect(
     () => ({
       continueReviewing: new URLSearchParams(location.search).get("review") === "due",
+      dueCount: dueCount(),
       isLoading: isLoading(),
       nextLine: nextDueLine(),
+      reviewQueue: state.training.reviewQueue,
     }),
-    ({ continueReviewing, isLoading, nextLine }) => {
+    ({ continueReviewing, dueCount, isLoading, nextLine, reviewQueue }) => {
       if (!continueReviewing || isLoading) return;
       if (nextLine === undefined) {
         navigate(trainingQueuePath(), { replace: true });
         return;
+      }
+      if (reviewQueue === null || reviewQueue.total < reviewQueue.reviewed + dueCount) {
+        onEnsureTrainingQueueReview(dueCount);
       }
       navigate(
         trainingLineReviewPath(
@@ -125,6 +134,7 @@ export function Training() {
                   line().chapter.handle,
                   line().line.id,
                 )}
+                onClick={() => onStartTrainingQueueReview(dueCount())}
               >
                 Review lines
               </Button>
