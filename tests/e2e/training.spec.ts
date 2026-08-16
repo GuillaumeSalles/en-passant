@@ -98,10 +98,78 @@ test("lists scheduled lines by training priority", async ({ page }) => {
   await expect(lines.nth(0).locator('[data-mastery-level="practiced"]')).toBeVisible();
   await expect(lines.nth(1)).toContainText("e4 e5");
   await expect(lines.nth(1).locator('[data-mastery-level="familiar"]')).toBeVisible();
-  await expect(page.getByRole("link", { name: "Train next" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Review lines" })).toHaveAttribute(
     "href",
-    /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-/,
+    /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
   );
+  await expect(lines.nth(0).getByRole("link", { name: "Review", exact: true })).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+test("reviews every due line across chapters and stops before future lines", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  const secondChapter = {
+    id: "training-chapter-2",
+    repertoireId: repertoire.id,
+    handle: "queens-pawn",
+    name: "Queen's pawn",
+    pgnId: "training-pgn-2",
+    updatedAt,
+    deletedAt: null,
+    dirty: false,
+  } satisfies ChapterRecord;
+  const futureLine = schedule("c2c4 e7e5", Date.now() + 60 * 60 * 1000, 2);
+  futureLine.chapterId = secondChapter.id;
+
+  await seedIndexedDb(page, {
+    repertoires: [repertoire],
+    chapters: [chapter, secondChapter],
+    pgns: [
+      {
+        id: chapter.pgnId,
+        pgn: "1. e4 e5 *",
+        updatedAt,
+        deletedAt: null,
+        dirty: false,
+      },
+      {
+        id: secondChapter.pgnId,
+        pgn: "1. d4 (1. c4 e5) d5 *",
+        updatedAt,
+        deletedAt: null,
+        dirty: false,
+      },
+    ],
+    trainingLineSchedules: [
+      schedule("e2e4 e7e5", Date.now() - 120_000, 1),
+      {
+        ...schedule("d2d4 d7d5", Date.now() - 60_000, 1),
+        chapterId: secondChapter.id,
+      },
+      futureLine,
+    ],
+  });
+
+  await page.goto("/app/training");
+  await expect(page.getByText("2 due · 3 scheduled")).toBeVisible();
+  await page.getByRole("link", { name: "Review lines" }).click();
+
+  await expect(page).toHaveURL(
+    /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
+  );
+  await dragPiece(page, "e2", "e4");
+
+  await expect(page).toHaveURL(
+    /\/app\/repertoires\/white-repertoire\/queens-pawn\/train\/v1-.*\?review=due$/,
+  );
+  await dragPiece(page, "d2", "d4");
+
+  await expect(page).toHaveURL("/app/training");
+  await expect(page.getByText("0 due · 3 scheduled")).toBeVisible();
+  const reviewLinesButton = page.getByRole("button", { name: "Review lines" });
+  await expect(reviewLinesButton).toBeDisabled();
+  await reviewLinesButton.hover({ force: true });
+  await expect(page.getByRole("tooltip")).toHaveText("You have no variation to review");
   expect(consoleMessages).toEqual([]);
 });
 
@@ -145,7 +213,10 @@ test("stops an imported-mistake exercise at the scheduled partial ply", async ({
     "href",
     "/app/games/lichess-mistake",
   );
-  await page.getByRole("link", { name: "Train next" }).click();
+  await page
+    .locator("[data-training-queue-line]")
+    .getByRole("link", { name: "Review", exact: true })
+    .click();
 
   await dragPiece(page, "e2", "e4");
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");

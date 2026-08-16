@@ -1,11 +1,19 @@
-import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
 import { Button } from "@/components/ui/button";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getScheduledTrainingLines } from "@/lib/AppState";
-import { importedGamePath, trainingLinePath, trainingPath } from "@/lib/routes";
+import {
+  importedGamePath,
+  trainingLinePath,
+  trainingLineReviewPath,
+  trainingPath,
+  trainingQueuePath,
+} from "@/lib/routes";
 import { useLoadPgns } from "@/lib/useLoadPgn";
 import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapters";
 import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
@@ -28,6 +36,8 @@ function formatDueTime(dueAt: number, now: number): string {
 
 export function Training() {
   const state = useState();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [now, setNow] = createSignal(Date.now());
   const clock = setInterval(() => setNow(Date.now()), 60_000);
   onCleanup(() => clearInterval(clock));
@@ -67,6 +77,30 @@ export function Training() {
     );
   });
   const dueCount = createMemo(() => lines().filter((line) => line.isDue).length);
+  const nextDueLine = createMemo(() => lines().find((line) => line.isDue));
+
+  createEffect(
+    () => ({
+      continueReviewing: new URLSearchParams(location.search).get("review") === "due",
+      isLoading: isLoading(),
+      nextLine: nextDueLine(),
+    }),
+    ({ continueReviewing, isLoading, nextLine }) => {
+      if (!continueReviewing || isLoading) return;
+      if (nextLine === undefined) {
+        navigate(trainingQueuePath(), { replace: true });
+        return;
+      }
+      navigate(
+        trainingLineReviewPath(
+          nextLine.repertoire.handle,
+          nextLine.chapter.handle,
+          nextLine.line.id,
+        ),
+        { replace: true },
+      );
+    },
+  );
 
   return (
     <FullWidthLayout
@@ -82,19 +116,31 @@ export function Training() {
               {dueCount()} due · {lines().length} scheduled
             </div>
           </div>
-          <Show when={lines()[0]}>
+          <Show when={nextDueLine()}>
             {(line) => (
               <Button
                 size="sm"
-                href={trainingLinePath(
+                href={trainingLineReviewPath(
                   line().repertoire.handle,
                   line().chapter.handle,
                   line().line.id,
                 )}
               >
-                Train next
+                Review lines
               </Button>
             )}
+          </Show>
+          <Show when={nextDueLine() === undefined}>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button size="sm" disabled>
+                    Review lines
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>You have no variation to review</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </Show>
         </div>
 
@@ -172,7 +218,7 @@ export function Training() {
                           line.line.id,
                         )}
                       >
-                        Train
+                        Review
                       </Button>
                     </div>
                   </>

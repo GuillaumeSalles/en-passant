@@ -7,6 +7,10 @@ export function trainingQueuePath(): string {
   return `${APP_ROOT}/training`;
 }
 
+export function trainingQueueReviewPath(): string {
+  return `${trainingQueuePath()}?review=due`;
+}
+
 type PathRepertoire = {
   id: string;
   handle: string;
@@ -89,6 +93,14 @@ export function trainingLinePath(
   lineId: string,
 ): string {
   return `${trainingPath(repertoireHandle, chapterHandle)}/${lineId}`;
+}
+
+export function trainingLineReviewPath(
+  repertoireHandle: string,
+  chapterHandle: string,
+  lineId: string,
+): string {
+  return `${trainingLinePath(repertoireHandle, chapterHandle, lineId)}?review=due`;
 }
 
 export function learningPath(repertoireHandle: string, chapterHandle: string): string {

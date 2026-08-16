@@ -4,11 +4,20 @@ import {
   learningLinePath,
   parseSelectedPositionKey,
   repertoireMovePath,
+  trainingLineReviewPath,
+  trainingQueueReviewPath,
 } from "./routes";
 
 test("builds a learning line path", () => {
   expect(learningLinePath("white", "main", "v1-line")).toBe(
     "/app/repertoires/white/main/learn/v1-line",
+  );
+});
+
+test("builds paths for reviewing all due lines", () => {
+  expect(trainingQueueReviewPath()).toBe("/app/training?review=due");
+  expect(trainingLineReviewPath("white", "main", "v1-line")).toBe(
+    "/app/repertoires/white/main/train/v1-line?review=due",
   );
 });
 

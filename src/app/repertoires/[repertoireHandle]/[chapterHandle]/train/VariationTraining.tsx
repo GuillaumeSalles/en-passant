@@ -9,11 +9,16 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Button } from "@/components/ui/button";
 import type { TrainingSessionSummary } from "@/lib/AppState";
-import { repertoirePath, trainingLinePath, trainingPath } from "@/lib/routes";
+import {
+  repertoirePath,
+  trainingLinePath,
+  trainingPath,
+  trainingQueueReviewPath,
+} from "@/lib/routes";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { createMemo, Show } from "solid-js";
-import { useParams } from "@solidjs/router";
+import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
 import { TrainingLines } from "./TrainingLines";
 import { useVariationTrainingFlow } from "./useVariationTrainingFlow";
@@ -23,13 +28,21 @@ export function VariationTraining(props: {
   chapterHandle: string;
   lineId: string;
 }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   useGlobalShortcuts();
   useLoadPgn(
     () => props.repertoireHandle,
     () => props.chapterHandle,
   );
 
-  const flow = useVariationTrainingFlow(props);
+  const flow = useVariationTrainingFlow(props, {
+    onLineComplete: () => {
+      if (new URLSearchParams(location.search).get("review") === "due") {
+        navigate(trainingQueueReviewPath(), { replace: true });
+      }
+    },
+  });
   const squareHighlights = useSquareHighlights();
 
   return (
