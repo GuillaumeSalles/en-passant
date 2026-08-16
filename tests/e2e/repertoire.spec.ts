@@ -1,8 +1,9 @@
-import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import {
   clearLocalStorageAndIndexedDb,
   collectUnexpectedConsole,
+  enableEngine,
   firstStoredPgn,
   mockSignedOutAuth,
   mockSignedInUser,
@@ -585,6 +586,12 @@ test("creates a demo London System repertoire on first open", async ({ page }) =
 
 test("repertoire page renders without console warnings", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
+  const stockfishWorkers: string[] = [];
+  page.on("worker", (worker) => {
+    if (worker.url().endsWith("/stockfish-18-lite-single.js")) {
+      stockfishWorkers.push(worker.url());
+    }
+  });
 
   await openRepertoire(page);
 
@@ -606,7 +613,9 @@ test("repertoire page renders without console warnings", async ({ page }) => {
   await page.getByRole("button", { name: "Evaluation settings" }).click();
   await expect(page.getByText("Show evaluation bar")).toBeVisible();
   await expect(page.getByText("Depth (20)")).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Computer evaluation" })).not.toBeChecked();
 
+  expect(stockfishWorkers).toEqual([]);
   expect(consoleMessages).toEqual([]);
 });
 
@@ -669,6 +678,8 @@ test("site root redirects to the app", async ({ page }) => {
 test("moves navigation into a drawer and stacks the panel on mobile and tablet", async ({
   page,
 }) => {
+  await enableEngine(page);
+
   for (const viewport of [
     { width: 390, height: 844 },
     { width: 834, height: 1112 },

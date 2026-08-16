@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { mockSignedInUser } from "./helpers";
+import { expect, test } from "./fixtures";
+import { enableEngine, mockSignedInUser } from "./helpers";
 
 test("keeps games visible while an asynchronous Lichess import progresses", async ({ page }) => {
   const session = await mockSignedInUser(page);
@@ -127,6 +127,7 @@ test("keeps games visible while an asynchronous Lichess import progresses", asyn
 });
 
 test("shows the latest repertoire move on an imported game", async ({ page }) => {
+  await enableEngine(page);
   const session = await mockSignedInUser(page);
   session.signIn();
   await page.route("**/api/games/lichess-abc123", async (route) => {

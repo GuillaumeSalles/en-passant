@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 async function expectTooltipWithinViewport(page: Page, triggerName: string, tooltipText: string) {
   const trigger = page.getByRole("button", { name: triggerName });

@@ -2,6 +2,8 @@ import { expect, type Page } from "@playwright/test";
 
 export const STORAGE_ORIGIN_PATH = "/stockfish-18-lite-single.js";
 
+const ENGINE_ENABLED_KEY = "en_passant_engine_enabled";
+
 export type RepertoireRecord = {
   id: string;
   handle: string;
@@ -268,6 +270,13 @@ export function emptyChanges(): SyncChanges {
 
 export async function gotoStorageOrigin(page: Page): Promise<void> {
   await page.goto(STORAGE_ORIGIN_PATH);
+}
+
+export async function enableEngine(page: Page): Promise<void> {
+  await gotoStorageOrigin(page);
+  await page.evaluate((engineEnabledKey) => {
+    window.localStorage.setItem(engineEnabledKey, "true");
+  }, ENGINE_ENABLED_KEY);
 }
 
 export async function clearLocalStorageAndIndexedDb(page: Page): Promise<void> {
