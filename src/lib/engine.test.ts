@@ -88,6 +88,31 @@ afterEach(() => {
 });
 
 describe("Engine", () => {
+  test("does not create a worker until the first evaluation", () => {
+    const { engine, workers } = createEngine();
+
+    engine.setNumberOfLines(3);
+
+    expect(workers).toHaveLength(0);
+
+    engine.evaluate("fen-a", 12);
+
+    expect(workers).toHaveLength(1);
+    expect(workers[0]?.messages).toEqual([
+      "setoption name MultiPV value 3",
+      "position fen fen-a",
+      "go depth 12",
+    ]);
+  });
+
+  test("terminating before an evaluation does not create a worker", () => {
+    const { engine, workers } = createEngine();
+
+    engine.terminate();
+
+    expect(workers).toHaveLength(0);
+  });
+
   test("starts an evaluation immediately when the engine is idle", () => {
     const { engine, workers } = createEngine();
 
@@ -98,9 +123,9 @@ describe("Engine", () => {
 
   test("coalesces rapid evaluations until the active search stops", () => {
     const { engine, workers } = createEngine();
-    const worker = workers[0];
 
     engine.evaluate("fen-a", 12);
+    const worker = workers[0];
     engine.evaluate("fen-b", 12);
     engine.evaluate("fen-c", 14);
 
@@ -119,9 +144,9 @@ describe("Engine", () => {
 
   test("waits for the active search to stop before applying line-count changes", () => {
     const { engine, workers } = createEngine();
-    const worker = workers[0];
 
     engine.evaluate("fen-a", 12);
+    const worker = workers[0];
     engine.setNumberOfLines(3);
     engine.evaluate("fen-b", 12);
 
@@ -136,6 +161,20 @@ describe("Engine", () => {
       "setoption name MultiPV value 3",
       "position fen fen-b",
       "go depth 12",
+    ]);
+  });
+
+  test("applies line-count changes immediately after the worker has loaded", () => {
+    const { engine, workers } = createEngine();
+
+    engine.evaluate("fen-a", 12);
+    workers[0]?.emitMessage("bestmove e2e4");
+    engine.setNumberOfLines(3);
+
+    expect(workers[0]?.messages).toEqual([
+      "position fen fen-a",
+      "go depth 12",
+      "setoption name MultiPV value 3",
     ]);
   });
 

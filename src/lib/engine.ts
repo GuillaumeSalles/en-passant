@@ -14,7 +14,7 @@ export type EngineWorker = {
 export type EngineWorkerFactory = () => EngineWorker;
 
 export class Engine {
-  private worker: EngineWorker;
+  private worker: EngineWorker | null = null;
 
   private onEvaluationCallbacks: ((evaluation: EngineEval) => void)[] = [];
 
@@ -34,9 +34,7 @@ export class Engine {
 
   constructor(
     private readonly workerFactory: EngineWorkerFactory = () => new Worker(STOCKFISH_WORKER_PATH),
-  ) {
-    this.worker = this.createWorker();
-  }
+  ) {}
 
   private createWorker(): EngineWorker {
     const worker = this.workerFactory();
@@ -101,13 +99,19 @@ export class Engine {
   terminate() {
     this.isTerminated = true;
     this.onEvaluationCallbacks = [];
-    this.removeWorkerListeners(this.worker);
-    this.worker.terminate();
+    const worker = this.worker;
+    if (worker !== null) {
+      this.removeWorkerListeners(worker);
+      worker.terminate();
+      this.worker = null;
+    }
   }
 
   private stopCurrentSearch() {
     if (this.isWaitingForStop) return;
-    this.worker.postMessage("stop");
+    const worker = this.worker;
+    if (worker === null) return;
+    worker.postMessage("stop");
     this.isWaitingForStop = true;
   }
 
@@ -121,24 +125,31 @@ export class Engine {
   private flushPendingCommands() {
     if (this.isTerminated || this.isSearching || this.isWaitingForStop) return;
 
+    const request = this.pendingRequest;
+    const worker = this.worker ?? (request === null ? null : this.createWorker());
+    if (worker === null) return;
+    this.worker = worker;
+
     const numberOfLines = this.pendingNumberOfLines;
     if (numberOfLines !== null) {
       this.pendingNumberOfLines = null;
-      this.worker.postMessage(`setoption name MultiPV value ${numberOfLines}`);
+      worker.postMessage(`setoption name MultiPV value ${numberOfLines}`);
     }
 
-    const request = this.pendingRequest;
     if (request === null) return;
 
     this.pendingRequest = null;
     this.currentRequest = request;
     this.isSearching = true;
-    this.worker.postMessage(`position fen ${request.fen}`);
-    this.worker.postMessage(`go depth ${request.depth}`);
+    worker.postMessage(`position fen ${request.fen}`);
+    worker.postMessage(`go depth ${request.depth}`);
   }
 
   private restartWorker() {
     if (this.isTerminated) return;
+
+    const worker = this.worker;
+    if (worker === null) return;
 
     const failedRequest = this.currentRequest;
     const shouldRetryFailedRequest =
@@ -148,8 +159,8 @@ export class Engine {
       this.lastCrashedRequest = failedRequest;
     }
 
-    this.removeWorkerListeners(this.worker);
-    this.worker.terminate();
+    this.removeWorkerListeners(worker);
+    worker.terminate();
     this.worker = this.createWorker();
     this.currentRequest = null;
     this.pendingRequest = requestToRun;
