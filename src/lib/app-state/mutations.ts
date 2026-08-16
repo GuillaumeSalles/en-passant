@@ -1005,9 +1005,11 @@ function immutableSwap(array: number[], firstIndex: number, secondIndex: number)
   return result;
 }
 
-export function toggleEngine(state: MutableAppState) {
+export function toggleEngine(state: MutableAppState): MutationEffect {
+  const isEnabled = !state.engineSettings.isEnabled;
   state.set("engineSettings", {
     ...state.engineSettings,
-    isEnabled: !state.engineSettings.isEnabled,
+    isEnabled,
   });
+  return { type: "persist-engine-enabled", isEnabled };
 }

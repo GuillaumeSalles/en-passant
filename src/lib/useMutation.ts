@@ -9,6 +9,7 @@ import { isSignedIn } from "@/lib/authSession";
 import { recordCachedMoveAdditions } from "@/lib/signupNudge";
 import { saveLatestPgnMutation, saveLatestPgnMutations } from "@/storage/pgnPersistence";
 import { queueRepertoireSync } from "@/storage/backendSync";
+import { writeEngineEnabledPreference } from "@/lib/enginePreference";
 
 export type MoveSound = "Move" | "Capture";
 
@@ -17,7 +18,8 @@ export type MutationEffect =
   | { type: "record-cached-move" }
   | { type: "persist-pgn-mutation"; pgnId: string; pgn: string; mutation: PgnMutation }
   | { type: "persist-pgn-mutations"; pgnId: string; pgn: string; mutations: PgnMutation[] }
-  | { type: "persist-training-line-schedule"; schedule: TrainingLineReview };
+  | { type: "persist-training-line-schedule"; schedule: TrainingLineReview }
+  | { type: "persist-engine-enabled"; isEnabled: boolean };
 
 export type MutationResult = void | MutationEffect | MutationEffect[];
 
@@ -50,6 +52,8 @@ function runMutationEffects(result: MutationResult): void {
       void saveLatestPgnMutations(effect.pgnId, effect.pgn, effect.mutations);
     } else if (effect.type === "persist-training-line-schedule") {
       void storage.saveTrainingLineSchedule(effect.schedule).then(queueRepertoireSync);
+    } else if (effect.type === "persist-engine-enabled") {
+      writeEngineEnabledPreference(effect.isEnabled);
     }
   }
 }

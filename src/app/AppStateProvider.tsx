@@ -3,6 +3,7 @@ import type { JSX } from "@solidjs/web";
 import { AppState, emptyState } from "@/lib/AppState";
 import { createStore as createCustomStore, Store } from "@/lib/createStore";
 import { startRecordChangeSync } from "@/lib/recordChangeSync";
+import { readEngineEnabledPreference } from "@/lib/enginePreference";
 
 type ContextValue = {
   store: Store<AppState>;
@@ -11,7 +12,12 @@ type ContextValue = {
 const AppStateContext = createContext<ContextValue>({} as ContextValue);
 
 export function AppStateProvider(props: { children: JSX.Element }) {
-  const store = createCustomStore(emptyState());
+  const initialState = emptyState();
+  const storedEngineEnabled = readEngineEnabledPreference();
+  if (storedEngineEnabled !== undefined) {
+    initialState.engineSettings.isEnabled = storedEngineEnabled;
+  }
+  const store = createCustomStore(initialState);
 
   onSettled(() => startRecordChangeSync(store));
 

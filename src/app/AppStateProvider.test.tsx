@@ -8,7 +8,10 @@ import { useMutation } from "@/lib/useMutation";
 import { flipBoard, toggleEngine } from "@/lib/AppState";
 import { TestRouter } from "@/tests/TestRouter";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
 
 function Wrapper(props: { children: JSX.Element }) {
   return (
@@ -71,4 +74,31 @@ test("should not re-render when the selected data does not change", async () => 
   expect(screen.getByRole("heading").textContent).toBe("white");
   flush(() => fireEvent.click(screen.getByText("Toggle")));
   expect(screen.getByRole("heading").textContent).toBe("white");
+});
+
+test("restores and persists the engine enabled preference", () => {
+  window.localStorage.setItem("en_passant_engine_enabled", "false");
+
+  function TestComponent() {
+    const onToggleEngine = useMutation(toggleEngine);
+    const isEngineEnabled = useSelector((state) => state.engineSettings.isEnabled);
+    return (
+      <>
+        <h1>{isEngineEnabled() ? "enabled" : "disabled"}</h1>
+        <button onClick={onToggleEngine}>Toggle</button>
+      </>
+    );
+  }
+
+  render(() => (
+    <Wrapper>
+      <TestComponent />
+    </Wrapper>
+  ));
+  expect(screen.getByRole("heading").textContent).toBe("disabled");
+
+  flush(() => fireEvent.click(screen.getByText("Toggle")));
+
+  expect(screen.getByRole("heading").textContent).toBe("enabled");
+  expect(window.localStorage.getItem("en_passant_engine_enabled")).toBe("true");
 });
