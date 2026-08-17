@@ -6,8 +6,6 @@ import { TrainingLineList, type TrainingLineListItem } from "@/components/Traini
 import { Button } from "@/components/ui/button";
 import {
   getChapterPgn,
-  getChapterName,
-  getRepertoireName,
   getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
   isTrainingReviewDue,
@@ -19,9 +17,7 @@ import {
   importedGamePath,
   learningLinePath,
   repertoireMovePath,
-  repertoireOverviewPath,
   trainingLinePath,
-  trainingPath,
 } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
@@ -44,9 +40,7 @@ export function TrainingLines(props: {
   );
 
   const chapterPgn = useSelector(getChapterPgn);
-  const chapterName = useSelector(getChapterName);
   const orientation = useSelector(selectOrientation);
-  const repertoireName = useSelector(getRepertoireName);
   const trainingSession = useSelector((state) => state.training.session);
   const reviews = useSelector((state) => state.training.reviews);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
@@ -141,14 +135,6 @@ export function TrainingLines(props: {
       return {
         id: line.id,
         label: lineLabel(line.terminalMoveId),
-        repertoire: {
-          href: repertoireOverviewPath(props.repertoireHandle),
-          label: repertoireName() ?? props.repertoireHandle,
-        },
-        chapter: {
-          href: trainingPath(props.repertoireHandle, props.chapterHandle),
-          label: chapterName() ?? props.chapterHandle,
-        },
         intervalIndex: review?.intervalIndex,
         isAlternative: line.isAlternative,
         isLearned,

@@ -8,8 +8,6 @@ function trainingLine(overrides: Partial<TrainingLineListItem> = {}): TrainingLi
   return {
     id: "v1-line",
     label: "e4 e5 Nf3",
-    repertoire: { href: "/repertoire", label: "Repertoire" },
-    chapter: { href: "/chapter", label: "Chapter" },
     intervalIndex: 1,
     isAlternative: false,
     isLearned: true,
@@ -37,12 +35,12 @@ test("renders the shared training-line structure and route-specific actions", ()
   ));
 
   const row = screen.getByText("e4 e5 Nf3").closest("[data-training-line]");
+  expect(screen.getByText("e4 e5 Nf3").classList.contains("text-foreground")).toBe(true);
   expect(row?.getAttribute("data-training-line")).toBe("v1-line");
   expect(row?.getAttribute("data-training-queue-line")).toBe("review-key");
   expect(row?.getAttribute("data-training-status")).toBe("due");
   expect(row?.textContent).toContain("Due now");
-  expect(screen.getByRole("link", { name: "Repertoire" }).getAttribute("href")).toBe("/repertoire");
-  expect(screen.getByRole("link", { name: "Chapter" }).getAttribute("href")).toBe("/chapter");
+  expect(screen.getByText("Due now").classList.contains("text-muted-foreground")).toBe(true);
   expect(screen.getByRole("link", { name: "View" }).getAttribute("href")).toBe("/chapter?move=end");
   expect(screen.getByRole("link", { name: "Review" }).getAttribute("href")).toBe("/train/v1-line");
 });
@@ -63,6 +61,27 @@ test("uses Learn as the primary action for a line that has never been learned", 
   ));
 
   expect(screen.getByRole("link", { name: "Learn" }).getAttribute("href")).toBe("/learn/v1-line");
+  expect(screen.queryByRole("link", { name: "Review" })).toBeNull();
+});
+
+test("uses a secondary Overstudy action for a learned line that is not due", () => {
+  render(() => (
+    <TrainingLineList
+      lines={[
+        trainingLine({
+          dueAt: 3_000,
+          trainingStatus: "trained",
+        }),
+      ]}
+      emptyMessage="Nothing to train"
+      loading={false}
+      now={2_000}
+    />
+  ));
+
+  const overstudy = screen.getByRole("link", { name: "Overstudy" });
+  expect(overstudy.getAttribute("href")).toBe("/train/v1-line");
+  expect(overstudy.classList.contains("border-input")).toBe(true);
   expect(screen.queryByRole("link", { name: "Review" })).toBeNull();
 });
 

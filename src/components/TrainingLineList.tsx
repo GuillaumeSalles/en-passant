@@ -27,8 +27,6 @@ function formatDueTime(dueAt: number, now: number): string {
 export type TrainingLineListItem = {
   id: string;
   label: string;
-  repertoire: TrainingLineLink;
-  chapter: TrainingLineLink;
   intervalIndex: number | undefined;
   isAlternative: boolean;
   isLearned: boolean;
@@ -39,6 +37,15 @@ export type TrainingLineListItem = {
   queueKey?: string | undefined;
   trainingStatus: "due" | "trained" | "untrained";
 };
+
+function isOverstudy(line: TrainingLineListItem, now: number): boolean {
+  return line.isLearned && line.dueAt !== undefined && line.dueAt > now;
+}
+
+function trainingActionLabel(line: TrainingLineListItem, now: number): string {
+  if (!line.isLearned) return "Learn";
+  return isOverstudy(line, now) ? "Overstudy" : "Review";
+}
 
 export function TrainingLineList(props: {
   lines: readonly TrainingLineListItem[];
@@ -75,24 +82,7 @@ export function TrainingLineList(props: {
                 data-alternative-line={line.isAlternative ? "true" : "false"}
               >
                 <div class="min-w-0">
-                  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                    <div class="flex min-w-0 flex-none items-baseline gap-1 text-xs text-muted-foreground">
-                      <a
-                        class="max-w-40 truncate underline-offset-4 hover:text-foreground hover:underline"
-                        href={line.repertoire.href}
-                      >
-                        {line.repertoire.label}
-                      </a>
-                      <span>·</span>
-                      <a
-                        class="max-w-40 truncate underline-offset-4 hover:text-foreground hover:underline"
-                        href={line.chapter.href}
-                      >
-                        {line.chapter.label}
-                      </a>
-                    </div>
-                    <div class="min-w-48 flex-1 font-medium">{line.label}</div>
-                  </div>
+                  <div class="text-sm font-medium text-foreground">{line.label}</div>
                   <div class="mt-1 flex flex-wrap items-center gap-2">
                     <TrainingMasteryBadge intervalIndex={line.intervalIndex} />
                     <Show when={line.isAlternative}>
@@ -102,11 +92,7 @@ export function TrainingLineList(props: {
                     </Show>
                     <Show when={line.dueAt !== undefined}>
                       <span
-                        class={
-                          line.trainingStatus === "due"
-                            ? "inline-flex items-center text-xs font-medium text-amber-600 dark:text-amber-400"
-                            : "inline-flex items-center text-xs text-muted-foreground"
-                        }
+                        class="inline-flex items-center text-xs text-muted-foreground"
                         title={new Date(line.dueAt ?? props.now).toLocaleString()}
                       >
                         {formatDueTime(line.dueAt ?? props.now, props.now)}
@@ -135,8 +121,12 @@ export function TrainingLineList(props: {
                   <Button size="sm" variant="outline" href={line.viewHref}>
                     View
                   </Button>
-                  <Button size="sm" href={line.primaryHref}>
-                    {line.isLearned ? "Review" : "Learn"}
+                  <Button
+                    size="sm"
+                    variant={isOverstudy(line, props.now) ? "outline" : "default"}
+                    href={line.primaryHref}
+                  >
+                    {trainingActionLabel(line, props.now)}
                   </Button>
                 </div>
               </div>

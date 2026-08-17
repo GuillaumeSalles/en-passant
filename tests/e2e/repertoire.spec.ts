@@ -1180,11 +1180,11 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page.locator('[data-training-status="trained"]')).toHaveCount(1);
   await expect(page.getByText("Learned", { exact: true })).toHaveCount(0);
   await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveCount(0);
-  await expect(firstLine.getByRole("link", { name: "Review" })).toBeVisible();
+  await expect(firstLine.getByRole("link", { name: "Overstudy" })).toBeVisible();
   await expect(firstLine).toContainText("Due in");
   await page.reload();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
-  await expect(firstLine.getByRole("link", { name: "Review" })).toBeVisible();
+  await expect(firstLine.getByRole("link", { name: "Overstudy" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Learn again" })).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });

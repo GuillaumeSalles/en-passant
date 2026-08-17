@@ -9,10 +9,8 @@ import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
   importedGamePath,
   repertoireMovePath,
-  repertoireOverviewPath,
   trainingLinePath,
   trainingLineReviewPath,
-  trainingPath,
   trainingQueuePath,
 } from "@/lib/routes";
 import { useLoadPgns } from "@/lib/useLoadPgn";
@@ -79,14 +77,6 @@ export function Training() {
       return {
         id: line.line.id,
         label: line.label,
-        repertoire: {
-          href: repertoireOverviewPath(line.repertoire.handle),
-          label: line.repertoire.name,
-        },
-        chapter: {
-          href: trainingPath(line.repertoire.handle, line.chapter.handle),
-          label: line.chapter.name,
-        },
         intervalIndex: line.review.intervalIndex,
         isAlternative: line.line.isAlternative,
         isLearned: true,
