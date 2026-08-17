@@ -1,14 +1,15 @@
 import { useLocation, useNavigate } from "@solidjs/router";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
-import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
+import { TrainingLineList, type TrainingLineListItem } from "@/components/TrainingLineList";
 import { Button } from "@/components/ui/button";
-import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { getScheduledTrainingLines } from "@/lib/AppState";
+import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
   importedGamePath,
+  repertoireMovePath,
+  repertoireOverviewPath,
   trainingLinePath,
   trainingLineReviewPath,
   trainingPath,
@@ -19,22 +20,6 @@ import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapte
 import { useMutation } from "@/lib/useMutation";
 import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
 import { ensureTrainingQueueReview, startTrainingQueueReview } from "@/mutations/trainingSession";
-
-function formatDueTime(dueAt: number, now: number): string {
-  const difference = dueAt - now;
-  const absoluteDifference = Math.abs(difference);
-  if (absoluteDifference < 60_000) return difference <= 0 ? "Due now" : "Due in less than a minute";
-
-  const units = [
-    { milliseconds: 24 * 60 * 60 * 1000, label: "day" },
-    { milliseconds: 60 * 60 * 1000, label: "hour" },
-    { milliseconds: 60 * 1000, label: "minute" },
-  ] as const;
-  const unit = units.find((candidate) => absoluteDifference >= candidate.milliseconds) ?? units[2];
-  const amount = Math.floor(absoluteDifference / unit.milliseconds);
-  const duration = `${amount} ${unit.label}${amount === 1 ? "" : "s"}`;
-  return difference <= 0 ? `Due ${duration} ago` : `Due in ${duration}`;
-}
 
 export function Training() {
   const state = useState();
@@ -65,23 +50,67 @@ export function Training() {
       return result === undefined || result.status === "not-loaded" || result.status === "loading";
     });
   });
-  const lines = createMemo(() => {
-    if (state.repertoires.status !== "success" || state.chapters.status !== "success") return [];
-    const pgns = Object.fromEntries(
+  const loadedPgns = createMemo(() =>
+    Object.fromEntries(
       Object.entries(state.pgns).flatMap(([pgnId, result]) =>
         result.status === "success" ? [[pgnId, result.data]] : [],
       ),
-    );
+    ),
+  );
+  const lines = createMemo(() => {
+    if (state.repertoires.status !== "success" || state.chapters.status !== "success") return [];
     return getScheduledTrainingLines(
       state.repertoires.data,
       state.chapters.data,
-      pgns,
+      loadedPgns(),
       state.training.reviews,
       now(),
     );
   });
   const dueCount = createMemo(() => lines().filter((line) => line.isDue).length);
   const nextDueLine = createMemo(() => lines().find((line) => line.isDue));
+  const listItems = createMemo<TrainingLineListItem[]>(() =>
+    lines().map((line) => {
+      const mistakeLink =
+        mistakeLinks()[trainingMistakeLinkKey(line.chapter.id, line.line.uciPath)];
+      const pgn = loadedPgns()[line.chapter.pgnId];
+      const selectedPositionKey =
+        pgn === undefined ? "" : (movePositionKey(pgn, line.line.terminalMoveId) ?? "");
+      return {
+        id: line.line.id,
+        label: line.label,
+        repertoire: {
+          href: repertoireOverviewPath(line.repertoire.handle),
+          label: line.repertoire.name,
+        },
+        chapter: {
+          href: trainingPath(line.repertoire.handle, line.chapter.handle),
+          label: line.chapter.name,
+        },
+        intervalIndex: line.review.intervalIndex,
+        isAlternative: line.line.isAlternative,
+        isLearned: true,
+        dueAt: line.review.dueAt,
+        detailLinks:
+          mistakeLink === undefined
+            ? undefined
+            : [
+                {
+                  href: importedGamePath(mistakeLink.game.id),
+                  label: `Review game vs ${mistakeLink.game.opponentName}`,
+                },
+              ],
+        viewHref: repertoireMovePath(
+          line.repertoire.handle,
+          line.chapter.handle,
+          selectedPositionKey,
+        ),
+        primaryHref: trainingLinePath(line.repertoire.handle, line.chapter.handle, line.line.id),
+        queueKey: line.key,
+        trainingStatus: line.isDue ? "due" : "trained",
+      };
+    }),
+  );
 
   createEffect(
     () => ({
@@ -154,89 +183,12 @@ export function Training() {
           </Show>
         </div>
 
-        <div class="mt-4 overflow-hidden rounded-md border border-border bg-background">
-          <Show
-            when={!isLoading()}
-            fallback={<div class="p-4 text-sm text-muted-foreground">Loading training lines…</div>}
-          >
-            <For
-              each={lines()}
-              fallback={
-                <div class="p-4 text-sm text-muted-foreground">
-                  No lines are scheduled yet. Learn a repertoire line to add it here.
-                </div>
-              }
-            >
-              {(line, index) => {
-                const mistakeLink = () =>
-                  mistakeLinks()[trainingMistakeLinkKey(line.chapter.id, line.line.uciPath)];
-                return (
-                  <>
-                    <Show when={index() > 0}>
-                      <HorizontalDashedDivider animation="none" />
-                    </Show>
-                    <div
-                      class="flex min-w-0 items-center justify-between gap-3 p-3"
-                      data-training-queue-line={line.key}
-                    >
-                      <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span class="text-xs font-medium text-muted-foreground">
-                            Priority {index() + 1}
-                          </span>
-                          <TrainingMasteryBadge intervalIndex={line.review.intervalIndex} />
-                          <span
-                            class={
-                              line.isDue
-                                ? "text-xs font-medium text-amber-600 dark:text-amber-400"
-                                : "text-xs text-muted-foreground"
-                            }
-                            title={new Date(line.review.dueAt).toLocaleString()}
-                          >
-                            {formatDueTime(line.review.dueAt, now())}
-                          </span>
-                        </div>
-                        <div class="mt-1 truncate text-sm font-medium">{line.label}</div>
-                        <div class="mt-0.5 truncate text-xs text-muted-foreground">
-                          <a
-                            class="underline-offset-4 hover:text-foreground hover:underline"
-                            href={trainingPath(line.repertoire.handle, line.chapter.handle)}
-                          >
-                            {line.repertoire.name} · {line.chapter.name}
-                          </a>
-                          <Show when={mistakeLink()}>
-                            {(link) => (
-                              <>
-                                {" · "}
-                                <a
-                                  class="underline-offset-4 hover:text-foreground hover:underline"
-                                  href={importedGamePath(link().game.id)}
-                                >
-                                  Review game vs {link().game.opponentName}
-                                </a>
-                              </>
-                            )}
-                          </Show>
-                        </div>
-                      </div>
-                      <Button
-                        class="flex-none"
-                        size="sm"
-                        href={trainingLinePath(
-                          line.repertoire.handle,
-                          line.chapter.handle,
-                          line.line.id,
-                        )}
-                      >
-                        Review
-                      </Button>
-                    </div>
-                  </>
-                );
-              }}
-            </For>
-          </Show>
-        </div>
+        <TrainingLineList
+          lines={listItems()}
+          loading={isLoading()}
+          now={now()}
+          emptyMessage="No lines are scheduled yet. Learn a repertoire line to add it here."
+        />
       </div>
     </FullWidthLayout>
   );

@@ -1,19 +1,13 @@
 import { useParams } from "@solidjs/router";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
-import { Ellipsis } from "@/components/Icons";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
+import { TrainingLineList, type TrainingLineListItem } from "@/components/TrainingLineList";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
-import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
-import {
   getChapterPgn,
+  getChapterName,
+  getRepertoireName,
   getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
   isTrainingReviewDue,
@@ -25,7 +19,9 @@ import {
   importedGamePath,
   learningLinePath,
   repertoireMovePath,
+  repertoireOverviewPath,
   trainingLinePath,
+  trainingPath,
 } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
@@ -48,7 +44,9 @@ export function TrainingLines(props: {
   );
 
   const chapterPgn = useSelector(getChapterPgn);
+  const chapterName = useSelector(getChapterName);
   const orientation = useSelector(selectOrientation);
+  const repertoireName = useSelector(getRepertoireName);
   const trainingSession = useSelector((state) => state.training.session);
   const reviews = useSelector((state) => state.training.reviews);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
@@ -131,6 +129,52 @@ export function TrainingLines(props: {
     return pgn === null ? "" : (movePositionKey(pgn, terminalMoveId) ?? "");
   }
 
+  const listItems = createMemo<TrainingLineListItem[]>(() =>
+    lines().map((line) => {
+      const result = results().get(line.id);
+      const review = reviewForLine(line.uciPath);
+      const isLearned = review !== undefined;
+      const isDue = isLineDue(line.uciPath);
+      const mistakeLink =
+        mistakeLinks()[trainingMistakeLinkKey(review?.chapterId ?? "", line.uciPath)];
+      const learningHref = learningLinePath(props.repertoireHandle, props.chapterHandle, line.id);
+      return {
+        id: line.id,
+        label: lineLabel(line.terminalMoveId),
+        repertoire: {
+          href: repertoireOverviewPath(props.repertoireHandle),
+          label: repertoireName() ?? props.repertoireHandle,
+        },
+        chapter: {
+          href: trainingPath(props.repertoireHandle, props.chapterHandle),
+          label: chapterName() ?? props.chapterHandle,
+        },
+        intervalIndex: review?.intervalIndex,
+        isAlternative: line.isAlternative,
+        isLearned,
+        dueAt: review?.dueAt,
+        detailLinks:
+          mistakeLink === undefined
+            ? undefined
+            : [
+                {
+                  href: importedGamePath(mistakeLink.game.id),
+                  label: `Review game vs ${mistakeLink.game.opponentName}`,
+                },
+              ],
+        viewHref: repertoireMovePath(
+          props.repertoireHandle,
+          props.chapterHandle,
+          linePositionKey(line.terminalMoveId),
+        ),
+        primaryHref: isLearned
+          ? trainingLinePath(props.repertoireHandle, props.chapterHandle, line.id)
+          : learningHref,
+        trainingStatus: isDue ? "due" : result === undefined ? "untrained" : "trained",
+      };
+    }),
+  );
+
   return (
     <FullWidthLayout
       title={<RepertoireBreadcrumb showTraining trainingLineId={null} />}
@@ -163,131 +207,12 @@ export function TrainingLines(props: {
           </div>
         </Show>
 
-        <div class="mt-4 overflow-hidden rounded-md border border-border bg-background">
-          <For
-            each={lines()}
-            fallback={<div class="p-3 text-sm text-muted-foreground">Nothing to train</div>}
-          >
-            {(line, index) => {
-              const result = () => results().get(line.id);
-              const review = () => reviewForLine(line.uciPath);
-              const isLearned = () => review() !== undefined;
-              const isDue = () => isLineDue(line.uciPath);
-              const mistakeLink = () =>
-                mistakeLinks()[trainingMistakeLinkKey(review()?.chapterId ?? "", line.uciPath)];
-              return (
-                <>
-                  <Show when={index() > 0}>
-                    <HorizontalDashedDivider animation="none" />
-                  </Show>
-                  <div
-                    class="flex min-w-0 items-center justify-between gap-3 p-3"
-                    data-training-line={line.id}
-                    data-training-status={
-                      isDue() ? "due" : result() === undefined ? "untrained" : "trained"
-                    }
-                    data-learning-status={isLearned() ? "learned" : "unlearned"}
-                    data-alternative-line={line.isAlternative ? "true" : "false"}
-                  >
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span class="font-medium">Line {index() + 1}</span>
-                        <TrainingMasteryBadge intervalIndex={review()?.intervalIndex} />
-                        <Show when={line.isAlternative}>
-                          <span class="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                            Alternative
-                          </span>
-                        </Show>
-                        <Show when={isDue()}>
-                          <span class="inline-flex items-center text-xs font-medium text-amber-600 dark:text-amber-400">
-                            Due
-                          </span>
-                        </Show>
-                      </div>
-                      <div class="mt-1 truncate text-sm text-muted-foreground">
-                        {lineLabel(line.terminalMoveId)}
-                      </div>
-                      <Show when={mistakeLink()}>
-                        {(link) => (
-                          <a
-                            class="mt-0.5 block truncate text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                            href={importedGamePath(link().game.id)}
-                          >
-                            Review game vs {link().game.opponentName}
-                          </a>
-                        )}
-                      </Show>
-                    </div>
-                    <div class="flex flex-none items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        href={repertoireMovePath(
-                          props.repertoireHandle,
-                          props.chapterHandle,
-                          linePositionKey(line.terminalMoveId),
-                        )}
-                      >
-                        View
-                      </Button>
-                      <Show
-                        when={isLearned()}
-                        fallback={
-                          <Button
-                            size="sm"
-                            href={learningLinePath(
-                              props.repertoireHandle,
-                              props.chapterHandle,
-                              line.id,
-                            )}
-                          >
-                            Learn
-                          </Button>
-                        }
-                      >
-                        <Button
-                          size="sm"
-                          href={trainingLinePath(
-                            props.repertoireHandle,
-                            props.chapterHandle,
-                            line.id,
-                          )}
-                        >
-                          Train
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger>
-                            <Button
-                              size="sm-icon"
-                              variant="outline"
-                              aria-label={`More actions for line ${index() + 1}`}
-                            >
-                              <Ellipsis />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled={false}>
-                              <a
-                                class="w-full"
-                                href={learningLinePath(
-                                  props.repertoireHandle,
-                                  props.chapterHandle,
-                                  line.id,
-                                )}
-                              >
-                                Learn again
-                              </a>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </Show>
-                    </div>
-                  </div>
-                </>
-              );
-            }}
-          </For>
-        </div>
+        <TrainingLineList
+          lines={listItems()}
+          emptyMessage="Nothing to train"
+          loading={false}
+          now={now()}
+        />
       </div>
     </FullWidthLayout>
   );
