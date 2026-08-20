@@ -1129,6 +1129,54 @@ test("highlights demonstrated and opponent moves while learning", async ({ page 
   expect(consoleMessages).toEqual([]);
 });
 
+test("waits one second at learning line boundaries", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 (1. d4) *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const lines = page.locator("[data-training-line]");
+  const secondLearnHref = await lines
+    .nth(1)
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  if (secondLearnHref === null) throw new Error("Expected the second line to have a learning URL");
+  await lines.first().getByRole("link", { name: "Learn" }).click();
+
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText(/Practice 1 of 2: White to play\./)).toBeVisible();
+
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()));
+  await dragPiece(page, "e2", "e4");
+
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await page.clock.runFor(999);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
+
+  await page.clock.runFor(1);
+  await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.getByText(/Practice 2 of 2: White to play\./)).toBeVisible();
+
+  await dragPiece(page, "e2", "e4");
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.getByRole("link", { name: "Next line" })).toHaveCount(0);
+  await page.clock.runFor(999);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.getByRole("link", { name: "Next line" })).toHaveCount(0);
+
+  await page.clock.runFor(1);
+  await expect(page.getByRole("link", { name: "Next line" })).toHaveAttribute(
+    "href",
+    secondLearnHref,
+  );
+  await page.getByRole("link", { name: "Next line" }).click();
+  await expect(page).toHaveURL(secondLearnHref);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("learns a line with demonstrations, responses, and progressive comments", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

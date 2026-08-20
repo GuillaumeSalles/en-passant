@@ -154,6 +154,44 @@ test("reviews only due lines from a chapter", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("waits one second before advancing to the next training line", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  const now = Date.now();
+  await seedIndexedDb(page, {
+    repertoires: [repertoire],
+    chapters: [chapter],
+    pgns: [
+      {
+        id: chapter.pgnId,
+        pgn: "1. e4 (1. d4) *",
+        updatedAt,
+        deletedAt: null,
+        dirty: false,
+      },
+    ],
+    trainingLineSchedules: [schedule("e2e4", now - 120_000, 0), schedule("d2d4", now - 60_000, 0)],
+  });
+
+  await page.goto("/app/repertoires/white-repertoire/open-games/train");
+  await page.getByRole("link", { name: "Review", exact: true }).first().click();
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  const firstLineUrl = page.url();
+
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now()));
+  await dragPiece(page, "e2", "e4");
+
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await page.clock.runFor(999);
+  await expect(page).toHaveURL(firstLineUrl);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+
+  await page.clock.runFor(1);
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  expect(page.url()).not.toBe(firstLineUrl);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("reviews every due line across chapters and stops before future lines", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   const secondChapter = {
