@@ -2102,6 +2102,37 @@ test("keyboard shortcuts navigate moves and flip the board", async ({ page }) =>
   expect(consoleMessages).toEqual([]);
 });
 
+test("links transpositions while preserving their separate continuations", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await openRepertoire(page, "1. Nf3 (1. d4 d5 2. Nf3 e6) d5 2. d4 Nf6 *");
+  const transposition = page.locator('[data-san="Nf3"][data-transposition-to]');
+  const transpositionLink = transposition.getByRole("button", {
+    name: "Transposes to 2.d4",
+  });
+  await expect(transposition).toHaveCount(1);
+  await expect(transpositionLink).toBeVisible();
+  await expect(transpositionLink).toHaveText("↔");
+  await expect(transposition).toHaveAttribute("aria-label", "Move Nf3. Transposes to 2.d4");
+  await transpositionLink.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Transposes to 2.d4");
+
+  await transposition.getByText("Nf3", { exact: true }).click();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-san="e6"]')).toHaveAttribute("data-selected", "true");
+  await page.keyboard.press("ArrowLeft");
+  await expect(transposition).toHaveAttribute("data-selected", "true");
+
+  await transpositionLink.click();
+  await expect(page.locator('[data-san="d4"][data-selected="true"]')).toHaveCount(1);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-san="Nf6"]')).toHaveAttribute("data-selected", "true");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator('[data-san="d4"][data-selected="true"]')).toHaveCount(1);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("keyboard shortcuts open move comment editors", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

@@ -56,6 +56,7 @@ export {
 export { applyNagToList, getNagGlyph, getNagMeaning } from "./app-state/nags";
 export { emptyNormalizedPgn } from "./app-state/reactivePgn";
 export {
+  buildPositionIndex,
   findMoveIdByPositionKey,
   formatMoveTimeSpent,
   getMoveNumber,
@@ -64,6 +65,8 @@ export {
   movePositionKey,
   normalizePgn,
   toPgn,
+  type PositionIndex,
+  type PositionIndexEntry,
 } from "./app-state/pgnTree";
 export {
   emptyState,

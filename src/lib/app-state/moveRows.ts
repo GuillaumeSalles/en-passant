@@ -1,5 +1,5 @@
 import type { CommentPlacement } from "@/lib/commentShortcutEvents";
-import { getMoveNumber, isMoveWhite } from "./pgnTree";
+import { buildPositionIndex, getMoveNumber, isMoveWhite, type PositionIndex } from "./pgnTree";
 import type { Move } from "./types";
 
 type MoveRowTask =
@@ -17,6 +17,7 @@ type MoveRowTask =
 export type MoveTokenData = {
   moveId: number;
   class?: string;
+  transposition: { moveId: number; label: string } | null;
   timeSpent: string | null;
   timeSpentShare: number | null;
   canPromoteVariation: boolean;
@@ -63,10 +64,35 @@ export type CommentEditorRequest = {
   version: number;
 };
 
-function mainMoveToken(move: Move): MoveTokenData {
+function moveReference(move: Move): string {
+  return `${getMoveNumber(move)}${isMoveWhite(move) ? "." : "..."}${move.san}`;
+}
+
+function transpositionData(
+  moves: Record<number, Move>,
+  positionIndex: PositionIndex,
+  move: Move,
+): MoveTokenData["transposition"] {
+  const entry = positionIndex.byMoveId.get(move.id);
+  if (entry === undefined || entry.canonicalMoveId === move.id) return null;
+
+  const canonicalMove = moves[entry.canonicalMoveId];
+  if (canonicalMove === undefined) return null;
+  return {
+    moveId: canonicalMove.id,
+    label: `Transposes to ${moveReference(canonicalMove)}`,
+  };
+}
+
+function mainMoveToken(
+  moves: Record<number, Move>,
+  positionIndex: PositionIndex,
+  move: Move,
+): MoveTokenData {
   return {
     moveId: move.id,
     class: "w-14",
+    transposition: transpositionData(moves, positionIndex, move),
     timeSpent: move.timeSpent,
     timeSpentShare: move.timeSpentShare,
     canPromoteVariation: false,
@@ -76,12 +102,15 @@ function mainMoveToken(move: Move): MoveTokenData {
 }
 
 function variationMoveToken(
+  moves: Record<number, Move>,
+  positionIndex: PositionIndex,
   move: Move,
   canMoveVariationUp: boolean,
   canMoveVariationDown: boolean,
 ): MoveTokenData {
   return {
     moveId: move.id,
+    transposition: transpositionData(moves, positionIndex, move),
     timeSpent: move.timeSpent,
     timeSpentShare: move.timeSpentShare,
     canPromoteVariation: true,
@@ -174,6 +203,8 @@ function variationTasksFromSiblings(
 }
 
 function addMoveToVariationItems(
+  moves: Record<number, Move>,
+  positionIndex: PositionIndex,
   items: VariationRowItem[],
   move: Move,
   canMoveVariationUp: boolean,
@@ -201,7 +232,7 @@ function addMoveToVariationItems(
   items.push({
     type: "move",
     id: `move-${move.id}`,
-    move: variationMoveToken(move, canMoveVariationUp, canMoveVariationDown),
+    move: variationMoveToken(moves, positionIndex, move, canMoveVariationUp, canMoveVariationDown),
   });
 
   const commentAfter = moveComment(move, "after", commentEditorRequest);
@@ -219,6 +250,7 @@ export function buildMoveRows(
   rootMoveIdsData: number[],
   commentEditorRequest: CommentEditorRequest | null,
 ): MoveListRow[] {
+  const positionIndex = buildPositionIndex(movesData, rootMoveIdsData);
   const rows: MoveListRow[] = [];
   const tasks: MoveRowTask[] = [];
   let mainRowCount = 0;
@@ -264,7 +296,7 @@ export function buildMoveRows(
       rows.push(
         mainMovesRow(
           `main-${whiteMove.id}`,
-          mainMoveToken(whiteMove),
+          mainMoveToken(movesData, positionIndex, whiteMove),
           undefined,
           whiteMove,
           nextMainRowHasAlternateBackground(),
@@ -286,8 +318,8 @@ export function buildMoveRows(
     rows.push(
       mainMovesRow(
         `main-${whiteMove.id}-${blackMove.id}`,
-        mainMoveToken(whiteMove),
-        mainMoveToken(blackMove),
+        mainMoveToken(movesData, positionIndex, whiteMove),
+        mainMoveToken(movesData, positionIndex, blackMove),
         whiteMove,
         nextMainRowHasAlternateBackground(),
         moveComment(whiteMove, "before", commentEditorRequest),
@@ -304,7 +336,7 @@ export function buildMoveRows(
     rows.push(
       mainMovesRow(
         `partial-white-${whiteMove.id}`,
-        mainMoveToken(whiteMove),
+        mainMoveToken(movesData, positionIndex, whiteMove),
         "dots",
         whiteMove,
         nextMainRowHasAlternateBackground(),
@@ -325,7 +357,7 @@ export function buildMoveRows(
       mainMovesRow(
         `partial-black-${blackMove.id}`,
         "dots",
-        mainMoveToken(blackMove),
+        mainMoveToken(movesData, positionIndex, blackMove),
         blackMove,
         nextMainRowHasAlternateBackground(),
         moveComment(blackMove, "before", commentEditorRequest),
@@ -343,7 +375,15 @@ export function buildMoveRows(
     const items: VariationRowItem[] = [];
 
     while (true) {
-      addMoveToVariationItems(items, move, task.canMoveUp, task.canMoveDown, commentEditorRequest);
+      addMoveToVariationItems(
+        movesData,
+        positionIndex,
+        items,
+        move,
+        task.canMoveUp,
+        task.canMoveDown,
+        commentEditorRequest,
+      );
 
       if (move.next.length === 0) break;
       if (move.next.length > 1) {

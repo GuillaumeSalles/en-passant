@@ -278,6 +278,7 @@ function MoveSlot(props: {
             canPromoteVariation={move().canPromoteVariation}
             canMoveVariationUp={move().canMoveVariationUp}
             canMoveVariationDown={move().canMoveVariationDown}
+            transposition={move().transposition}
             onComment={props.onComment}
           />
         )}
@@ -417,6 +418,7 @@ function VariationMovesRow(props: {
                     canPromoteVariation={moveItem().move.canPromoteVariation}
                     canMoveVariationUp={moveItem().move.canMoveVariationUp}
                     canMoveVariationDown={moveItem().move.canMoveVariationDown}
+                    transposition={moveItem().move.transposition}
                     onComment={props.onComment}
                   />
                 )}
@@ -447,6 +449,7 @@ function MoveComponent(props: {
   canPromoteVariation: boolean;
   canMoveVariationUp: boolean;
   canMoveVariationDown: boolean;
+  transposition: MoveTokenData["transposition"];
   onComment: (moveId: number, placement: CommentPlacement) => void;
 }) {
   const readOnly = useMovesTreeReadOnly();
@@ -484,9 +487,12 @@ function MoveComponent(props: {
       >
         <div
           role="button"
-          aria-label={`Move ${move()?.san ?? props.moveId}`}
+          aria-label={`Move ${move()?.san ?? props.moveId}${
+            props.transposition === null ? "" : `. ${props.transposition.label}`
+          }`}
           data-move-id={props.moveId}
           data-san={move()?.san}
+          data-transposition-to={props.transposition?.moveId}
           data-selected={isSelected() ? "true" : undefined}
           aria-current={isSelected() ? "true" : undefined}
           class={cn(
@@ -518,6 +524,26 @@ function MoveComponent(props: {
                 </span>
               )}
             </For>
+            <Show when={props.transposition}>
+              {(transposition) => (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <button
+                        type="button"
+                        data-move-transposition
+                        aria-label={transposition().label}
+                        class="inline-flex cursor-pointer self-center border-0 bg-transparent p-0 text-[11px] leading-none text-muted-foreground hover:text-blue-500 active:scale-95"
+                        onClick={() => onSelectMove(transposition().moveId)}
+                      >
+                        ↔
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{transposition().label}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </Show>
             <Show when={indicator()}>
               {(currentIndicator) => (
                 <TooltipProvider>

@@ -5,6 +5,7 @@ import {
   arrowDown,
   arrowUp,
   back,
+  buildPositionIndex,
   deleteMove,
   emptyState,
   formatMoveTimeSpent,
@@ -705,6 +706,63 @@ test("arrow up on a move without variation should unselect move", () => {
   arrowDown(state, ctx);
   arrowUp(state, ctx);
   expect(selectedMove(state, ctx)).toBeNull();
+});
+
+test("right and left arrows stay on an occurrence's own transposition line", () => {
+  const state = fromPgn("1. Nf3 (1. d4 d5 2. Nf3 e6) d5 2. d4 Nf6 *");
+  const pgn = getPgn(state, ctx)!;
+  const entry = [...buildPositionIndex(pgn.moves, pgn.rootMoveIds).byKey.values()].find(
+    (candidate) => candidate.occurrenceMoveIds.length === 2,
+  );
+  const alternateMoveId = entry?.occurrenceMoveIds[1];
+  expect(alternateMoveId).toBeDefined();
+  if (alternateMoveId === undefined) return;
+
+  selectMove(state, ctx, alternateMoveId);
+  forward(state, ctx);
+  expect(selectedMove(state, ctx)?.san).toBe("e6");
+
+  back(state, ctx);
+  expect(selectedMove(state, ctx)?.id).toBe(alternateMoveId);
+});
+
+test("variation shortcuts only include continuations from the selected occurrence", () => {
+  const state = fromPgn("1. Nf3 (1. d4 d5 2. Nf3 e6 (2... c6)) d5 2. d4 Nf6 *");
+  const pgn = getPgn(state, ctx)!;
+  const entry = [...buildPositionIndex(pgn.moves, pgn.rootMoveIds).byKey.values()].find(
+    (candidate) => candidate.occurrenceMoveIds.length === 2,
+  );
+  const alternateMoveId = entry?.occurrenceMoveIds[1];
+  expect(alternateMoveId).toBeDefined();
+  if (alternateMoveId === undefined) return;
+
+  selectMove(state, ctx, alternateMoveId);
+  arrowDown(state, ctx);
+  expect(pgn.moves[selectPreselectedVariation(state, ctx) ?? -1]?.san).toBe("c6");
+  forward(state, ctx);
+  expect(selectedMove(state, ctx)?.san).toBe("c6");
+});
+
+test("moves added from a transposition stay on that occurrence", () => {
+  const state = fromPgn("1. Nf3 (1. d4 d5 2. Nf3) d5 2. d4 Nf6 *");
+  const pgn = getPgn(state, ctx)!;
+  const entry = [...buildPositionIndex(pgn.moves, pgn.rootMoveIds).byKey.values()].find(
+    (candidate) => candidate.occurrenceMoveIds.length === 2,
+  );
+  const alternateMoveId = entry?.occurrenceMoveIds[1];
+  expect(alternateMoveId).toBeDefined();
+  if (alternateMoveId === undefined) return;
+
+  selectMove(state, ctx, alternateMoveId);
+  moveFromChessboard(state, ctx, "c7", "c5", "bP");
+
+  const addedMove = selectedMove(state, ctx);
+  expect(addedMove?.san).toBe("c5");
+  expect(addedMove?.prev).toBe(alternateMoveId);
+  expect(pgn.moves[alternateMoveId]?.next).toEqual([addedMove?.id]);
+  expect(pgn.moves[entry?.canonicalMoveId ?? -1]?.next.map((id) => pgn.moves[id]?.san)).toEqual([
+    "Nf6",
+  ]);
 });
 
 test("multi root moves", () => {

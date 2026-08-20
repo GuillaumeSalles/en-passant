@@ -1,10 +1,27 @@
 import { describe, expect, test } from "vitest";
-import { buildMoveRows } from "./moveRows";
-import { normalizePgn } from "./pgnTree";
+import { buildMoveRows, type MoveTokenData } from "./moveRows";
+import { buildPositionIndex, normalizePgn } from "./pgnTree";
 
 function rowsFromPgn(pgn: string) {
   const normalizedPgn = normalizePgn(pgn);
   return buildMoveRows(normalizedPgn.moves, normalizedPgn.rootMoveIds, null);
+}
+
+function moveTokens(pgn: string): {
+  moves: ReturnType<typeof normalizePgn>["moves"];
+  tokens: MoveTokenData[];
+} {
+  const normalizedPgn = normalizePgn(pgn);
+  const rows = buildMoveRows(normalizedPgn.moves, normalizedPgn.rootMoveIds, null);
+  const tokens = rows.flatMap((row) => {
+    if (row.type === "variation") {
+      return row.items.flatMap((item) => (item.type === "move" ? [item.move] : []));
+    }
+    return [row.whiteMove, row.blackMove].flatMap((move) =>
+      typeof move === "object" ? [move] : [],
+    );
+  });
+  return { moves: normalizedPgn.moves, tokens };
 }
 
 describe("buildMoveRows", () => {
@@ -116,5 +133,24 @@ describe("buildMoveRows", () => {
         hasAlternateBackground: false,
       },
     ]);
+  });
+
+  test("marks later position occurrences while retaining each continuation", () => {
+    const pgn = "1. Nf3 (1. d4 d5 2. Nf3 e6) d5 2. d4 Nf6 *";
+    const normalizedPgn = normalizePgn(pgn);
+    const index = buildPositionIndex(normalizedPgn.moves, normalizedPgn.rootMoveIds);
+    const transposedEntry = [...index.byKey.values()].find(
+      (entry) => entry.occurrenceMoveIds.length === 2,
+    );
+    const { moves, tokens } = moveTokens(pgn);
+    const alternateMoveId = transposedEntry?.occurrenceMoveIds[1];
+
+    expect(alternateMoveId).toBeDefined();
+    expect(tokens.find((token) => token.moveId === alternateMoveId)?.transposition).toEqual({
+      moveId: transposedEntry?.canonicalMoveId,
+      label: "Transposes to 2.d4",
+    });
+    expect(tokens.filter((token) => moves[token.moveId]?.san === "Nf6")).toHaveLength(1);
+    expect(tokens.filter((token) => moves[token.moveId]?.san === "e6")).toHaveLength(1);
   });
 });

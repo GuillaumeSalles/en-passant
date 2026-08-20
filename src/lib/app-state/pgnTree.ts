@@ -25,6 +25,77 @@ type ClockState = {
   black: number | null;
 };
 
+export type PositionIndexEntry = {
+  key: string;
+  canonicalMoveId: number;
+  occurrenceMoveIds: number[];
+};
+
+export type PositionIndex = {
+  byKey: ReadonlyMap<string, PositionIndexEntry>;
+  byMoveId: ReadonlyMap<number, PositionIndexEntry>;
+};
+
+function mainLineFirstMoveIds(moves: Record<number, Move>, rootMoveIds: number[]): number[] {
+  const result: number[] = [];
+  const visited = new Set<number>();
+
+  function visitLine(moveId: number): void {
+    if (visited.has(moveId)) return;
+    const move = moves[moveId];
+    if (move === undefined) return;
+
+    visited.add(moveId);
+    result.push(moveId);
+
+    const mainMoveId = move.next[0];
+    if (mainMoveId !== undefined) visitLine(mainMoveId);
+    for (const variationMoveId of move.next.slice(1)) {
+      visitLine(variationMoveId);
+    }
+  }
+
+  const mainRootMoveId = rootMoveIds[0];
+  if (mainRootMoveId !== undefined) visitLine(mainRootMoveId);
+  for (const variationMoveId of rootMoveIds.slice(1)) {
+    visitLine(variationMoveId);
+  }
+
+  return result;
+}
+
+export function buildPositionIndex(
+  moves: Record<number, Move>,
+  rootMoveIds: number[],
+): PositionIndex {
+  const byKey = new Map<string, PositionIndexEntry>();
+  const byMoveId = new Map<number, PositionIndexEntry>();
+  const orderedMoveIds = mainLineFirstMoveIds(moves, rootMoveIds);
+
+  for (const moveId of orderedMoveIds) {
+    const move = moves[moveId];
+    if (move === undefined) continue;
+
+    const key = positionKey(createChessPosition(move.fen));
+    const existingEntry = byKey.get(key);
+    if (existingEntry !== undefined) {
+      existingEntry.occurrenceMoveIds.push(moveId);
+      byMoveId.set(moveId, existingEntry);
+      continue;
+    }
+
+    const entry: PositionIndexEntry = {
+      key,
+      canonicalMoveId: moveId,
+      occurrenceMoveIds: [moveId],
+    };
+    byKey.set(key, entry);
+    byMoveId.set(moveId, entry);
+  }
+
+  return { byKey, byMoveId };
+}
+
 export function getVariationsEnds(normalizedPgn: NormalizedPgn): number[] {
   const ends: number[] = [];
 
@@ -44,13 +115,11 @@ export function findMoveIdByPositionKey(
   normalizedPgn: NormalizedPgn,
   expectedPositionKey: string,
 ): number | null {
-  for (let moveId = 0; moveId < normalizedPgn.moveIdCounter; moveId++) {
-    const move = normalizedPgn.moves[moveId];
-    if (move !== undefined && positionKey(createChessPosition(move.fen)) === expectedPositionKey) {
-      return moveId;
-    }
-  }
-  return null;
+  return (
+    buildPositionIndex(normalizedPgn.moves, normalizedPgn.rootMoveIds).byKey.get(
+      expectedPositionKey,
+    )?.canonicalMoveId ?? null
+  );
 }
 
 export function movePositionKey(normalizedPgn: NormalizedPgn, moveId: number): string | null {
