@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  chapterTrainingLineReviewPath,
   firstRepertoireChapterPath,
   learningLinePath,
   parseSelectedPositionKey,
@@ -18,6 +19,12 @@ test("builds paths for reviewing all due lines", () => {
   expect(trainingQueueReviewPath()).toBe("/app/training?review=due");
   expect(trainingLineReviewPath("white", "main", "v1-line")).toBe(
     "/app/repertoires/white/main/train/v1-line?review=due",
+  );
+});
+
+test("builds a path for reviewing due lines in one chapter", () => {
+  expect(chapterTrainingLineReviewPath("white", "main", "v1-line")).toBe(
+    "/app/repertoires/white/main/train/v1-line?review=chapter",
   );
 });
 

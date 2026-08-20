@@ -103,7 +103,54 @@ test("lists scheduled lines by training priority", async ({ page }) => {
     "href",
     /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
   );
+  await expect(
+    page.getByRole("link", { name: "Review lines" }).locator("[data-review-count]"),
+  ).toHaveText("2");
   await expect(lines.nth(0).getByRole("link", { name: "Review", exact: true })).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+test("reviews only due lines from a chapter", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  const now = Date.now();
+  await seedIndexedDb(page, {
+    repertoires: [repertoire],
+    chapters: [chapter],
+    pgns: [
+      {
+        id: chapter.pgnId,
+        pgn: "1. e4 (1. d4 d5) (1. c4 e5) (1. Nf3 Nf6) e5 *",
+        updatedAt,
+        deletedAt: null,
+        dirty: false,
+      },
+    ],
+    trainingLineSchedules: [
+      schedule("e2e4 e7e5", now - 120_000, 0),
+      schedule("d2d4 d7d5", now - 60_000, 0),
+      schedule("c2c4 e7e5", now + 60 * 60 * 1000, 0),
+    ],
+  });
+
+  await page.goto("/app/repertoires/white-repertoire/open-games/train");
+
+  const reviewChapter = page.getByRole("link", { name: "Review", exact: true }).first();
+  await expect(reviewChapter).toHaveAttribute("href", /\?review=chapter$/);
+  await expect(reviewChapter.locator("[data-review-count]")).toHaveText("2");
+  await expect(page.getByRole("link", { name: "Train all" })).toHaveCount(0);
+  await reviewChapter.click();
+
+  await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+
+  await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await dragPiece(page, "d2", "d4");
+
+  await expect(page).toHaveURL("/app/repertoires/white-repertoire/open-games/train");
+  await expect(page.getByRole("link", { name: "Review", exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-training-status="due"]')).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
 

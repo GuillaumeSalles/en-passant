@@ -10,6 +10,7 @@ import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Button } from "@/components/ui/button";
 import type { TrainingSessionSummary } from "@/lib/AppState";
 import {
+  chapterTrainingLineReviewPath,
   repertoirePath,
   trainingLinePath,
   trainingPath,
@@ -40,13 +41,23 @@ export function VariationTraining(props: {
     () => props.repertoireHandle,
     () => props.chapterHandle,
   );
-  const isReviewingQueue = () => new URLSearchParams(location.search).get("review") === "due";
+  const reviewMode = () => new URLSearchParams(location.search).get("review");
+  const isReviewingQueue = () => reviewMode() === "due";
+  const isReviewingChapter = () => reviewMode() === "chapter";
 
   createEffect(
-    () => ({ isReviewingQueue: isReviewingQueue(), reviewQueue: state.training.reviewQueue }),
-    ({ isReviewingQueue, reviewQueue }) => {
-      if (isReviewingQueue && reviewQueue === null) {
+    () => ({
+      chapterHandle: props.chapterHandle,
+      repertoireHandle: props.repertoireHandle,
+      reviewMode: reviewMode(),
+      reviewQueue: state.training.reviewQueue,
+    }),
+    ({ chapterHandle, repertoireHandle, reviewMode, reviewQueue }) => {
+      if (reviewQueue !== null) return;
+      if (reviewMode === "due") {
         navigate(trainingQueueReviewPath(), { replace: true });
+      } else if (reviewMode === "chapter") {
+        navigate(trainingPath(repertoireHandle, chapterHandle), { replace: true });
       }
     },
   );
@@ -56,6 +67,19 @@ export function VariationTraining(props: {
       if (isReviewingQueue()) {
         onCompleteTrainingQueueReviewLine();
         navigate(trainingQueueReviewPath(), { replace: true });
+      } else if (isReviewingChapter()) {
+        onCompleteTrainingQueueReviewLine();
+        const nextLine = flow.nextDueLine();
+        navigate(
+          nextLine === undefined
+            ? trainingPath(props.repertoireHandle, props.chapterHandle)
+            : chapterTrainingLineReviewPath(
+                props.repertoireHandle,
+                props.chapterHandle,
+                nextLine.id,
+              ),
+          { replace: true },
+        );
       }
     },
   });

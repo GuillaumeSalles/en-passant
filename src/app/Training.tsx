@@ -4,6 +4,7 @@ import { useState } from "@/app/AppStateProvider";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { TrainingLineList, type TrainingLineListItem } from "@/components/TrainingLineList";
 import { Button } from "@/components/ui/button";
+import { ButtonCountBadge } from "@/components/ui/button-count-badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
@@ -148,6 +149,7 @@ export function Training() {
             {(line) => (
               <Button
                 size="sm"
+                class="relative"
                 href={trainingLineReviewPath(
                   line().repertoire.handle,
                   line().chapter.handle,
@@ -156,6 +158,7 @@ export function Training() {
                 onClick={() => onStartTrainingQueueReview(dueCount())}
               >
                 Review lines
+                <ButtonCountBadge count={dueCount()} />
               </Button>
             )}
           </Show>

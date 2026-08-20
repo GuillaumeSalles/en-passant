@@ -172,9 +172,9 @@ function AppShell(props: { children?: JSX.Element }) {
   const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
 
   createEffect(
-    () => new URLSearchParams(location.search).get("review") === "due",
-    (isReviewingQueue) => {
-      if (!isReviewingQueue) onClearTrainingQueueReview();
+    () => new URLSearchParams(location.search).get("review"),
+    (reviewMode) => {
+      if (reviewMode !== "due" && reviewMode !== "chapter") onClearTrainingQueueReview();
     },
   );
 

@@ -447,6 +447,18 @@ export function useVariationTrainingFlow(
     }
     return undefined;
   });
+  const nextDueLine = () => {
+    const allLines = lines();
+    if (allLines.length === 0) return undefined;
+    for (let offset = 1; offset <= allLines.length; offset++) {
+      const line = allLines[(activeLineIndex() + offset) % allLines.length];
+      if (line === undefined) continue;
+      const key = trainingLineScheduleKey(state, ctx(), line.uciPath);
+      const review = key === null ? undefined : state.training.reviews[key];
+      if (isTrainingReviewDue(review, Date.now())) return line;
+    }
+    return undefined;
+  };
   const canDrag = createMemo(() => acceptsTrainingMove(phase()) && nextMoveIds().length === 0);
   const instruction = createMemo(() =>
     trainingInstruction(phase(), orientation(), nextMoveIds().length > 0),
@@ -473,6 +485,7 @@ export function useVariationTrainingFlow(
     isInitialized: () => initializedScopeKey() === scopeKey(),
     isLineComplete: () => phase().type === "line-complete",
     lines,
+    nextDueLine,
     nextUntrainedLine,
     onIntroComplete: () => setBoardIntroComplete(true),
     onPieceDrop,

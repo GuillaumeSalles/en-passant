@@ -103,6 +103,14 @@ export function trainingLineReviewPath(
   return `${trainingLinePath(repertoireHandle, chapterHandle, lineId)}?review=due`;
 }
 
+export function chapterTrainingLineReviewPath(
+  repertoireHandle: string,
+  chapterHandle: string,
+  lineId: string,
+): string {
+  return `${trainingLinePath(repertoireHandle, chapterHandle, lineId)}?review=chapter`;
+}
+
 export function learningPath(repertoireHandle: string, chapterHandle: string): string {
   return `${repertoirePath(repertoireHandle, chapterHandle)}/learn`;
 }
