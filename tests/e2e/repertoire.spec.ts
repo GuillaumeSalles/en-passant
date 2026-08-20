@@ -1189,6 +1189,46 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   expect(consoleMessages).toEqual([]);
 });
 
+test("continues learning with the next unlearned line", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 (1. d4) *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const lines = page.locator("[data-training-line]");
+  await expect(lines).toHaveCount(2);
+  const firstLearnHref = await lines
+    .first()
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  const secondLearnHref = await lines
+    .nth(1)
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  if (firstLearnHref === null || secondLearnHref === null) {
+    throw new Error("Expected both lines to have learning URLs");
+  }
+
+  await page.goto(firstLearnHref);
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText(/Practice 1 of 2:/)).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+  await expect(page.getByText(/Practice 2 of 2:/)).toBeVisible();
+  await dragPiece(page, "e2", "e4");
+
+  await expect(page.getByText("Line learned.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Next line" })).toHaveAttribute(
+    "href",
+    secondLearnHref,
+  );
+  await expect(page.getByRole("link", { name: "Back to lines" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Next line" }).click();
+  await expect(page).toHaveURL(secondLearnHref);
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
 test("unknown routes render a 404 page", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

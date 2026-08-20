@@ -21,7 +21,7 @@ import {
   selectSelectedMoveId,
   selectTraining,
 } from "@/lib/AppState";
-import { trainingPath } from "@/lib/routes";
+import { learningLinePath, trainingPath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useRouteContext } from "@/lib/useRouteContext";
@@ -32,6 +32,7 @@ import {
   playLearningMove,
   removeLearningPreview,
   startLearningLine,
+  trainingLineScheduleKey,
 } from "@/mutations/learningSession";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { useParams } from "@solidjs/router";
@@ -67,6 +68,7 @@ export function LineLearning(props: {
   const ctx = useRouteContext();
   const chapterPgn = useSelector(getChapterPgn);
   const training = useSelector(selectTraining);
+  const reviews = useSelector((state) => state.training.reviews);
   const currentFen = useSelector(selectFen);
   const orientation = useSelector(selectOrientation);
   const animation = useSelector(selectAnimation);
@@ -97,6 +99,19 @@ export function LineLearning(props: {
     return pgn === null ? [] : getTrainingLines(pgn, orientation());
   });
   const activeLine = createMemo(() => lines().find((line) => line.id === props.lineId));
+  const nextLineToLearn = createMemo(() => {
+    const allLines = lines();
+    const activeLineIndex = allLines.findIndex((line) => line.id === props.lineId);
+    if (activeLineIndex < 0) return undefined;
+
+    for (let offset = 1; offset <= allLines.length; offset++) {
+      const line = allLines[(activeLineIndex + offset) % allLines.length];
+      if (line === undefined) continue;
+      const scheduleKey = trainingLineScheduleKey(state, ctx(), line.uciPath);
+      if (scheduleKey === null || reviews()[scheduleKey] === undefined) return line;
+    }
+    return undefined;
+  });
   const variation = createMemo(() => {
     const pgn = chapterPgn();
     const line = activeLine();
@@ -286,12 +301,30 @@ export function LineLearning(props: {
                     : learningInstruction(phase(), orientation())}
                 </span>
                 <Show when={phase() === "complete"}>
-                  <Button
-                    size="sm"
-                    href={trainingPath(props.repertoireHandle, props.chapterHandle)}
+                  <Show
+                    when={nextLineToLearn()}
+                    fallback={
+                      <Button
+                        size="sm"
+                        href={trainingPath(props.repertoireHandle, props.chapterHandle)}
+                      >
+                        Back to lines
+                      </Button>
+                    }
                   >
-                    Back to lines
-                  </Button>
+                    {(nextLine) => (
+                      <Button
+                        size="sm"
+                        href={learningLinePath(
+                          props.repertoireHandle,
+                          props.chapterHandle,
+                          nextLine().id,
+                        )}
+                      >
+                        Next line
+                      </Button>
+                    )}
+                  </Show>
                 </Show>
               </div>
               <HorizontalDashedDivider animation="none" />
