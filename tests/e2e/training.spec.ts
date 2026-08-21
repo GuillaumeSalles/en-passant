@@ -149,11 +149,11 @@ test("reviews only due lines from a chapter", async ({ page }) => {
   await reviewChapter.click();
 
   await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
-  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   await dragPiece(page, "e2", "e4");
 
   await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
-  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("2/2", { exact: true })).toBeVisible();
   await dragPiece(page, "d2", "d4");
 
   await expect(page).toHaveURL("/app/repertoires/white-repertoire/open-games/train");
@@ -185,7 +185,7 @@ test("waits one second before advancing to the next training line", async ({ pag
 
   await page.goto("/app/repertoires/white-repertoire/open-games/train");
   await page.getByRole("link", { name: "Review lines", exact: true }).click();
-  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   const firstLineUrl = page.url();
 
   await page.clock.install();
@@ -198,7 +198,7 @@ test("waits one second before advancing to the next training line", async ({ pag
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
 
   await page.clock.runFor(1);
-  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("2/2", { exact: true })).toBeVisible();
   expect(page.url()).not.toBe(firstLineUrl);
   expect(consoleMessages).toEqual([]);
 });
@@ -254,18 +254,18 @@ test("reviews every due line across chapters and stops before future lines", asy
   await expect(page).toHaveURL(
     /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
   );
-  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   await dragPiece(page, "e2", "e4");
 
   await expect(page).toHaveURL(
     /\/app\/repertoires\/white-repertoire\/queens-pawn\/train\/v1-.*\?review=due$/,
   );
-  await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("2/2", { exact: true })).toBeVisible();
 
   await page.locator('a[href="/app/training"]').click();
   await expect(page.getByText("1 due · 3 scheduled")).toBeVisible();
   await page.getByRole("link", { name: "Review lines" }).click();
-  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+  await expect(page.getByText("1/1", { exact: true })).toBeVisible();
 
   await dragPiece(page, "d2", "d4");
 

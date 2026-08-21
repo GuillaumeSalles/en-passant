@@ -125,6 +125,7 @@ export function VariationTraining(props: {
                 <TrainingSessionStats
                   result={flow.trainingSessionStats()}
                   reviewQueue={state.training.reviewQueue}
+                  isLineComplete={flow.isLineComplete()}
                 />
                 <ProgressBar progress={flow.progress()} />
                 <Show when={flow.chapterHasMoves()}>
@@ -217,6 +218,7 @@ export default function VariationTrainingRoute() {
 function TrainingSessionStats(props: {
   result: TrainingSessionSummary | null;
   reviewQueue: { reviewed: number; total: number } | null;
+  isLineComplete: boolean;
 }) {
   return (
     <Show when={props.result}>
@@ -226,8 +228,12 @@ function TrainingSessionStats(props: {
             label="Lines"
             value={
               props.reviewQueue === null
-                ? `${result().tried}/${result().total}`
-                : `${props.reviewQueue.reviewed}/${props.reviewQueue.total}`
+                ? lineCounter(result().tried, result().total, props.isLineComplete)
+                : lineCounter(
+                    props.reviewQueue.reviewed,
+                    props.reviewQueue.total,
+                    props.isLineComplete,
+                  )
             }
           />
           <VerticalDashedDivider />
@@ -245,6 +251,11 @@ function TrainingSessionStats(props: {
       )}
     </Show>
   );
+}
+
+export function lineCounter(completed: number, total: number, isLineComplete: boolean): string {
+  const current = Math.min(completed + (isLineComplete ? 0 : 1), total);
+  return `${current}/${total}`;
 }
 
 function StatCell(props: { label: string; value: string }) {

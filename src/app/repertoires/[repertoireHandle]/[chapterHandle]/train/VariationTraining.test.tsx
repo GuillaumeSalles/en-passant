@@ -6,7 +6,7 @@ import { emptyState, getTrainingLines, normalizePgn } from "@/lib/AppState";
 import { STARTING_FEN } from "@/lib/chess";
 import { createStore, type Store } from "@/lib/createStore";
 import { TestRouter } from "@/tests/TestRouter";
-import { VariationTraining } from "./VariationTraining";
+import { lineCounter, VariationTraining } from "./VariationTraining";
 
 const testContext = vi.hoisted<{ store: Store<AppState> | null; renderedPositions: string[] }>(
   () => ({
@@ -55,6 +55,13 @@ function recordRenderedPosition(position: string): string {
 afterEach(() => {
   cleanup();
   testContext.renderedPositions = [];
+});
+
+test("counts the active line before it is completed", () => {
+  expect(lineCounter(0, 2, false)).toBe("1/2");
+  expect(lineCounter(1, 2, false)).toBe("2/2");
+  expect(lineCounter(1, 2, true)).toBe("1/2");
+  expect(lineCounter(2, 2, true)).toBe("2/2");
 });
 
 test("never renders the previous line while initializing a training route", async () => {
