@@ -255,6 +255,19 @@ test("reviews every due line across chapters and stops before future lines", asy
 
   await page.goto("/app/training");
   await expect(page.getByText("2 due · 3 scheduled")).toBeVisible();
+  const repertoireGroup = page.locator(`[data-training-repertoire-group="${repertoire.id}"]`);
+  await expect(repertoireGroup.getByRole("heading", { name: repertoire.name })).toBeVisible();
+  const openGamesGroup = repertoireGroup.locator(`[data-training-chapter-group="${chapter.id}"]`);
+  const queensPawnGroup = repertoireGroup.locator(
+    `[data-training-chapter-group="${secondChapter.id}"]`,
+  );
+  await expect(openGamesGroup.getByRole("heading", { name: chapter.name })).toBeVisible();
+  await expect(openGamesGroup.locator("[data-training-queue-line]")).toContainText("e4 e5");
+  await expect(queensPawnGroup.getByRole("heading", { name: secondChapter.name })).toBeVisible();
+  await expect(queensPawnGroup.locator("[data-training-queue-line]")).toHaveCount(2);
+  await expect(queensPawnGroup.locator("[data-training-queue-line]").first()).toContainText(
+    "d4 d5",
+  );
   await page.getByRole("link", { name: "Review lines" }).click();
 
   await expect(page).toHaveURL(

@@ -2,7 +2,11 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
-import { TrainingLineList, type TrainingLineListItem } from "@/components/TrainingLineList";
+import type { TrainingLineListItem } from "@/components/TrainingLineList";
+import {
+  TrainingQueueList,
+  type TrainingQueueRepertoireGroup,
+} from "@/components/TrainingQueueList";
 import { TrainingReviewButton } from "@/components/TrainingReviewButton";
 import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
@@ -17,6 +21,63 @@ import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapte
 import { useMutation } from "@/lib/useMutation";
 import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
 import { ensureTrainingQueueReview } from "@/mutations/trainingSession";
+
+type TrainingQueueEntry = {
+  repertoireId: string;
+  repertoireName: string;
+  chapterId: string;
+  chapterName: string;
+  line: TrainingLineListItem;
+};
+
+type MutableTrainingQueueChapterGroup = {
+  id: string;
+  name: string;
+  lines: TrainingLineListItem[];
+};
+
+type MutableTrainingQueueRepertoireGroup = {
+  id: string;
+  name: string;
+  chapters: MutableTrainingQueueChapterGroup[];
+};
+
+function compareNamedIds(
+  left: { id: string; name: string },
+  right: { id: string; name: string },
+): number {
+  const byName = left.name.localeCompare(right.name, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+  return byName === 0 ? left.id.localeCompare(right.id) : byName;
+}
+
+function groupTrainingQueueEntries(
+  entries: readonly TrainingQueueEntry[],
+): TrainingQueueRepertoireGroup[] {
+  const groups = new Map<string, MutableTrainingQueueRepertoireGroup>();
+
+  for (const entry of entries) {
+    let repertoire = groups.get(entry.repertoireId);
+    if (repertoire === undefined) {
+      repertoire = { id: entry.repertoireId, name: entry.repertoireName, chapters: [] };
+      groups.set(entry.repertoireId, repertoire);
+    }
+
+    let chapter = repertoire.chapters.find((candidate) => candidate.id === entry.chapterId);
+    if (chapter === undefined) {
+      chapter = { id: entry.chapterId, name: entry.chapterName, lines: [] };
+      repertoire.chapters.push(chapter);
+    }
+    chapter.lines.push(entry.line);
+  }
+
+  return [...groups.values()].sort(compareNamedIds).map((repertoire) => ({
+    ...repertoire,
+    chapters: [...repertoire.chapters].sort(compareNamedIds),
+  }));
+}
 
 export function Training() {
   const state = useState();
@@ -71,7 +132,7 @@ export function Training() {
       ? undefined
       : trainingLineReviewPath(line.repertoire.handle, line.chapter.handle, line.line.id);
   });
-  const listItems = createMemo<TrainingLineListItem[]>(() =>
+  const listEntries = createMemo<TrainingQueueEntry[]>(() =>
     lines().map((line) => {
       const mistakeLink =
         mistakeLinks()[trainingMistakeLinkKey(line.chapter.id, line.line.uciPath)];
@@ -79,31 +140,40 @@ export function Training() {
       const selectedPositionKey =
         pgn === undefined ? "" : (movePositionKey(pgn, line.line.terminalMoveId) ?? "");
       return {
-        id: line.line.id,
-        label: line.label,
-        intervalIndex: line.review.intervalIndex,
-        isAlternative: line.line.isAlternative,
-        isLearned: true,
-        dueAt: line.review.dueAt,
-        detailLinks:
-          mistakeLink === undefined
-            ? undefined
-            : [
-                {
-                  href: importedGamePath(mistakeLink.game.id),
-                  label: `Review game vs ${mistakeLink.game.opponentName}`,
-                },
-              ],
-        viewHref: repertoireMovePath(
-          line.repertoire.handle,
-          line.chapter.handle,
-          selectedPositionKey,
-        ),
-        primaryHref: trainingLinePath(line.repertoire.handle, line.chapter.handle, line.line.id),
-        queueKey: line.key,
-        trainingStatus: line.isDue ? "due" : "trained",
+        repertoireId: line.repertoire.id,
+        repertoireName: line.repertoire.name,
+        chapterId: line.chapter.id,
+        chapterName: line.chapter.name,
+        line: {
+          id: line.line.id,
+          label: line.label,
+          intervalIndex: line.review.intervalIndex,
+          isAlternative: line.line.isAlternative,
+          isLearned: true,
+          dueAt: line.review.dueAt,
+          detailLinks:
+            mistakeLink === undefined
+              ? undefined
+              : [
+                  {
+                    href: importedGamePath(mistakeLink.game.id),
+                    label: `Review game vs ${mistakeLink.game.opponentName}`,
+                  },
+                ],
+          viewHref: repertoireMovePath(
+            line.repertoire.handle,
+            line.chapter.handle,
+            selectedPositionKey,
+          ),
+          primaryHref: trainingLinePath(line.repertoire.handle, line.chapter.handle, line.line.id),
+          queueKey: line.key,
+          trainingStatus: line.isDue ? "due" : "trained",
+        },
       };
     }),
+  );
+  const queueGroups = createMemo<TrainingQueueRepertoireGroup[]>(() =>
+    groupTrainingQueueEntries(listEntries()),
   );
 
   createEffect(
@@ -151,8 +221,8 @@ export function Training() {
           <TrainingReviewButton count={dueCount()} href={reviewHref()} />
         </div>
 
-        <TrainingLineList
-          lines={listItems()}
+        <TrainingQueueList
+          groups={queueGroups()}
           loading={isLoading()}
           now={now()}
           emptyMessage="No lines are scheduled yet. Learn a repertoire line to add it here."

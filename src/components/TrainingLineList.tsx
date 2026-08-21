@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
+import { cn } from "@/lib/utils";
 
 type TrainingLineLink = {
   href: string;
@@ -99,6 +100,7 @@ function TrainingLineListSkeleton(props: { message: string }) {
 }
 
 export function TrainingLineList(props: {
+  class?: string;
   lines: readonly TrainingLineListItem[];
   emptyMessage: string;
   loading: boolean;
@@ -106,7 +108,9 @@ export function TrainingLineList(props: {
   loadingMessage?: string;
 }) {
   return (
-    <div class="mt-4 overflow-hidden rounded-md border border-border bg-background">
+    <div
+      class={cn("mt-4 overflow-hidden rounded-md border border-border bg-background", props.class)}
+    >
       <Show
         when={!props.loading}
         fallback={
