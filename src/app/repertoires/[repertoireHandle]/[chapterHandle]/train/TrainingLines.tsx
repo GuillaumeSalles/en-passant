@@ -3,8 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-j
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { TrainingLineList, type TrainingLineListItem } from "@/components/TrainingLineList";
-import { Button } from "@/components/ui/button";
-import { ButtonCountBadge } from "@/components/ui/button-count-badge";
+import { TrainingReviewButton } from "@/components/TrainingReviewButton";
 import {
   getChapterPgn,
   getChapterScopeFromData,
@@ -25,7 +24,7 @@ import {
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
-import { ensureTrainingSession, startTrainingQueueReview } from "@/mutations/trainingSession";
+import { ensureTrainingSession } from "@/mutations/trainingSession";
 import { trainingLineScheduleKey } from "@/mutations/learningSession";
 import { useState } from "@/app/AppStateProvider";
 import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
@@ -47,7 +46,6 @@ export function TrainingLines(props: {
   const trainingSession = useSelector((state) => state.training.session);
   const reviews = useSelector((state) => state.training.reviews);
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
-  const onStartTrainingQueueReview = useMutation(startTrainingQueueReview);
   const [now, setNow] = createSignal(Date.now());
   const mistakeLinks = useTrainingMistakeLinks();
 
@@ -107,6 +105,12 @@ export function TrainingLines(props: {
   const dueCount = createMemo(
     () => lines().filter((line) => isLineLearned(line.uciPath) && isLineDue(line.uciPath)).length,
   );
+  const reviewHref = createMemo(() => {
+    const line = firstDueLine();
+    return line === undefined
+      ? undefined
+      : chapterTrainingLineReviewPath(props.repertoireHandle, props.chapterHandle, line.id);
+  });
 
   let dueTimer: ReturnType<typeof setTimeout> | undefined;
   createEffect(
@@ -197,23 +201,7 @@ export function TrainingLines(props: {
               {results().size}/{lines().length} trained
             </div>
           </div>
-          <Show when={firstDueLine()}>
-            {(line) => (
-              <Button
-                size="sm"
-                class="relative"
-                href={chapterTrainingLineReviewPath(
-                  props.repertoireHandle,
-                  props.chapterHandle,
-                  line().id,
-                )}
-                onClick={() => onStartTrainingQueueReview(dueCount())}
-              >
-                Review
-                <ButtonCountBadge count={dueCount()} />
-              </Button>
-            )}
-          </Show>
+          <TrainingReviewButton count={dueCount()} href={reviewHref()} />
         </div>
 
         <Show when={props.missingLine}>

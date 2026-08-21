@@ -1,11 +1,9 @@
 import { useLocation, useNavigate } from "@solidjs/router";
-import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { TrainingLineList, type TrainingLineListItem } from "@/components/TrainingLineList";
-import { Button } from "@/components/ui/button";
-import { ButtonCountBadge } from "@/components/ui/button-count-badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TrainingReviewButton } from "@/components/TrainingReviewButton";
 import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
   importedGamePath,
@@ -18,14 +16,13 @@ import { useLoadPgns } from "@/lib/useLoadPgn";
 import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapters";
 import { useMutation } from "@/lib/useMutation";
 import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
-import { ensureTrainingQueueReview, startTrainingQueueReview } from "@/mutations/trainingSession";
+import { ensureTrainingQueueReview } from "@/mutations/trainingSession";
 
 export function Training() {
   const state = useState();
   const location = useLocation();
   const navigate = useNavigate();
   const onEnsureTrainingQueueReview = useMutation(ensureTrainingQueueReview);
-  const onStartTrainingQueueReview = useMutation(startTrainingQueueReview);
   const [now, setNow] = createSignal(Date.now());
   const clock = setInterval(() => setNow(Date.now()), 60_000);
   onCleanup(() => clearInterval(clock));
@@ -68,6 +65,12 @@ export function Training() {
   });
   const dueCount = createMemo(() => lines().filter((line) => line.isDue).length);
   const nextDueLine = createMemo(() => lines().find((line) => line.isDue));
+  const reviewHref = createMemo(() => {
+    const line = nextDueLine();
+    return line === undefined
+      ? undefined
+      : trainingLineReviewPath(line.repertoire.handle, line.chapter.handle, line.line.id);
+  });
   const listItems = createMemo<TrainingLineListItem[]>(() =>
     lines().map((line) => {
       const mistakeLink =
@@ -145,35 +148,7 @@ export function Training() {
               {dueCount()} due · {lines().length} scheduled
             </div>
           </div>
-          <Show when={nextDueLine()}>
-            {(line) => (
-              <Button
-                size="sm"
-                class="relative"
-                href={trainingLineReviewPath(
-                  line().repertoire.handle,
-                  line().chapter.handle,
-                  line().line.id,
-                )}
-                onClick={() => onStartTrainingQueueReview(dueCount())}
-              >
-                Review lines
-                <ButtonCountBadge count={dueCount()} />
-              </Button>
-            )}
-          </Show>
-          <Show when={nextDueLine() === undefined}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button size="sm" disabled>
-                    Review lines
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>You have no variation to review</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Show>
+          <TrainingReviewButton count={dueCount()} href={reviewHref()} />
         </div>
 
         <TrainingLineList

@@ -134,7 +134,7 @@ test("reviews only due lines from a chapter", async ({ page }) => {
 
   await page.goto("/app/repertoires/white-repertoire/open-games/train");
 
-  const reviewChapter = page.getByRole("link", { name: "Review", exact: true }).first();
+  const reviewChapter = page.getByRole("link", { name: "Review lines", exact: true });
   await expect(reviewChapter).toHaveAttribute("href", /\?review=chapter$/);
   await expect(reviewChapter.locator("[data-review-count]")).toHaveText("2");
   await expect(page.getByRole("link", { name: "Train all" })).toHaveCount(0);
@@ -149,7 +149,10 @@ test("reviews only due lines from a chapter", async ({ page }) => {
   await dragPiece(page, "d2", "d4");
 
   await expect(page).toHaveURL("/app/repertoires/white-repertoire/open-games/train");
-  await expect(page.getByRole("link", { name: "Review", exact: true })).toHaveCount(0);
+  const reviewLinesButton = page.getByRole("button", { name: "Review lines" });
+  await expect(reviewLinesButton).toBeDisabled();
+  await reviewLinesButton.hover({ force: true });
+  await expect(page.getByRole("tooltip")).toHaveText("You have no variation to review");
   await expect(page.locator('[data-training-status="due"]')).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
@@ -173,7 +176,7 @@ test("waits one second before advancing to the next training line", async ({ pag
   });
 
   await page.goto("/app/repertoires/white-repertoire/open-games/train");
-  await page.getByRole("link", { name: "Review", exact: true }).first().click();
+  await page.getByRole("link", { name: "Review lines", exact: true }).click();
   await expect(page.getByText("0/2", { exact: true })).toBeVisible();
   const firstLineUrl = page.url();
 
