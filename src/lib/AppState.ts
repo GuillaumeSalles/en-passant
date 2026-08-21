@@ -33,6 +33,7 @@ export type {
 } from "./app-state/types";
 export {
   getTrainingLineByUciPath,
+  getTrainingLinePgn,
   getTrainingLines,
   getTrainingLinesWithScheduledPaths,
   isAlternativeTrainingMove,
@@ -89,6 +90,7 @@ export {
   selectCurrentMove,
   selectFen,
   selectHighlights,
+  selectNagAnnotations,
   selectMoveById,
   selectNextMoveIds,
   selectOrientation,

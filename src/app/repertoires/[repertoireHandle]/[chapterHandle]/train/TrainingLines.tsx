@@ -18,6 +18,7 @@ import {
   chapterTrainingLineReviewPath,
   importedGamePath,
   learningLinePath,
+  lineReaderPath,
   repertoireMovePath,
   trainingLinePath,
 } from "@/lib/routes";
@@ -174,6 +175,7 @@ export function TrainingLines(props: {
                   label: `Review game vs ${mistakeLink.game.opponentName}`,
                 },
               ],
+        readHref: lineReaderPath(props.repertoireHandle, props.chapterHandle, line.id),
         viewHref: repertoireMovePath(
           props.repertoireHandle,
           props.chapterHandle,
@@ -189,7 +191,7 @@ export function TrainingLines(props: {
 
   return (
     <FullWidthLayout
-      title={<RepertoireBreadcrumb showTraining trainingLineId={null} />}
+      title={<RepertoireBreadcrumb showTraining trainingLineId={null} readLine={false} />}
       reserveRightSlot
       showMobileHeaderDivider
     >

@@ -13,7 +13,8 @@ function trainingLine(id: string, label: string): TrainingLineListItem {
     isAlternative: false,
     isLearned: true,
     dueAt: 1_000,
-    primaryHref: `/train/${id}`,
+    primaryHref: `/app/repertoire/chapter/${id}/train`,
+    readHref: `/app/repertoire/chapter/${id}`,
     viewHref: `/chapter/${id}`,
     trainingStatus: "due",
   };

@@ -9,17 +9,15 @@ import {
   EvalMove,
   findMoveIdByPositionKey,
   getPgn,
-  getNagGlyph,
-  getNagMeaning,
   moveFromChessboard,
   moveFromEvalMove,
   selectAnimation,
   selectFen,
   selectHighlights,
+  selectNagAnnotations,
   selectNextMoveIds,
   selectOrientation,
   selectMove,
-  selectedMove,
   toggleArrowOnSelectedMove,
   toggleSquareOnSelectedMove,
   updateEvaluation,
@@ -88,21 +86,6 @@ function selectEvaluations(state: AppState, _ctx: Context): Eval[] {
 
 function selectIsEvalBarVisible(state: AppState, _ctx: Context): boolean {
   return state.engineSettings.isEnabled && state.engineSettings.showEvalBar;
-}
-
-function selectNagAnnotations(
-  state: AppState,
-  ctx: Context,
-): { [square: string]: { type: "nag"; glyph: string; meaning: string }[] } {
-  const move = selectedMove(state, ctx);
-  if (move === null || move.nags.length === 0) return {};
-  return {
-    [move.to]: move.nags.slice(0, 2).map((nag) => ({
-      type: "nag",
-      glyph: getNagGlyph(nag),
-      meaning: getNagMeaning(nag),
-    })),
-  };
 }
 
 export function Repertoire(props: {

@@ -48,6 +48,7 @@ const TrainingLines = lazy(
 const LineLearning = lazy(
   () => import("@/app/repertoires/[repertoireHandle]/[chapterHandle]/learn/LineLearning"),
 );
+const LineReader = lazy(() => import("@/app/LineReader"));
 
 function SidebarHeader() {
   return (
@@ -260,20 +261,26 @@ export function appShellHasRightPanel(pathname: string): boolean {
   if (routeSegments[0] === "games") {
     return routeSegments.length === 2;
   }
+  if (
+    (routeSegments.length === 3 ||
+      (routeSegments.length === 4 && ["train", "learn"].includes(routeSegments[3] ?? ""))) &&
+    routeSegments[0] !== "training" &&
+    routeSegments[0] !== "repertoires"
+  ) {
+    return true;
+  }
   if (routeSegments[0] !== "repertoires") {
     return false;
   }
 
-  const [, repertoireHandle, chapterHandle, modeSegment, lineId] = routeSegments;
+  const [, repertoireHandle, chapterHandle, modeSegment] = routeSegments;
   if (repertoireHandle === undefined || chapterHandle === undefined) {
     return false;
   }
   if (modeSegment === undefined) {
     return true;
   }
-  return (
-    ["train", "learn"].includes(modeSegment) && lineId !== undefined && routeSegments.length === 5
-  );
+  return false;
 }
 
 function BaseLayout() {
@@ -370,12 +377,16 @@ const AppRouter = createRouter({
       component: TrainingLines,
     },
     {
-      path: `${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/train/:lineId`,
+      path: `${APP_ROOT}/:lineRepertoireHandle/:lineChapterHandle/:lineId/train`,
       component: VariationTraining,
     },
     {
-      path: `${APP_ROOT}/repertoires/:repertoireHandle/:chapterHandle/learn/:lineId`,
+      path: `${APP_ROOT}/:lineRepertoireHandle/:lineChapterHandle/:lineId/learn`,
       component: LineLearning,
+    },
+    {
+      path: `${APP_ROOT}/:lineRepertoireHandle/:lineChapterHandle/:lineId`,
+      component: LineReader,
     },
     { path: "*", component: NotFound },
   ],

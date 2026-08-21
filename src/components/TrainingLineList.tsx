@@ -41,6 +41,7 @@ export type TrainingLineListItem = {
   dueAt?: number | undefined;
   detailLinks?: readonly TrainingLineLink[] | undefined;
   primaryHref: string;
+  readHref: string;
   viewHref: string;
   queueKey?: string | undefined;
   trainingStatus: "due" | "trained" | "untrained";
@@ -182,7 +183,9 @@ export function TrainingLineList(props: {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem disabled>Read line</DropdownMenuItem>
+                      <DropdownMenuItem disabled={false} href={line.readHref}>
+                        Read line
+                      </DropdownMenuItem>
                       <DropdownMenuItem disabled={false} href={line.viewHref}>
                         View in chapter
                       </DropdownMenuItem>

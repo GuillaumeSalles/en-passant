@@ -103,7 +103,9 @@ export function VariationTraining(props: {
       >
         <Show when={flow.isInitialized()}>
           <WorkspaceLayout
-            title={<RepertoireBreadcrumb showTraining trainingLineId={props.lineId} />}
+            title={
+              <RepertoireBreadcrumb showTraining trainingLineId={props.lineId} readLine={false} />
+            }
             chessboard={
               <Chessboard
                 boardOrientation={flow.orientation()}
@@ -196,17 +198,17 @@ export function VariationTraining(props: {
 
 export default function VariationTrainingRoute() {
   const params = useParams<{
-    repertoireHandle: string;
-    chapterHandle: string;
+    lineRepertoireHandle: string;
+    lineChapterHandle: string;
     lineId: string;
   }>();
   useRedirectMissingRepertoireRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-    getChapterHandle: () => params.chapterHandle,
+    getRepertoireHandle: () => params.lineRepertoireHandle,
+    getChapterHandle: () => params.lineChapterHandle,
   });
   const scope = createMemo(() => ({
-    repertoireHandle: params.repertoireHandle,
-    chapterHandle: params.chapterHandle,
+    repertoireHandle: params.lineRepertoireHandle,
+    chapterHandle: params.lineChapterHandle,
     lineId: params.lineId,
   }));
   return (

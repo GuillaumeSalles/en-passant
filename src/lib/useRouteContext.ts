@@ -3,7 +3,14 @@ import { createMemo } from "solid-js";
 import type { Accessor } from "solid-js";
 import { Context } from "./AppState";
 
-type Params = { repertoireHandle: string; chapterHandle: string; gameId: string };
+type Params = {
+  repertoireHandle: string;
+  chapterHandle: string;
+  lineRepertoireHandle: string;
+  lineChapterHandle: string;
+  lineId: string;
+  gameId: string;
+};
 
 export function useRouteContext(): Accessor<Context> {
   const location = useLocation();
@@ -13,6 +20,23 @@ export function useRouteContext(): Accessor<Context> {
     const rh = params.repertoireHandle ?? "";
     const ch = params.chapterHandle ?? "";
     const gameId = params.gameId ?? "";
+    if (
+      params.lineRepertoireHandle !== undefined &&
+      params.lineChapterHandle !== undefined &&
+      params.lineId !== undefined
+    ) {
+      const repertoireHandle = params.lineRepertoireHandle;
+      const chapterHandle = params.lineChapterHandle;
+      if (["train", "learn"].includes(segments.at(-1) ?? "")) {
+        return { type: "variation-training", repertoireHandle, chapterHandle };
+      }
+      return {
+        type: "line-reader",
+        lineId: params.lineId,
+        repertoireHandle,
+        chapterHandle,
+      };
+    }
     if (segments.at(-2) === "games") {
       return { type: "imported-game", gameId, repertoireHandle: "", chapterHandle: "" };
     }

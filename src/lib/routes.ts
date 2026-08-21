@@ -92,7 +92,15 @@ export function trainingLinePath(
   chapterHandle: string,
   lineId: string,
 ): string {
-  return `${trainingPath(repertoireHandle, chapterHandle)}/${lineId}`;
+  return `${lineReaderPath(repertoireHandle, chapterHandle, lineId)}/train`;
+}
+
+export function lineReaderPath(
+  repertoireHandle: string,
+  chapterHandle: string,
+  lineId: string,
+): string {
+  return `${APP_ROOT}/${repertoireHandle}/${chapterHandle}/${lineId}`;
 }
 
 export function trainingLineReviewPath(
@@ -111,16 +119,12 @@ export function chapterTrainingLineReviewPath(
   return `${trainingLinePath(repertoireHandle, chapterHandle, lineId)}?review=chapter`;
 }
 
-export function learningPath(repertoireHandle: string, chapterHandle: string): string {
-  return `${repertoirePath(repertoireHandle, chapterHandle)}/learn`;
-}
-
 export function learningLinePath(
   repertoireHandle: string,
   chapterHandle: string,
   lineId: string,
 ): string {
-  return `${learningPath(repertoireHandle, chapterHandle)}/${lineId}`;
+  return `${lineReaderPath(repertoireHandle, chapterHandle, lineId)}/learn`;
 }
 
 export function routePath(ctx: Context, repertoireHandle: string, chapterHandle: string): string {

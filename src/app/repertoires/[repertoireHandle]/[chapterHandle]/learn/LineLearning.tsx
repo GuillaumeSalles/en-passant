@@ -305,6 +305,7 @@ export function LineLearning(props: {
               showTraining={false}
               trainingLineId={null}
               learningLineId={props.lineId}
+              readLine={false}
             />
           }
           chessboard={
@@ -398,17 +399,17 @@ export function LineLearning(props: {
 
 export default function LineLearningRoute() {
   const params = useParams<{
-    repertoireHandle: string;
-    chapterHandle: string;
+    lineRepertoireHandle: string;
+    lineChapterHandle: string;
     lineId: string;
   }>();
   useRedirectMissingRepertoireRoute({
-    getRepertoireHandle: () => params.repertoireHandle,
-    getChapterHandle: () => params.chapterHandle,
+    getRepertoireHandle: () => params.lineRepertoireHandle,
+    getChapterHandle: () => params.lineChapterHandle,
   });
   const scope = createMemo(() => ({
-    repertoireHandle: params.repertoireHandle,
-    chapterHandle: params.chapterHandle,
+    repertoireHandle: params.lineRepertoireHandle,
+    chapterHandle: params.lineChapterHandle,
     lineId: params.lineId,
   }));
   return (

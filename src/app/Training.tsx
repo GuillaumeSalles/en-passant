@@ -11,6 +11,7 @@ import { TrainingReviewButton } from "@/components/TrainingReviewButton";
 import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
   importedGamePath,
+  lineReaderPath,
   repertoireMovePath,
   trainingLinePath,
   trainingLineReviewPath,
@@ -160,6 +161,7 @@ export function Training() {
                     label: `Review game vs ${mistakeLink.game.opponentName}`,
                   },
                 ],
+          readHref: lineReaderPath(line.repertoire.handle, line.chapter.handle, line.line.id),
           viewHref: repertoireMovePath(
             line.repertoire.handle,
             line.chapter.handle,

@@ -7,15 +7,15 @@ describe("appShellHasRightPanel", () => {
   });
 
   it("keeps the right panel for individual training lines", () => {
-    expect(appShellHasRightPanel("/app/repertoires/black-repertoire/chapter-3/train/v1-line")).toBe(
-      true,
-    );
+    expect(appShellHasRightPanel("/app/black-repertoire/chapter-3/v1-line/train")).toBe(true);
   });
 
   it("keeps the right panel for individual learning lines", () => {
-    expect(appShellHasRightPanel("/app/repertoires/white-repertoire/chapter-1/learn/v1-line")).toBe(
-      true,
-    );
+    expect(appShellHasRightPanel("/app/white-repertoire/chapter-1/v1-line/learn")).toBe(true);
+  });
+
+  it("keeps the right panel for read-only lines", () => {
+    expect(appShellHasRightPanel("/app/white-repertoire/main/v1-line")).toBe(true);
   });
 
   it("keeps the right panel for chapter and game detail pages", () => {

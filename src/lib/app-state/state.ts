@@ -17,6 +17,8 @@ import type {
 } from "./types";
 import { trainingLineReviewKey } from "./spacedRepetition";
 import { highlightsFromPgnMetadata } from "./pgnHighlights";
+import { getTrainingLinePgn } from "./trainingLines";
+import { getNagGlyph, getNagMeaning } from "./nags";
 
 type ChapterScope = {
   repertoire: Repertoire;
@@ -224,6 +226,11 @@ export function getPgn(state: AppState, ctx: Context): NormalizedPgn | null {
     return getChapterPgn(state, ctx);
   }
 
+  if (ctx.type === "line-reader") {
+    const pgn = getChapterPgn(state, ctx);
+    return pgn === null ? null : getTrainingLinePgn(pgn, ctx.lineId);
+  }
+
   if (ctx.type === "imported-game") {
     const gamePgn = state.pgns[ctx.gameId];
     return gamePgn?.status === "success" ? gamePgn.data : null;
@@ -261,8 +268,13 @@ export function selectNextMoveIds(state: AppState, ctx: Context): number[] {
 }
 
 function getChapterSelectionKey(ctx: Context): string | null {
-  if (ctx.type !== "repertoire-builder") return null;
-  return `${ctx.repertoireHandle}/${ctx.chapterHandle}`;
+  if (ctx.type === "repertoire-builder") {
+    return `${ctx.repertoireHandle}/${ctx.chapterHandle}`;
+  }
+  if (ctx.type === "line-reader") {
+    return `line-reader/${ctx.repertoireHandle}/${ctx.chapterHandle}/${ctx.lineId}`;
+  }
+  return null;
 }
 
 export function selectSelectedMoveId(state: AppState, ctx: Context): number | null {
@@ -335,6 +347,21 @@ export function selectedMove(state: AppState, ctx: Context) {
 export function selectHighlights(state: AppState, ctx: Context) {
   const move = selectedMove(state, ctx);
   return move === null ? state.highlights : highlightsFromPgnMetadata(move.metadata);
+}
+
+export function selectNagAnnotations(
+  state: AppState,
+  ctx: Context,
+): { [square: string]: { type: "nag"; glyph: string; meaning: string }[] } {
+  const move = selectedMove(state, ctx);
+  if (move === null || move.nags.length === 0) return {};
+  return {
+    [move.to]: move.nags.slice(0, 2).map((nag) => ({
+      type: "nag",
+      glyph: getNagGlyph(nag),
+      meaning: getNagMeaning(nag),
+    })),
+  };
 }
 
 export function selectMoveById(state: AppState, ctx: Context, moveId: number): Move | null {

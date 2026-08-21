@@ -123,6 +123,43 @@ export function trainingLineUciPath(moves: readonly Move[]): string {
   return moves.map((move) => `${move.from}${move.to}${move.promotion ?? ""}`).join(" ");
 }
 
+export function getTrainingLinePgn(pgn: NormalizedPgn, lineId: string): NormalizedPgn | null {
+  const uciPath = trainingLineUciPathFromId(lineId);
+  if (uciPath === null) return null;
+
+  const moveIds: number[] = [];
+  let candidateIds = pgn.rootMoveIds;
+  for (const uci of uciPath.split(" ")) {
+    const moveId = candidateIds.find((candidateId) => {
+      const move = pgn.moves[candidateId];
+      return move !== undefined && `${move.from}${move.to}${move.promotion ?? ""}` === uci;
+    });
+    if (moveId === undefined) return null;
+
+    moveIds.push(moveId);
+    candidateIds = pgn.moves[moveId]?.next ?? [];
+  }
+
+  const moves: Record<number, Move> = {};
+  moveIds.forEach((moveId, index) => {
+    const move = pgn.moves[moveId];
+    if (move === undefined) return;
+    const nextMoveId = moveIds[index + 1];
+    moves[moveId] = {
+      ...move,
+      next: nextMoveId === undefined ? [] : [nextMoveId],
+    };
+  });
+
+  const rootMoveId = moveIds[0];
+  if (rootMoveId === undefined) return null;
+  return {
+    rootMoveIds: [rootMoveId],
+    moves,
+    moveIdCounter: pgn.moveIdCounter,
+  };
+}
+
 function isUserMove(move: Move, orientation: Orientation): boolean {
   return (move.halfMoveNumber % 2 === 0 ? "white" : "black") === orientation;
 }

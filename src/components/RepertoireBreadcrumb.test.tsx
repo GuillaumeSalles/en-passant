@@ -48,7 +48,7 @@ function Wrapper(props: { children: JSX.Element }) {
 function renderBreadcrumb(props: { trainingLineId: string | null } = { trainingLineId: null }) {
   render(() => (
     <Wrapper>
-      <RepertoireBreadcrumb showTraining trainingLineId={props.trainingLineId} />
+      <RepertoireBreadcrumb showTraining trainingLineId={props.trainingLineId} readLine={false} />
     </Wrapper>
   ));
 }
@@ -80,6 +80,6 @@ test("links the current training line breadcrumb", () => {
     "/app/repertoires/untitled-repertoire/chapter-1/train",
   );
   expect(screen.getByRole("link", { name: "Line" }).getAttribute("href")).toBe(
-    "/app/repertoires/untitled-repertoire/chapter-1/train/v1-line",
+    "/app/untitled-repertoire/chapter-1/v1-line/train",
   );
 });

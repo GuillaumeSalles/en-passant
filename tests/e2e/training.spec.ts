@@ -150,14 +150,14 @@ test("reviews only due lines from a chapter", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Train all" })).toHaveCount(0);
   await reviewChapter.click();
 
-  await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
+  await expect(page).toHaveURL(/\/v1-.*\/train\?review=chapter$/);
   await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   await pausePacingClock(page);
   await dragPiece(page, "e2", "e4");
   await advanceTrainingPacing(page, "waiting-for-response", 500);
   await advanceTrainingPacing(page, "line-boundary", 1000);
 
-  await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
+  await expect(page).toHaveURL(/\/v1-.*\/train\?review=chapter$/);
   await expect(page.getByText("2/2", { exact: true })).toBeVisible();
   await dragPiece(page, "d2", "d4");
   await advanceTrainingPacing(page, "waiting-for-response", 500);

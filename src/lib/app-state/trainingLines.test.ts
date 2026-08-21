@@ -3,6 +3,7 @@ import { getVariationMoveIds } from "./training";
 import { normalizePgn } from "./pgnTree";
 import {
   getTrainingLineByUciPath,
+  getTrainingLinePgn,
   getTrainingLines,
   getTrainingLinesWithScheduledPaths,
   isAlternativeTrainingMove,
@@ -49,6 +50,26 @@ describe("training lines", () => {
     expect(partial?.id).toBe(trainingLineIdFromUciPath(uciPath));
     expect(trainingLineUciPathFromId(partial?.id ?? "")).toBe(uciPath);
     expect(getTrainingLinesWithScheduledPaths(pgn, "white", [uciPath])).toHaveLength(2);
+  });
+
+  test("extracts only the requested line while preserving its move details", () => {
+    const pgn = normalizePgn("1. e4 $1 {King pawn [%csl Re4] [%cal Ge2e4]} (1. d4 d5) e5 2. Nf3 *");
+    const line = getTrainingLines(pgn, "white")[0];
+    const linePgn = line === undefined ? null : getTrainingLinePgn(pgn, line.id);
+
+    expect(linePgn?.rootMoveIds).toHaveLength(1);
+    expect(Object.values(linePgn?.moves ?? {}).map((move) => move.san)).toEqual([
+      "e4",
+      "e5",
+      "Nf3",
+    ]);
+    const rootMoveId = linePgn?.rootMoveIds[0];
+    expect(rootMoveId === undefined ? undefined : linePgn?.moves[rootMoveId]).toMatchObject({
+      nags: [1],
+      commentAfter: "King pawn",
+      metadata: ["[%csl Re4]", "[%cal Ge2e4]"],
+    });
+    expect(getTrainingLinePgn(pgn, "v1-not-a-line")).toBeNull();
   });
 
   test("marks only branches on the repertoire user's turns as alternative lines", () => {

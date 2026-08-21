@@ -3,28 +3,33 @@ import {
   chapterTrainingLineReviewPath,
   firstRepertoireChapterPath,
   learningLinePath,
+  lineReaderPath,
   parseSelectedPositionKey,
   repertoireMovePath,
   trainingLineReviewPath,
   trainingQueueReviewPath,
 } from "./routes";
 
-test("builds a learning line path", () => {
-  expect(learningLinePath("white", "main", "v1-line")).toBe(
-    "/app/repertoires/white/main/learn/v1-line",
+test("builds a read-only line path from handles", () => {
+  expect(lineReaderPath("white-repertoire", "main-line", "v1-line")).toBe(
+    "/app/white-repertoire/main-line/v1-line",
   );
+});
+
+test("builds a learning line path", () => {
+  expect(learningLinePath("white", "main", "v1-line")).toBe("/app/white/main/v1-line/learn");
 });
 
 test("builds paths for reviewing all due lines", () => {
   expect(trainingQueueReviewPath()).toBe("/app/training?review=due");
   expect(trainingLineReviewPath("white", "main", "v1-line")).toBe(
-    "/app/repertoires/white/main/train/v1-line?review=due",
+    "/app/white/main/v1-line/train?review=due",
   );
 });
 
 test("builds a path for reviewing due lines in one chapter", () => {
   expect(chapterTrainingLineReviewPath("white", "main", "v1-line")).toBe(
-    "/app/repertoires/white/main/train/v1-line?review=chapter",
+    "/app/white/main/v1-line/train?review=chapter",
   );
 });
 

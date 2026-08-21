@@ -13,7 +13,8 @@ function trainingLine(overrides: Partial<TrainingLineListItem> = {}): TrainingLi
     isAlternative: false,
     isLearned: true,
     dueAt: 1_000,
-    primaryHref: "/train/v1-line",
+    primaryHref: "/app/white/main/v1-line/train",
+    readHref: "/app/white-repertoire/main-line/v1-line",
     viewHref: "/chapter?move=end",
     trainingStatus: "due",
     ...overrides,
@@ -43,11 +44,15 @@ test("renders the shared training-line structure and route-specific actions", ()
   expect(row?.textContent).toContain("Due now");
   expect(screen.getByText("Due now").classList.contains("text-muted-foreground")).toBe(true);
   flush(() => fireEvent.click(screen.getByRole("button", { name: "Actions for e4 e5 Nf3" })));
-  expect(screen.getByText("Read line").getAttribute("aria-disabled")).toBe("true");
+  expect(screen.getByRole("link", { name: "Read line" }).getAttribute("href")).toBe(
+    "/app/white-repertoire/main-line/v1-line",
+  );
   expect(screen.getByRole("link", { name: "View in chapter" }).getAttribute("href")).toBe(
     "/chapter?move=end",
   );
-  expect(screen.getByRole("link", { name: "Review" }).getAttribute("href")).toBe("/train/v1-line");
+  expect(screen.getByRole("link", { name: "Review" }).getAttribute("href")).toBe(
+    "/app/white/main/v1-line/train",
+  );
 });
 
 test("uses Learn as the primary action for a line that has never been learned", () => {
@@ -56,7 +61,7 @@ test("uses Learn as the primary action for a line that has never been learned", 
       lines={[
         trainingLine({
           isLearned: false,
-          primaryHref: "/learn/v1-line",
+          primaryHref: "/app/white/main/v1-line/learn",
         }),
       ]}
       emptyMessage="Nothing to train"
@@ -65,7 +70,9 @@ test("uses Learn as the primary action for a line that has never been learned", 
     />
   ));
 
-  expect(screen.getByRole("link", { name: "Learn" }).getAttribute("href")).toBe("/learn/v1-line");
+  expect(screen.getByRole("link", { name: "Learn" }).getAttribute("href")).toBe(
+    "/app/white/main/v1-line/learn",
+  );
   expect(screen.queryByRole("link", { name: "Review" })).toBeNull();
 });
 
@@ -85,7 +92,7 @@ test("uses a secondary Overstudy action for a learned line that is not due", () 
   ));
 
   const overstudy = screen.getByRole("link", { name: "Overstudy" });
-  expect(overstudy.getAttribute("href")).toBe("/train/v1-line");
+  expect(overstudy.getAttribute("href")).toBe("/app/white/main/v1-line/train");
   expect(overstudy.classList.contains("border-input")).toBe(true);
   expect(screen.queryByRole("link", { name: "Review" })).toBeNull();
 });

@@ -294,7 +294,7 @@ async function openFirstTrainingLine(page: Page) {
     .getByRole("link", { name: "Learn" })
     .getAttribute("href");
   if (learnHref === null) throw new Error("Expected the first line to have a learning URL");
-  await page.goto(learnHref.replace("/learn/", "/train/"));
+  await page.goto(learnHref.replace(/\/learn$/, "/train"));
   await expect(page.locator("[data-square]")).toHaveCount(64);
 }
 
@@ -940,7 +940,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(lines).toHaveCount(2);
   await expect(lines.first().getByRole("link", { name: "Learn" })).toHaveAttribute(
     "href",
-    /\/learn\/v1-[A-Za-z0-9_-]+$/,
+    /\/v1-[A-Za-z0-9_-]+\/learn$/,
   );
   await expect(lines.first().getByRole("link", { name: "Train" })).toHaveCount(0);
   const firstLearnHref = await lines
@@ -951,7 +951,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();
   await expect(page.getByText("0/2 trained")).toBeVisible();
 
-  await page.goto(firstLearnHref.replace("/learn/", "/train/"));
+  await page.goto(firstLearnHref.replace(/\/learn$/, "/train"));
   await expect(page.locator("[data-square]")).toHaveCount(64);
   const cleanStat = page.locator('[data-training-stat="clean"]');
   const mistakesStat = page.locator('[data-training-stat="mistakes"]');
@@ -1022,6 +1022,49 @@ test("opens a chapter at the terminal move of a line", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("reads one line with its comments, annotations, and arrows", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await seedRepertoire(
+    page,
+    "1. e4 $1 {King pawn [%csl Rd4] [%cal Yb1c3]} (1. d4 {Queen pawn} d5) e5 2. Nf3 *",
+  );
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+
+  const line = page.locator("[data-training-line]").first();
+  await line.getByRole("button", { name: /Actions for/ }).click();
+  const readLine = page.getByRole("link", { name: "Read line" });
+  await expect(readLine).toHaveAttribute(
+    "href",
+    /\/app\/untitled-repertoire\/chapter-1\/v1-[A-Za-z0-9_-]+$/,
+  );
+  await readLine.click();
+
+  await expect(page).toHaveURL(/\/app\/untitled-repertoire\/chapter-1\/v1-[A-Za-z0-9_-]+$/);
+  await expect(page.locator("[data-moves-tree]")).toBeVisible();
+  await expect(page.locator('[aria-label="Move e4"]')).toBeVisible();
+  await expect(page.locator('[aria-label="Move e5"]')).toBeVisible();
+  await expect(page.locator('[aria-label="Move Nf3"]')).toBeVisible();
+  await expect(page.locator('[aria-label="Move d4"]')).toHaveCount(0);
+  await expect(page.getByText("King pawn", { exact: true })).toBeVisible();
+  await expect(page.getByText("Queen pawn", { exact: true })).toHaveCount(0);
+
+  await page.locator('[aria-label="Move e4"]').click();
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveAttribute("data-arrow-kind", "normal");
+  await expect(page.locator('[data-square="highlight-square-d4"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "normal",
+  );
+  await expect(page.locator('[data-annotation="nag"][data-annotation-square="e4"]')).toHaveText(
+    "!",
+  );
+
+  await page.locator('[aria-label="Move e4"]').dblclick();
+  await expect(page.getByLabel("Move comment")).toHaveCount(0);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("labels alternative lines and accepts their moves without counting mistakes", async ({
   page,
 }) => {
@@ -1039,7 +1082,7 @@ test("labels alternative lines and accepts their moves without counting mistakes
 
   const learnHref = await lines.first().getByRole("link", { name: "Learn" }).getAttribute("href");
   if (learnHref === null) throw new Error("Expected the first line to have a learning URL");
-  await page.goto(learnHref.replace("/learn/", "/train/"));
+  await page.goto(learnHref.replace(/\/learn$/, "/train"));
   await pausePacingClock(page);
   await dragPiece(page, "d2", "d4");
   await expect(

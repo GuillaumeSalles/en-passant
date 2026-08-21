@@ -13,6 +13,12 @@ export type Context =
       chapterHandle: string;
     }
   | {
+      type: "line-reader";
+      lineId: string;
+      repertoireHandle: string;
+      chapterHandle: string;
+    }
+  | {
       type: "imported-game";
       gameId: string;
       repertoireHandle: string;

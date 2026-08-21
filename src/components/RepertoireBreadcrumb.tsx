@@ -18,6 +18,7 @@ export function RepertoireBreadcrumb(props: {
   showTraining: boolean;
   trainingLineId: string | null;
   learningLineId?: string | null;
+  readLine: boolean;
 }) {
   const repertoireName = useSelector(getRepertoireName);
   const chapterName = useSelector(getChapterName);
@@ -84,6 +85,10 @@ export function RepertoireBreadcrumb(props: {
                 </a>
               </>
             )}
+          </Show>
+          <Show when={props.readLine}>
+            <span>·</span>
+            <span aria-current="page">Line</span>
           </Show>
         </nav>
       )}
