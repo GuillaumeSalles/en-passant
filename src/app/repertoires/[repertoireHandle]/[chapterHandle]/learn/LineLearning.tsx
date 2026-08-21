@@ -44,6 +44,7 @@ const INITIAL_DEMONSTRATION_DELAY = 650;
 const MOVE_RESPONSE_DELAY = 400;
 const MOVE_DEMONSTRATION_DURATION = 700;
 const WRONG_MOVE_DELAY = 700;
+const LEARNING_BOUNDARY_DELAY = 1000;
 
 type LearningPhase =
   | "starting"
@@ -87,6 +88,7 @@ export function LineLearning(props: {
   const reinforcement = useVariationTrainingFlow(props, {
     enabled: () => phase() === "reinforcement",
     repetitions: 2,
+    boundaryDelayMs: LEARNING_BOUNDARY_DELAY,
     onLineComplete: () => {
       const line = activeLine();
       if (line !== undefined) onMarkLineLearned(line.uciPath);

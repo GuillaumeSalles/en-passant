@@ -90,6 +90,7 @@ export function useVariationTrainingFlow(
   options: {
     enabled?: Accessor<boolean>;
     repetitions?: number;
+    boundaryDelayMs?: number;
     onLineComplete?: () => void;
   } = {},
 ) {
@@ -114,6 +115,7 @@ export function useVariationTrainingFlow(
   const [initializedScopeKey, setInitializedScopeKey] = createSignal<string | null>(null);
   const isEnabled = () => options.enabled?.() ?? true;
   const repetitions = () => Math.max(1, options.repetitions ?? 1);
+  const boundaryDelayMs = () => Math.max(0, options.boundaryDelayMs ?? 0);
 
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromEvalMove = useMutation(moveFromEvalMove);
@@ -221,8 +223,12 @@ export function useVariationTrainingFlow(
     }
   }
 
-  function finishRepetition(): void {
+  async function finishRepetition(version: number, key: string): Promise<void> {
     const completed = completedRepetitions() + 1;
+    const delayMs = boundaryDelayMs();
+    if (delayMs > 0) await delay(delayMs);
+    if (!isCurrentFlowStep(version, key)) return;
+
     setCompletedRepetitions(completed);
     if (completed >= repetitions()) {
       setPhase({ type: "line-complete" });
@@ -232,7 +238,11 @@ export function useVariationTrainingFlow(
     }
   }
 
-  function completeLineAttempt(completedMoveId: number): void {
+  async function completeLineAttempt(
+    completedMoveId: number,
+    version: number,
+    key: string,
+  ): Promise<void> {
     const line = activeLine();
     if (line === undefined) return;
     const finishesLine = completedRepetitions() + 1 >= repetitions();
@@ -245,7 +255,7 @@ export function useVariationTrainingFlow(
     if ((state.training.session?.replayMoveIds.length ?? 0) > 0) {
       setPhase({ type: "preparing-replay" });
     } else {
-      finishRepetition();
+      await finishRepetition(version, key);
     }
   }
 
@@ -405,7 +415,7 @@ export function useVariationTrainingFlow(
       if ((state.training.session?.replayMoveIds.length ?? 0) > 0) {
         setPhaseAfterLineCompletion();
       } else {
-        finishRepetition();
+        await finishRepetition(version, key);
       }
       return;
     }
@@ -413,7 +423,7 @@ export function useVariationTrainingFlow(
     const responseId = variation()[currentHalfMoveNumber + 2];
     const response = responseId === undefined ? undefined : pgn.moves[responseId];
     if (response === undefined) {
-      completeLineAttempt(expectedMove.id);
+      await completeLineAttempt(expectedMove.id, version, key);
       return;
     }
 
@@ -424,7 +434,7 @@ export function useVariationTrainingFlow(
     }
     onMoveFromEvalMove(response);
     if (variation()[currentHalfMoveNumber + 3] === undefined) {
-      completeLineAttempt(expectedMove.id);
+      await completeLineAttempt(expectedMove.id, version, key);
     } else {
       setPhase({ type: "awaiting-line-move", notice: null });
     }

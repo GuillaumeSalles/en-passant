@@ -1181,6 +1181,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   const consoleMessages = collectUnexpectedConsole(page);
 
   await recordPlayedSounds(page);
+  await recordPieceAnimations(page);
   await seedRepertoire(
     page,
     "1. e4 {Take the center.} e5 {Black challenges the center.} 2. Nf3 {Develop with tempo.} *",
@@ -1198,7 +1199,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
 
   await expect(page.getByText("Watch this move.")).toBeVisible();
-  await expect(page.locator('[data-moving-piece="true"]')).toBeVisible();
+  await expect.poll(() => pieceAnimationCount(page)).toBeGreaterThan(0);
   await expect(page.getByText("Now repeat the move.")).toBeVisible();
   await dragPiece(page, "e2", "e4");
 
