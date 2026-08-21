@@ -47,6 +47,50 @@ function trainingActionLabel(line: TrainingLineListItem, now: number): string {
   return isOverstudy(line, now) ? "Overstudy" : "Review";
 }
 
+const TRAINING_LINE_SKELETONS = [
+  { labelWidth: "w-40", detailWidth: "w-24" },
+  { labelWidth: "w-52", detailWidth: "w-32" },
+  { labelWidth: "w-32", detailWidth: "w-20" },
+] as const;
+
+function TrainingLineListSkeleton(props: { message: string }) {
+  return (
+    <div role="status" aria-label={props.message}>
+      <span class="sr-only">{props.message}</span>
+      <For each={TRAINING_LINE_SKELETONS}>
+        {(skeleton, index) => (
+          <>
+            <Show when={index() > 0}>
+              <HorizontalDashedDivider animation="none" />
+            </Show>
+            <div
+              class="flex min-w-0 items-center justify-between gap-3 p-3"
+              data-training-line-skeleton
+              aria-hidden="true"
+            >
+              <div class="min-w-0 flex-1">
+                <div
+                  class={`h-4 max-w-full animate-pulse rounded-sm bg-muted/60 motion-reduce:animate-none ${skeleton.labelWidth}`}
+                />
+                <div class="mt-2 flex items-center gap-2">
+                  <div class="h-5 w-16 animate-pulse rounded-full bg-muted/50 motion-reduce:animate-none" />
+                  <div
+                    class={`h-3 max-w-full animate-pulse rounded-sm bg-muted/40 motion-reduce:animate-none ${skeleton.detailWidth}`}
+                  />
+                </div>
+              </div>
+              <div class="flex flex-none items-center gap-2">
+                <div class="h-8 w-14 animate-pulse rounded-md bg-muted/50 motion-reduce:animate-none" />
+                <div class="h-8 w-16 animate-pulse rounded-md bg-muted/60 motion-reduce:animate-none" />
+              </div>
+            </div>
+          </>
+        )}
+      </For>
+    </div>
+  );
+}
+
 export function TrainingLineList(props: {
   lines: readonly TrainingLineListItem[];
   emptyMessage: string;
@@ -59,9 +103,7 @@ export function TrainingLineList(props: {
       <Show
         when={!props.loading}
         fallback={
-          <div class="p-4 text-sm text-muted-foreground">
-            {props.loadingMessage ?? "Loading training lines…"}
-          </div>
+          <TrainingLineListSkeleton message={props.loadingMessage ?? "Loading training lines…"} />
         }
       >
         <For

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ButtonCountBadge } from "@/components/ui/button-count-badge";
 import {
   getChapterPgn,
+  getChapterScopeFromData,
   getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
   isTrainingReviewDue,
@@ -49,6 +50,21 @@ export function TrainingLines(props: {
   const onStartTrainingQueueReview = useMutation(startTrainingQueueReview);
   const [now, setNow] = createSignal(Date.now());
   const mistakeLinks = useTrainingMistakeLinks();
+
+  const isLoading = createMemo(() => {
+    if (state.repertoires.status !== "success" || state.chapters.status !== "success") {
+      return true;
+    }
+    const scope = getChapterScopeFromData(
+      state.repertoires.data,
+      state.chapters.data,
+      props.repertoireHandle,
+      props.chapterHandle,
+    );
+    if (scope === null) return false;
+    const pgn = state.pgns[scope.chapter.pgnId];
+    return pgn === undefined || pgn.status === "not-loaded" || pgn.status === "loading";
+  });
 
   const reviewKey = (uciPath: string) =>
     trainingLineScheduleKey(
@@ -209,7 +225,7 @@ export function TrainingLines(props: {
         <TrainingLineList
           lines={listItems()}
           emptyMessage="Nothing to train"
-          loading={false}
+          loading={isLoading()}
           now={now()}
         />
       </div>

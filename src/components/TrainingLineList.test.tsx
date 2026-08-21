@@ -92,3 +92,20 @@ test("renders one empty state for either training route", () => {
 
   expect(screen.getByText("No scheduled lines")).not.toBeNull();
 });
+
+test("renders line-shaped placeholders while training lines load", () => {
+  render(() => (
+    <TrainingLineList
+      lines={[trainingLine()]}
+      emptyMessage="Nothing to train"
+      loading
+      loadingMessage="Loading chapter lines…"
+      now={2_000}
+    />
+  ));
+
+  expect(screen.getByRole("status", { name: "Loading chapter lines…" })).not.toBeNull();
+  expect(document.querySelectorAll("[data-training-line-skeleton]")).toHaveLength(3);
+  expect(screen.queryByText("e4 e5 Nf3")).toBeNull();
+  expect(screen.queryByRole("link")).toBeNull();
+});
