@@ -27,6 +27,8 @@ import { completeTrainingQueueReviewLine } from "@/mutations/trainingSession";
 import { TrainingLines } from "./TrainingLines";
 import { useVariationTrainingFlow } from "./useVariationTrainingFlow";
 
+const REVIEW_LINE_BOUNDARY_DELAY = 1000;
+
 export function VariationTraining(props: {
   repertoireHandle: string;
   chapterHandle: string;
@@ -63,6 +65,8 @@ export function VariationTraining(props: {
   );
 
   const flow = useVariationTrainingFlow(props, {
+    boundaryDelayMs: () =>
+      isReviewingQueue() || isReviewingChapter() ? REVIEW_LINE_BOUNDARY_DELAY : 0,
     onLineComplete: () => {
       if (isReviewingQueue()) {
         onCompleteTrainingQueueReviewLine();

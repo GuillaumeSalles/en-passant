@@ -90,7 +90,7 @@ export function useVariationTrainingFlow(
   options: {
     enabled?: Accessor<boolean>;
     repetitions?: number;
-    boundaryDelayMs?: number;
+    boundaryDelayMs?: number | Accessor<number>;
     onLineComplete?: () => void;
   } = {},
 ) {
@@ -115,7 +115,13 @@ export function useVariationTrainingFlow(
   const [initializedScopeKey, setInitializedScopeKey] = createSignal<string | null>(null);
   const isEnabled = () => options.enabled?.() ?? true;
   const repetitions = () => Math.max(1, options.repetitions ?? 1);
-  const boundaryDelayMs = () => Math.max(0, options.boundaryDelayMs ?? 0);
+  const boundaryDelayMs = () =>
+    Math.max(
+      0,
+      typeof options.boundaryDelayMs === "function"
+        ? options.boundaryDelayMs()
+        : (options.boundaryDelayMs ?? 0),
+    );
 
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromEvalMove = useMutation(moveFromEvalMove);
