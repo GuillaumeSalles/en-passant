@@ -983,7 +983,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByText("Good job!")).toBeVisible();
   await expect(cleanStat).toContainText("0");
   await expect(mistakesStat).toContainText("2");
-  await expect(accuracyStat).toContainText("60%");
+  await expect(accuracyStat).toContainText("33%");
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
   await dragPiece(page, "d2", "d4");
@@ -991,7 +991,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByText("Good job!")).toBeVisible();
   await expect(cleanStat).toContainText("1");
   await expect(mistakesStat).toContainText("2");
-  await expect(accuracyStat).toContainText("67%");
+  await expect(accuracyStat).toContainText("50%");
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.getByText("2/2 trained")).toBeVisible();
   await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();

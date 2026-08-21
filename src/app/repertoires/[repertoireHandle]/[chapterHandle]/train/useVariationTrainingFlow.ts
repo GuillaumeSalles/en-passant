@@ -464,7 +464,6 @@ export function useVariationTrainingFlow(
         dispatch({ type: "RESET" });
         return;
       }
-      onMarkTrainingCorrectMove();
       onCompleteTrainingReplayMove({
         lineId: props.lineId,
         uciPath: line.uciPath,

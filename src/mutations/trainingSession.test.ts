@@ -142,6 +142,44 @@ describe("training session", () => {
     });
   });
 
+  test("does not count failed-move replays as moves or toward accuracy", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+
+    markTrainingMistake(context.state, context.route, { moveId: 2 });
+    markTrainingCorrectMove(context.state, context.route);
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      completedMoveId: 2,
+      finishLine: true,
+    });
+
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+    completeTrainingReplayMove(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      finishLine: true,
+    });
+
+    expect(selectTrainingSessionStats(context.state, context.route)).toMatchObject({
+      accuracy: 1 / 2,
+      mistakes: 1,
+      moves: 2,
+    });
+    expect(context.state.training.session?.results).toEqual([
+      { lineId: "line-a", moveCount: 2, mistakeCount: 1 },
+    ]);
+  });
+
   test("advances a learned line after a clean review", () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_000);
