@@ -98,7 +98,15 @@ test("lists scheduled lines by training priority", async ({ page }) => {
   await expect(lines.nth(0).locator('[data-mastery-level="practiced"]')).toBeVisible();
   await expect(lines.nth(1)).toContainText("e4 e5");
   await expect(lines.nth(1).locator('[data-mastery-level="familiar"]')).toBeVisible();
-  await expect(lines.nth(0).getByRole("link", { name: "View", exact: true })).toBeVisible();
+  await lines
+    .nth(0)
+    .getByRole("button", { name: /Actions for/ })
+    .click();
+  await expect(page.getByText("Read line", { exact: true })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  await expect(page.getByRole("link", { name: "View in chapter" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Review lines" })).toHaveAttribute(
     "href",
     /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,

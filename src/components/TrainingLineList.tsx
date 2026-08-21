@@ -1,6 +1,13 @@
 import { For, Show } from "solid-js";
+import { Ellipsis } from "@/components/Icons";
 import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 
 type TrainingLineLink = {
@@ -80,7 +87,7 @@ function TrainingLineListSkeleton(props: { message: string }) {
                 </div>
               </div>
               <div class="flex flex-none items-center gap-2">
-                <div class="h-8 w-14 animate-pulse rounded-md bg-muted/50 motion-reduce:animate-none" />
+                <div class="h-8 w-8 animate-pulse rounded-md bg-muted/50 motion-reduce:animate-none" />
                 <div class="h-8 w-16 animate-pulse rounded-md bg-muted/60 motion-reduce:animate-none" />
               </div>
             </div>
@@ -160,9 +167,23 @@ export function TrainingLineList(props: {
                   </Show>
                 </div>
                 <div class="flex flex-none items-center gap-2">
-                  <Button size="sm" variant="outline" href={line.viewHref}>
-                    View
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        aria-label={`Actions for ${line.label}`}
+                      >
+                        <Ellipsis />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem disabled>Read line</DropdownMenuItem>
+                      <DropdownMenuItem disabled={false} href={line.viewHref}>
+                        View in chapter
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     size="sm"
                     variant={isOverstudy(line, props.now) ? "outline" : "default"}

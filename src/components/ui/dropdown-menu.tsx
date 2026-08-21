@@ -1,4 +1,4 @@
-import { createContext, createSignal, omit, useContext, createMemo, untrack } from "solid-js";
+import { createContext, createSignal, omit, useContext, createMemo, Show, untrack } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { cn } from "@/lib/utils";
 import {
@@ -181,23 +181,43 @@ function DropdownMenuItem(props: {
   children: JSX.Element;
   class?: string;
   disabled: boolean;
+  href?: string;
   onClick?: () => void;
 }) {
   const ctx = useContext(DropdownMenuContext);
 
+  const closeMenu = () => {
+    props.onClick?.();
+    ctx.setOpen(false);
+  };
+
   return (
-    <div
-      aria-disabled={props.disabled ? "true" : undefined}
-      class={cn(menuItemClass, props.disabled && "pointer-events-none opacity-50", props.class)}
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={() => {
-        if (props.disabled) return;
-        props.onClick?.();
-        ctx.setOpen(false);
-      }}
+    <Show
+      when={props.href !== undefined}
+      fallback={
+        <div
+          aria-disabled={props.disabled ? "true" : undefined}
+          class={cn(menuItemClass, props.disabled && "pointer-events-none opacity-50", props.class)}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            if (props.disabled) return;
+            closeMenu();
+          }}
+        >
+          {props.children}
+        </div>
+      }
     >
-      {props.children}
-    </div>
+      <a
+        aria-disabled={props.disabled ? "true" : undefined}
+        class={cn(menuItemClass, props.disabled && "pointer-events-none opacity-50", props.class)}
+        href={props.disabled ? undefined : props.href}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={closeMenu}
+      >
+        {props.children}
+      </a>
+    </Show>
   );
 }
 

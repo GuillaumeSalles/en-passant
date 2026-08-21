@@ -962,11 +962,12 @@ test("opens a chapter at the terminal move of a line", async ({ page }) => {
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
 
   const line = page.locator("[data-training-line]").first();
-  await expect(line.getByRole("link", { name: "View" })).toHaveAttribute(
+  await line.getByRole("button", { name: /Actions for/ }).click();
+  await expect(page.getByRole("link", { name: "View in chapter" })).toHaveAttribute(
     "href",
     "/app/repertoires/untitled-repertoire/chapter-1?selectedPositionKey=rnbqkbnr%2Fpppp1ppp%2F8%2F4p3%2F4P3%2F8%2FPPPP1PPP%2FRNBQKBNR%20w%20KQkq%20-",
   );
-  await line.getByRole("link", { name: "View" }).click();
+  await page.getByRole("link", { name: "View in chapter" }).click();
 
   await expect(page).toHaveURL(
     /\/app\/repertoires\/untitled-repertoire\/chapter-1\?selectedPositionKey=rnbqkbnr%2Fpppp1ppp%2F8%2F4p3%2F4P3%2F8%2FPPPP1PPP%2FRNBQKBNR%20w%20KQkq%20-$/,

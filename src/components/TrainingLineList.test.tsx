@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { flush } from "solid-js";
 import { afterEach, expect, test } from "vitest";
 import { TrainingLineList, type TrainingLineListItem } from "./TrainingLineList";
 
@@ -41,7 +42,11 @@ test("renders the shared training-line structure and route-specific actions", ()
   expect(row?.getAttribute("data-training-status")).toBe("due");
   expect(row?.textContent).toContain("Due now");
   expect(screen.getByText("Due now").classList.contains("text-muted-foreground")).toBe(true);
-  expect(screen.getByRole("link", { name: "View" }).getAttribute("href")).toBe("/chapter?move=end");
+  flush(() => fireEvent.click(screen.getByRole("button", { name: "Actions for e4 e5 Nf3" })));
+  expect(screen.getByText("Read line").getAttribute("aria-disabled")).toBe("true");
+  expect(screen.getByRole("link", { name: "View in chapter" }).getAttribute("href")).toBe(
+    "/chapter?move=end",
+  );
   expect(screen.getByRole("link", { name: "Review" }).getAttribute("href")).toBe("/train/v1-line");
 });
 
