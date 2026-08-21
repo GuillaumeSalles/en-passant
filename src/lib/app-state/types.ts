@@ -183,6 +183,7 @@ export type TrainingLineResult = {
 };
 
 export type TrainingReviewQueue = {
+  clean: number;
   reviewed: number;
   total: number;
 };

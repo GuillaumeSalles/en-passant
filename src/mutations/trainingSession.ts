@@ -22,7 +22,7 @@ export function startTrainingQueueReview(
 ): void {
   state.set("training", {
     ...state.training,
-    reviewQueue: { reviewed: 0, total },
+    reviewQueue: { clean: 0, reviewed: 0, total },
   });
 }
 
@@ -36,16 +36,22 @@ export function ensureTrainingQueueReview(
   if (queue !== null && queue.total === total) return;
   state.set("training", {
     ...state.training,
-    reviewQueue: { reviewed: queue?.reviewed ?? 0, total },
+    reviewQueue: { clean: queue?.clean ?? 0, reviewed: queue?.reviewed ?? 0, total },
   });
 }
 
 export function completeTrainingQueueReviewLine(state: StoreState<AppState>, _ctx: Context): void {
   const queue = state.training.reviewQueue;
-  if (queue === null) return;
+  if (queue === null || queue.reviewed >= queue.total) return;
+  const session = state.training.session;
+  const activeResult = session?.results.find((result) => result.lineId === session.activeLineId);
   state.set("training", {
     ...state.training,
-    reviewQueue: { ...queue, reviewed: Math.min(queue.reviewed + 1, queue.total) },
+    reviewQueue: {
+      ...queue,
+      clean: queue.clean + (activeResult?.mistakeCount === 0 ? 1 : 0),
+      reviewed: queue.reviewed + 1,
+    },
   });
 }
 

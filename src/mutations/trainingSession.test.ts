@@ -51,13 +51,54 @@ describe("training session", () => {
 
     startTrainingQueueReview(context.state, context.route, 2);
     completeTrainingQueueReviewLine(context.state, context.route);
-    expect(context.state.training.reviewQueue).toEqual({ reviewed: 1, total: 2 });
+    expect(context.state.training.reviewQueue).toEqual({ clean: 0, reviewed: 1, total: 2 });
 
     ensureTrainingQueueReview(context.state, context.route, 2);
-    expect(context.state.training.reviewQueue).toEqual({ reviewed: 1, total: 3 });
+    expect(context.state.training.reviewQueue).toEqual({ clean: 0, reviewed: 1, total: 3 });
 
     clearTrainingQueueReview(context.state, context.route);
     expect(context.state.training.reviewQueue).toBeNull();
+  });
+
+  test("keeps a queue-wide count of completed lines without mistakes", () => {
+    const context = createTrainingContext();
+    startTrainingQueueReview(context.state, context.route, 2);
+
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      completedMoveId: 4,
+      finishLine: true,
+    });
+    completeTrainingQueueReviewLine(context.state, context.route);
+
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-b"],
+      lineId: "line-b",
+      variationIndex: 0,
+    });
+    markTrainingMistake(context.state, context.route, { moveId: 2 });
+    completeTrainingLine(context, {
+      lineId: "line-b",
+      uciPath: "e2e4 e7e5",
+      completedMoveId: 4,
+      finishLine: true,
+    });
+    for (let replay = 0; replay < 3; replay += 1) {
+      completeTrainingReplayMove(context, {
+        lineId: "line-b",
+        uciPath: "e2e4 e7e5",
+        finishLine: true,
+      });
+    }
+    completeTrainingQueueReviewLine(context.state, context.route);
+
+    expect(context.state.training.reviewQueue).toEqual({ clean: 1, reviewed: 2, total: 2 });
   });
 
   test("keeps results for unchanged lines when the chapter lines change", () => {

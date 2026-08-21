@@ -218,7 +218,7 @@ export default function VariationTrainingRoute() {
 
 function TrainingSessionStats(props: {
   result: TrainingSessionSummary | null;
-  reviewQueue: { reviewed: number; total: number } | null;
+  reviewQueue: { clean: number; reviewed: number; total: number } | null;
   isLineComplete: boolean;
 }) {
   return (
@@ -238,7 +238,14 @@ function TrainingSessionStats(props: {
             }
           />
           <VerticalDashedDivider />
-          <StatCell label="Clean" value={result().clean.toString()} />
+          <StatCell
+            label="Clean"
+            value={
+              props.reviewQueue === null
+                ? cleanCounter(result().clean, result().total)
+                : cleanCounter(props.reviewQueue.clean, props.reviewQueue.total)
+            }
+          />
           <VerticalDashedDivider />
           <StatCell label="Mistakes" value={result().mistakes.toString()} />
           <VerticalDashedDivider />
@@ -256,6 +263,10 @@ function formatAccuracy(accuracy: number | null): string {
 export function lineCounter(completed: number, total: number, isLineComplete: boolean): string {
   const current = Math.min(completed + (isLineComplete ? 0 : 1), total);
   return `${current}/${total}`;
+}
+
+export function cleanCounter(clean: number, total: number): string {
+  return `${clean}/${total}`;
 }
 
 function StatCell(props: { label: string; value: string }) {
