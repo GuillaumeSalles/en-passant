@@ -116,6 +116,7 @@ export function VariationTraining(props: {
                 onHighlightSquare={() => {}}
                 onDrawArrow={() => {}}
                 onIntroComplete={flow.onIntroComplete}
+                onAnimationSettled={flow.onAnimationSettled}
                 annotations={flow.annotations()}
               />
             }
@@ -149,7 +150,7 @@ export function VariationTraining(props: {
                       </>
                     }
                   >
-                    <span>{flow.instruction()}</span>
+                    <span data-training-flow-state={flow.phase().type}>{flow.instruction()}</span>
                     <Show when={flow.isLineComplete()}>
                       <Show
                         when={flow.nextUntrainedLine()}

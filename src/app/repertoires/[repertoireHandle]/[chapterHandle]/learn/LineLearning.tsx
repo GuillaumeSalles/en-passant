@@ -8,7 +8,6 @@ import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { useSquareHighlights } from "@/components/useSquareHighlights";
 import {
-  deleteMove,
   getChapterPgn,
   getTrainingLines,
   getVariationMoveIds,
@@ -21,12 +20,12 @@ import {
   selectSelectedMoveId,
   selectTraining,
 } from "@/lib/AppState";
+import { createPacingTimer } from "@/lib/createPacingTimer";
 import { learningLinePath, trainingPath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useRouteContext } from "@/lib/useRouteContext";
 import { useSelector } from "@/lib/useSelector";
-import { delay } from "@/lib/utils";
 import {
   markLineLearned,
   playLearningMove,
@@ -39,21 +38,21 @@ import { useParams } from "@solidjs/router";
 import { useRedirectMissingRepertoireRoute } from "@/app/routeRedirects";
 import { TrainingLines } from "../train/TrainingLines";
 import { useVariationTrainingFlow } from "../train/useVariationTrainingFlow";
+import {
+  acceptsLearningMove,
+  initialLearningFlowState,
+  learningInstruction,
+  reduceLearningFlow,
+  type LearningFlowCommand,
+  type LearningFlowEvent,
+  type LearningPacingKind,
+} from "./learningFlow";
 
-const INITIAL_DEMONSTRATION_DELAY = 650;
-const MOVE_RESPONSE_DELAY = 400;
-const MOVE_DEMONSTRATION_DURATION = 700;
+const AFTER_CORRECT_MOVE_DELAY = 400;
+const AFTER_OPPONENT_MOVE_DELAY = 180;
+const DEMONSTRATION_HOLD_DELAY = 480;
 const WRONG_MOVE_DELAY = 700;
 const LEARNING_BOUNDARY_DELAY = 1000;
-
-type LearningPhase =
-  | "starting"
-  | "opponent"
-  | "preview"
-  | "repeat"
-  | "wrong"
-  | "reinforcement"
-  | "complete";
 
 export function LineLearning(props: {
   repertoireHandle: string;
@@ -73,26 +72,25 @@ export function LineLearning(props: {
   const currentFen = useSelector(selectFen);
   const orientation = useSelector(selectOrientation);
   const animation = useSelector(selectAnimation);
-  const selectedMoveId = useSelector(selectSelectedMoveId);
   const squareHighlights = useSquareHighlights();
-  const [phase, setPhase] = createSignal<LearningPhase>("starting");
-  const [wrongSquare, setWrongSquare] = createSignal<string | null>(null);
+  const [flow, setFlow] = createSignal(initialLearningFlowState);
+  let currentFlow = initialLearningFlowState;
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
+  const pacingTimer = createPacingTimer();
 
   const onStartLearningLine = useMutation(startLearningLine);
   const onPlayLearningMove = useMutation(playLearningMove);
   const onRemoveLearningPreview = useMutation(removeLearningPreview);
   const onMoveFromChessboard = useMutation(moveFromChessboard);
-  const onDeleteMove = useMutation(deleteMove);
   const onMarkLineLearned = useMutation(markLineLearned);
   const reinforcement = useVariationTrainingFlow(props, {
-    enabled: () => phase() === "reinforcement",
+    enabled: () => flow().type === "reinforcement",
     repetitions: 2,
     boundaryDelayMs: LEARNING_BOUNDARY_DELAY,
     onLineComplete: () => {
       const line = activeLine();
       if (line !== undefined) onMarkLineLearned(line.uciPath);
-      setPhase("complete");
+      dispatch({ type: "REINFORCEMENT_COMPLETE" });
     },
   });
 
@@ -124,96 +122,148 @@ export function LineLearning(props: {
     const line = activeLine();
     return line === undefined || line.plyCount === 0 ? 0 : revealedPlyCount() / line.plyCount;
   });
-
-  let flowVersion = 0;
-  onCleanup(() => {
-    flowVersion += 1;
+  const wrongSquare = createMemo(() => {
+    const current = flow();
+    return current.type === "recording-wrong" || current.type === "showing-wrong"
+      ? current.square
+      : null;
   });
 
-  function isCurrentFlow(version: number, lineId: string): boolean {
-    return version === flowVersion && props.lineId === lineId;
-  }
+  onCleanup(() => {
+    pacingTimer.cancel();
+  });
 
   function currentRevealedPlyCount(): number {
     return Object.keys(state.training.variation.moves).length;
   }
 
-  async function advanceLearning(version: number, lineId: string, delayBeforeMove: boolean) {
+  function pacingDuration(kind: LearningPacingKind): number {
+    switch (kind) {
+      case "after-correct":
+        return AFTER_CORRECT_MOVE_DELAY;
+      case "after-opponent":
+        return AFTER_OPPONENT_MOVE_DELAY;
+      case "preview-hold":
+        return DEMONSTRATION_HOLD_DELAY;
+      case "wrong":
+        return WRONG_MOVE_DELAY;
+    }
+  }
+
+  function executeCommand(command: LearningFlowCommand): void {
+    switch (command.type) {
+      case "START_LINE":
+        onStartLearningLine();
+        return;
+      case "ADVANCE": {
+        const pgn = chapterPgn();
+        const sourceMoveId = variation()[currentRevealedPlyCount()];
+        if (pgn === null || sourceMoveId === undefined) {
+          dispatch({ type: "NO_NEXT_MOVE" });
+          return;
+        }
+        const sourceMove = pgn.moves[sourceMoveId];
+        if (sourceMove === undefined) {
+          dispatch({ type: "RESET" });
+          return;
+        }
+        const moveColor = sourceMove.halfMoveNumber % 2 === 0 ? "white" : "black";
+        dispatch({
+          type: "NEXT_MOVE",
+          role: moveColor === orientation() ? "preview" : "opponent",
+          sourceMoveId,
+        });
+        return;
+      }
+      case "PLAY_ANIMATED_MOVE": {
+        const sourceMove = chapterPgn()?.moves[command.sourceMoveId];
+        if (sourceMove === undefined) {
+          dispatch({ type: "RESET" });
+          return;
+        }
+        onPlayLearningMove({
+          sourceMove,
+          input: moveToEvalMove(sourceMove),
+          animate: true,
+        });
+        const renderedMoveId = selectSelectedMoveId(state, ctx());
+        if (renderedMoveId === null) {
+          dispatch({ type: "RESET" });
+          return;
+        }
+        dispatch({
+          type: "ANIMATION_STARTED",
+          sourceMoveId: command.sourceMoveId,
+          renderedMoveId,
+          animationId: selectAnimation(state, ctx())?.id ?? null,
+        });
+        return;
+      }
+      case "PLAY_CORRECT_MOVE": {
+        const sourceMove = chapterPgn()?.moves[command.sourceMoveId];
+        if (sourceMove === undefined) {
+          dispatch({ type: "RESET" });
+          return;
+        }
+        onPlayLearningMove({ sourceMove, input: command.input, animate: false });
+        return;
+      }
+      case "PLAY_WRONG_MOVE": {
+        onMoveFromChessboard(command.input.from, command.input.to, command.input.piece);
+        const moveId = selectSelectedMoveId(state, ctx());
+        if (moveId === null) {
+          dispatch({ type: "RESET" });
+          return;
+        }
+        dispatch({ type: "WRONG_MOVE_RECORDED", moveId });
+        return;
+      }
+      case "REMOVE_MOVE":
+        onRemoveLearningPreview(command.moveId);
+        return;
+      case "SCHEDULE_PACING":
+        pacingTimer.schedule(pacingDuration(command.kind), () => {
+          dispatch({ type: "PACING_ELAPSED", kind: command.kind });
+        });
+        return;
+    }
+  }
+
+  function dispatch(event: LearningFlowEvent): boolean {
+    const current = currentFlow;
+    const transition = reduceLearningFlow(current, event);
+    if (transition.state === current && transition.commands.length === 0) return false;
+    if (event.type === "RESET") pacingTimer.cancel();
+    currentFlow = transition.state;
+    setFlow(transition.state);
+    for (const command of transition.commands) executeCommand(command);
+    return true;
+  }
+
+  function readyLearningFlow() {
     const pgn = chapterPgn();
-    const sourceMoveId = variation()[currentRevealedPlyCount()];
-    const sourceMove = sourceMoveId === undefined ? undefined : pgn?.moves[sourceMoveId];
-
-    if (sourceMove === undefined) {
-      setPhase("reinforcement");
-      return;
-    }
-
-    const moveColor = sourceMove.halfMoveNumber % 2 === 0 ? "white" : "black";
-    if (delayBeforeMove) {
-      await delay(MOVE_RESPONSE_DELAY);
-      if (!isCurrentFlow(version, lineId)) return;
-    }
-
-    if (moveColor !== orientation()) {
-      setPhase("opponent");
-      onPlayLearningMove({
-        sourceMove,
-        input: moveToEvalMove(sourceMove),
-        animate: true,
-      });
-      await delay(MOVE_RESPONSE_DELAY);
-      if (!isCurrentFlow(version, lineId)) return;
-      await advanceLearning(version, lineId, false);
-      return;
-    }
-
-    setPhase("preview");
-    onPlayLearningMove({
-      sourceMove,
-      input: moveToEvalMove(sourceMove),
-      animate: true,
-    });
-    await delay(MOVE_DEMONSTRATION_DURATION);
-    if (!isCurrentFlow(version, lineId)) return;
-
-    const previewMoveId = selectedMoveId();
-    if (previewMoveId === null) return;
-    onRemoveLearningPreview(previewMoveId);
-    setPhase("repeat");
+    if (pgn === null || activeLine() === undefined || !boardIntroComplete()) return;
+    dispatch({ type: "READY" });
   }
 
   createEffect(
     () => {
       const currentOrientation = orientation();
       return {
-        boardIntroComplete: currentOrientation === "white" ? true : boardIntroComplete(),
+        boardIntroComplete: boardIntroComplete(),
         line: activeLine(),
         lineId: props.lineId,
         orientation: currentOrientation,
       };
     },
-    ({ boardIntroComplete, line, lineId, orientation }) => {
-      flowVersion += 1;
-      const version = flowVersion;
-      setWrongSquare(null);
-      setPhase("starting");
-      if (line === undefined || (orientation === "black" && !boardIntroComplete)) return;
-
-      untrack(() => {
-        onStartLearningLine();
-        void (async () => {
-          if (orientation === "white") {
-            await delay(INITIAL_DEMONSTRATION_DELAY);
-            if (!isCurrentFlow(version, lineId)) return;
-          }
-          await advanceLearning(version, lineId, false);
-        })();
-      });
+    ({ boardIntroComplete, line }) => {
+      if (line === undefined || !boardIntroComplete) return;
+      untrack(readyLearningFlow);
     },
   );
 
-  async function onPieceDrop(sourceSquare: string, targetSquare: string, piece: string) {
-    if (phase() !== "repeat") return;
+  function onPieceDrop(sourceSquare: string, targetSquare: string, piece: string) {
+    if (!acceptsLearningMove(currentFlow)) return;
 
     const pgn = chapterPgn();
     const sourceMoveId = variation()[currentRevealedPlyCount()];
@@ -223,27 +273,18 @@ export function LineLearning(props: {
     }
 
     if (sourceSquare === sourceMove.from && targetSquare === sourceMove.to) {
-      setPhase("starting");
-      onPlayLearningMove({
-        sourceMove,
+      dispatch({
+        type: "CORRECT_MOVE",
+        sourceMoveId: sourceMove.id,
         input: { from: sourceSquare, to: targetSquare, piece },
-        animate: false,
       });
-      await advanceLearning(flowVersion, props.lineId, true);
       return;
     }
 
-    setPhase("wrong");
-    setWrongSquare(targetSquare);
-    onMoveFromChessboard(sourceSquare, targetSquare, piece);
-    const version = flowVersion;
-    const lineId = props.lineId;
-    await delay(WRONG_MOVE_DELAY);
-    if (!isCurrentFlow(version, lineId)) return;
-    const wrongMoveId = selectedMoveId();
-    if (wrongMoveId !== null) onDeleteMove(wrongMoveId);
-    setWrongSquare(null);
-    setPhase("repeat");
+    dispatch({
+      type: "WRONG_MOVE",
+      input: { from: sourceSquare, to: targetSquare, piece },
+    });
   }
 
   return (
@@ -270,8 +311,14 @@ export function LineLearning(props: {
             <Chessboard
               boardOrientation={orientation()}
               position={currentFen()}
-              canDrag={phase() === "reinforcement" ? reinforcement.canDrag() : phase() === "repeat"}
-              onPieceDrop={phase() === "reinforcement" ? reinforcement.onPieceDrop : onPieceDrop}
+              canDrag={
+                flow().type === "reinforcement"
+                  ? reinforcement.canDrag()
+                  : acceptsLearningMove(flow())
+              }
+              onPieceDrop={
+                flow().type === "reinforcement" ? reinforcement.onPieceDrop : onPieceDrop
+              }
               pieceToAnimate={animation()}
               arrows={{}}
               squareHighlights={squareHighlights()}
@@ -281,12 +328,16 @@ export function LineLearning(props: {
                 setBoardIntroComplete(true);
                 reinforcement.onIntroComplete();
               }}
+              onAnimationSettled={(animationId) => {
+                dispatch({ type: "ANIMATION_SETTLED", animationId });
+                reinforcement.onAnimationSettled(animationId);
+              }}
               annotations={
-                phase() === "reinforcement"
+                flow().type === "reinforcement"
                   ? reinforcement.annotations()
-                  : wrongSquare() === null
-                    ? {}
-                    : { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
+                  : wrongSquare() !== null
+                    ? { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
+                    : {}
               }
             />
           }
@@ -294,15 +345,21 @@ export function LineLearning(props: {
           panelChildren={
             <>
               <ProgressBar
-                progress={phase() === "reinforcement" ? reinforcement.progress() : progress()}
+                progress={flow().type === "reinforcement" ? reinforcement.progress() : progress()}
               />
               <div class="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-sm">
-                <span aria-live="polite">
-                  {phase() === "reinforcement"
+                <span
+                  aria-live="polite"
+                  data-learning-flow-state={flow().type}
+                  data-training-flow-state={
+                    flow().type === "reinforcement" ? reinforcement.phase().type : undefined
+                  }
+                >
+                  {flow().type === "reinforcement"
                     ? `Practice ${reinforcement.completedRepetitions() + 1} of 2: ${reinforcement.instruction()}`
-                    : learningInstruction(phase(), orientation())}
+                    : learningInstruction(flow(), orientation())}
                 </span>
-                <Show when={phase() === "complete"}>
+                <Show when={flow().type === "complete"}>
                   <Show
                     when={nextLineToLearn()}
                     fallback={
@@ -359,13 +416,4 @@ export default function LineLearningRoute() {
       {(currentScope) => <LineLearning {...currentScope} />}
     </Show>
   );
-}
-
-function learningInstruction(phase: LearningPhase, orientation: "white" | "black"): string {
-  if (phase === "preview") return "Watch this move.";
-  if (phase === "repeat") return "Now repeat the move.";
-  if (phase === "wrong") return "That’s not the move. Try again.";
-  if (phase === "complete") return "Line learned.";
-  if (phase === "opponent") return `${orientation === "white" ? "Black" : "White"} responds.`;
-  return "Get ready…";
 }

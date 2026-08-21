@@ -4,6 +4,25 @@ export const STORAGE_ORIGIN_PATH = "/stockfish-18-lite-single.js";
 
 const ENGINE_ENABLED_KEY = "en_passant_engine_enabled";
 
+export async function pausePacingClock(page: Page) {
+  await page.clock.install();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+}
+
+export async function advanceTrainingPacing(page: Page, phase: string, durationMs: number) {
+  await expect(page.locator(`[data-training-flow-state="${phase}"]`)).toBeVisible();
+  await page.clock.runFor(durationMs);
+}
+
+export async function expectTrainingInputReady(page: Page) {
+  await expect(page.locator('[data-training-flow-state="awaiting-line-move"]')).toBeVisible();
+}
+
+export async function advanceLearningPacing(page: Page, durationMs: number) {
+  await expect(page.locator('[data-learning-flow-state="pacing"]')).toBeVisible();
+  await page.clock.runFor(durationMs);
+}
+
 export type RepertoireRecord = {
   id: string;
   handle: string;

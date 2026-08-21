@@ -7,6 +7,7 @@ import styles from "./Chessboard.module.css";
 
 export type PieceMovement = {
   id: string;
+  animationPartId: string;
   piece: FenPiece;
   from: string;
   to: string;
@@ -32,6 +33,7 @@ export function MovingPiece(props: { movement: PieceMovement; boardOrientation: 
           class: styles["MovingPiece"],
           "data-moving-piece": "true",
           "data-moving-piece-id": props.movement.id,
+          "data-board-animation-part": props.movement.animationPartId,
           style: {
             position: "absolute",
             "z-index": 3,
@@ -54,6 +56,7 @@ export function MovingPiece(props: { movement: PieceMovement; boardOrientation: 
 }
 
 export function CapturedPiece(props: {
+  animationPartId: string;
   piece: FenPiece;
   square: string;
   boardOrientation: Orientation;
@@ -61,6 +64,7 @@ export function CapturedPiece(props: {
   return (
     <StaticAnimatedPiece
       piece={props.piece}
+      animationPartId={props.animationPartId}
       square={props.square}
       boardOrientation={props.boardOrientation}
       class={styles["CapturedPiece"]}
@@ -70,6 +74,7 @@ export function CapturedPiece(props: {
 }
 
 export function PromotedPiece(props: {
+  animationPartId: string;
   piece: FenPiece;
   square: string;
   boardOrientation: Orientation;
@@ -77,6 +82,7 @@ export function PromotedPiece(props: {
   return (
     <StaticAnimatedPiece
       piece={props.piece}
+      animationPartId={props.animationPartId}
       square={props.square}
       boardOrientation={props.boardOrientation}
       class={styles["PromotedPiece"]}
@@ -86,6 +92,7 @@ export function PromotedPiece(props: {
 }
 
 function StaticAnimatedPiece(props: {
+  animationPartId: string;
   piece: FenPiece;
   square: string;
   boardOrientation: Orientation;
@@ -111,6 +118,7 @@ function StaticAnimatedPiece(props: {
       <PieceComponent
         svgProps={{
           class: props.class,
+          "data-board-animation-part": props.animationPartId,
           ...dataProps(),
           style: {
             position: "absolute",

@@ -1,9 +1,11 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
+  advanceTrainingPacing,
   collectUnexpectedConsole,
   mockSignedInUser,
   mockSignedOutAuth,
+  pausePacingClock,
   seedIndexedDb,
   type ChapterRecord,
   type RepertoireRecord,
@@ -150,11 +152,16 @@ test("reviews only due lines from a chapter", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
   await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await pausePacingClock(page);
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page).toHaveURL(/\/train\/v1-.*\?review=chapter$/);
   await expect(page.getByText("2/2", { exact: true })).toBeVisible();
   await dragPiece(page, "d2", "d4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page).toHaveURL("/app/repertoires/white-repertoire/open-games/train");
   const reviewLinesButton = page.getByRole("button", { name: "Review lines" });
@@ -188,8 +195,7 @@ test("waits one second before advancing to the next training line", async ({ pag
   await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   const firstLineUrl = page.url();
 
-  await page.clock.install();
-  await page.clock.pauseAt(await page.evaluate(() => Date.now()));
+  await pausePacingClock(page);
   await dragPiece(page, "e2", "e4");
 
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
@@ -255,7 +261,10 @@ test("reviews every due line across chapters and stops before future lines", asy
     /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
   );
   await expect(page.getByText("1/2", { exact: true })).toBeVisible();
+  await pausePacingClock(page);
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page).toHaveURL(
     /\/app\/repertoires\/white-repertoire\/queens-pawn\/train\/v1-.*\?review=due$/,
@@ -268,6 +277,8 @@ test("reviews every due line across chapters and stops before future lines", asy
   await expect(page.getByText("1/1", { exact: true })).toBeVisible();
 
   await dragPiece(page, "d2", "d4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page).toHaveURL("/app/training");
   await expect(page.getByText("0 due · 3 scheduled")).toBeVisible();

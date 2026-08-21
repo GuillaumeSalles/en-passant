@@ -1,12 +1,16 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import {
+  advanceLearningPacing,
+  advanceTrainingPacing,
   clearLocalStorageAndIndexedDb,
   collectUnexpectedConsole,
   enableEngine,
   firstStoredPgn,
+  expectTrainingInputReady,
   mockSignedOutAuth,
   mockSignedInUser,
+  pausePacingClock,
   seedIndexedDb,
   storedTrainingLineUciPaths,
   type ChapterRecord,
@@ -908,6 +912,23 @@ test("black repertoire learning waits for the board intro before the first white
   expect(consoleMessages).toEqual([]);
 });
 
+test("white repertoire learning waits for the board intro before demonstrating the first move", async ({
+  page,
+}) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await recordBoardAnimationSequence(page);
+  await seedRepertoire(page, "1. e4 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
+  await page.locator("[data-training-line]").first().getByRole("link", { name: "Learn" }).click();
+
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expectFirstMoveAfterBoardIntro(page);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("lists stable line URLs and continues through untrained lines", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
@@ -935,21 +956,27 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   const cleanStat = page.locator('[data-training-stat="clean"]');
   const mistakesStat = page.locator('[data-training-stat="mistakes"]');
   const accuracyStat = page.locator('[data-training-stat="accuracy"]');
+  await pausePacingClock(page);
 
   await dragPiece(page, "g1", "f3");
   await expect(page.getByText("Checking the move.")).toBeVisible();
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
   await expect(page.getByText("Try again.")).toBeVisible();
   await expect(mistakesStat).toContainText("1");
   await expect(accuracyStat).toContainText("0%");
   await dragPiece(page, "g1", "f3");
   await expect(page.getByText("Checking the move.")).toBeVisible();
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
   await expect(page.getByText("Try again.")).toBeVisible();
   await expect(mistakesStat).toContainText("2");
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await advanceTrainingPacing(page, "preparing-replay", 500);
   await expect(page.getByText("Replay the failed move.")).toBeVisible();
   await expect(accuracyStat).toContainText("33%");
   await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "preparing-replay", 500);
   await expect(page.getByText("Replay the failed move.")).toBeVisible();
   await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
   await dragPiece(page, "e2", "e4");
@@ -960,6 +987,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
   await dragPiece(page, "d2", "d4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
   await expect(page.getByText("Good job!")).toBeVisible();
   await expect(cleanStat).toContainText("1");
   await expect(mistakesStat).toContainText("2");
@@ -1012,6 +1040,7 @@ test("labels alternative lines and accepts their moves without counting mistakes
   const learnHref = await lines.first().getByRole("link", { name: "Learn" }).getAttribute("href");
   if (learnHref === null) throw new Error("Expected the first line to have a learning URL");
   await page.goto(learnHref.replace("/learn/", "/train/"));
+  await pausePacingClock(page);
   await dragPiece(page, "d2", "d4");
   await expect(
     page.getByText("That move belongs to an alternative line. Find another one."),
@@ -1020,8 +1049,10 @@ test("labels alternative lines and accepts their moves without counting mistakes
     "data-annotation-square",
     "d4",
   );
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
   await expect(page.locator('[data-square="d2"]')).toHaveAttribute("data-piece", "P");
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
   await expect(page.getByText("Good job!")).toBeVisible();
 
   await page.getByRole("link", { name: "Next line" }).click();
@@ -1033,8 +1064,10 @@ test("labels alternative lines and accepts their moves without counting mistakes
     "data-annotation-square",
     "e4",
   );
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
   await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
   await dragPiece(page, "d2", "d4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
   await expect(page.getByText("Good job!")).toBeVisible();
 
   await page.getByRole("link", { name: "Back to lines" }).click();
@@ -1065,6 +1098,28 @@ test("locks training input while grading a move and waiting for the response", a
   await expect(page.locator('[data-square="e5"]')).not.toHaveAttribute("data-piece");
 
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.getByText("White to play.")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+test("keeps training input locked until the actual response animation settles", async ({
+  page,
+}) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
+  await openFirstTrainingLine(page);
+  await page.addStyleTag({
+    content: "[data-moving-piece] { animation-duration: 1200ms !important; }",
+  });
+
+  await dragPiece(page, "e2", "e4");
+  await expect(page.locator('[data-training-flow-state="animating-response"]')).toBeVisible();
+  await dragPiece(page, "g1", "f3");
+  await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.locator('[data-square="f3"]')).not.toHaveAttribute("data-piece");
+
   await expect(page.getByText("White to play.")).toBeVisible();
   expect(consoleMessages).toEqual([]);
 });
@@ -1165,8 +1220,7 @@ test("waits one second at learning line boundaries", async ({ page }) => {
   await dragPiece(page, "e2", "e4");
   await expect(page.getByText(/Practice 1 of 2: White to play\./)).toBeVisible();
 
-  await page.clock.install();
-  await page.clock.pauseAt(await page.evaluate(() => Date.now()));
+  await pausePacingClock(page);
   await dragPiece(page, "e2", "e4");
 
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
@@ -1217,26 +1271,40 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
 
   await expect(page.getByText("Watch this move.")).toBeVisible();
+  await pausePacingClock(page);
   await expect.poll(() => pieceAnimationCount(page)).toBeGreaterThan(0);
+  await advanceLearningPacing(page, 480);
   await expect(page.getByText("Now repeat the move.")).toBeVisible();
   await dragPiece(page, "e2", "e4");
+  await advanceLearningPacing(page, 400);
 
   expect(consoleMessages).toEqual([]);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.getByText("Take the center.")).toBeVisible();
+  await advanceLearningPacing(page, 180);
   await expect(page.getByText("Black challenges the center.")).toBeVisible();
+  await advanceLearningPacing(page, 480);
   await expect(page.getByText("Now repeat the move.")).toBeVisible();
   await dragPiece(page, "g1", "f3");
+  await advanceLearningPacing(page, 400);
 
   await expect(page.getByText(/Practice 1 of 2:/)).toBeVisible();
+  await expectTrainingInputReady(page);
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
   await expect(page.getByText(/Practice 1 of 2: White to play\./)).toBeVisible();
+  await expectTrainingInputReady(page);
   await dragPiece(page, "g1", "f3");
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page.getByText(/Practice 2 of 2:/)).toBeVisible();
+  await expectTrainingInputReady(page);
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
   await expect(page.getByText(/Practice 2 of 2: White to play\./)).toBeVisible();
+  await expectTrainingInputReady(page);
   await dragPiece(page, "g1", "f3");
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page.getByText("Line learned.")).toBeVisible();
   await expect.poll(() => storedTrainingLineUciPaths(page)).toEqual(["e2e4 e7e5 g1f3"]);
@@ -1277,12 +1345,20 @@ test("continues learning with the next unlearned line", async ({ page }) => {
   }
 
   await page.goto(firstLearnHref);
+  await expect(page.getByText("Watch this move.")).toBeVisible();
+  await pausePacingClock(page);
+  await advanceLearningPacing(page, 480);
   await expect(page.getByText("Now repeat the move.")).toBeVisible();
   await dragPiece(page, "e2", "e4");
+  await advanceLearningPacing(page, 400);
   await expect(page.getByText(/Practice 1 of 2:/)).toBeVisible();
+  await expectTrainingInputReady(page);
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "line-boundary", 1000);
   await expect(page.getByText(/Practice 2 of 2:/)).toBeVisible();
+  await expectTrainingInputReady(page);
   await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page.getByText("Line learned.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Next line" })).toHaveAttribute(
@@ -1292,6 +1368,7 @@ test("continues learning with the next unlearned line", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Back to lines" })).toHaveCount(0);
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page).toHaveURL(secondLearnHref);
+  await advanceLearningPacing(page, 480);
   await expect(page.getByText("Now repeat the move.")).toBeVisible();
   expect(consoleMessages).toEqual([]);
 });
@@ -2331,7 +2408,7 @@ test("dragging a piece does not replay the previous move animation", async ({ pa
   await expect(page.locator('[data-san="e4"]')).toHaveAttribute("data-selected", "true");
   await expect.poll(() => pieceAnimationCount(page)).toBe(1);
 
-  await page.waitForTimeout(500);
+  await expect(page.locator("[data-moving-piece]")).toHaveCount(0);
   const e7 = await squareCenter(page, "e7");
   await page.mouse.move(e7.x, e7.y);
   await page.mouse.down();
@@ -2365,7 +2442,6 @@ test("keyboard move shortcuts animate pieces", async ({ page }) => {
   await expect.poll(() => pieceAnimationCount(page)).toBe(2);
   await expect(page.locator("[data-moving-piece]")).toHaveCount(1);
 
-  await page.waitForTimeout(300);
   await expect(page.locator("[data-moving-piece]")).toHaveCount(0);
   await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
 });
@@ -2388,7 +2464,6 @@ test("capture animations fade the captured piece", async ({ page }) => {
     "d5",
   );
 
-  await page.waitForTimeout(500);
   await expect(page.locator("[data-captured-piece]")).toHaveCount(0);
   await expect(page.locator('[data-square="d5"]')).toHaveAttribute("data-piece", "P");
 });
@@ -2412,7 +2487,8 @@ test("en passant fades the piece on the captured square", async ({ page }) => {
     "d5",
   );
 
-  await page.waitForTimeout(500);
+  await expect(page.locator("[data-moving-piece]")).toHaveCount(0);
+  await expect(page.locator("[data-captured-piece]")).toHaveCount(0);
   await expect(page.locator('[data-square="d6"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="d5"]')).not.toHaveAttribute("data-piece");
 });
@@ -2429,13 +2505,12 @@ test("castling animates the king before the rook", async ({ page }) => {
 
   await page.getByRole("button", { name: "Next move" }).click();
   await expect(page.locator('[data-san="O-O"]')).toHaveAttribute("data-selected", "true");
-  await expect.poll(() => pieceAnimationCount(page)).toBe(2);
   const movingPieces = page.locator("[data-moving-piece]");
   await expect(movingPieces).toHaveCount(2);
   await expect(movingPieces.nth(0)).toHaveCSS("animation-delay", "0s");
   await expect(movingPieces.nth(1)).toHaveCSS("animation-delay", "0.11s");
+  await expect.poll(() => pieceAnimationCount(page)).toBe(2);
 
-  await page.waitForTimeout(500);
   await expect(page.locator("[data-moving-piece]")).toHaveCount(0);
   await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "K");
   await expect(page.locator('[data-square="f1"]')).toHaveAttribute("data-piece", "R");

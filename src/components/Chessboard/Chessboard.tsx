@@ -41,6 +41,7 @@ type ChessboardProps = {
   pieceToAnimate?: BoardAnimation | null;
   annotations: { [square: string]: MoveAnnotationData[] };
   onIntroComplete?: () => void;
+  onAnimationSettled?: (animationId: number, status: "finished" | "cancelled") => void;
 };
 
 export type { FenPiece };
@@ -50,7 +51,6 @@ type PieceEntry = {
   square: string;
   piece: FenPiece;
 };
-const MOVE_ANIMATION_DURATION_MS = 400;
 const MOVE_ANIMATION_STAGGER_MS = 110;
 const INTRO_GRID_LINE_STAGGER_MS = 22;
 const INTRO_DELAY_FILE_MS = 26;
@@ -105,11 +105,13 @@ export function Chessboard(props: ChessboardProps) {
   const canDrag = () => props.canDrag;
   const [draggingData, setDraggingData] = createSignal<DraggingData | null>(null);
   const [activeAnimation, setActiveAnimation] = createSignal<BoardAnimation | null>(null);
+  let currentActiveAnimation: BoardAnimation | null = null;
   const [introActive, setIntroActive] = createSignal(true);
   const [useMeasuredBoardSize, setUseMeasuredBoardSize] = createSignal(false);
   const [boardSize, setBoardSize] = createSignal<number | null>(null);
   let boardFrameRef: HTMLDivElement | undefined;
   let pieceEntryCache = new Map<PieceKey, PieceEntry>();
+  let completedAnimationParts = new Set<string>();
   const constructionGridLines = Array.from({ length: 7 }, (_, index) => ({
     position: (index + 1) * 12.5,
     delay: `${index * INTRO_GRID_LINE_STAGGER_MS}ms`,
@@ -189,16 +191,24 @@ export function Chessboard(props: ChessboardProps) {
     return animation.movements.map((movement, index) => ({
       ...movement,
       id: `${animation.id}:${index}`,
+      animationPartId: `${animation.id}:movement:${index}`,
       delayMs: index * MOVE_ANIMATION_STAGGER_MS,
     }));
   });
   const activeCaptures = createMemo(() => {
     const animation = activeAnimation();
-    return animation?.captures ?? [];
+    return (
+      animation?.captures.map((capture, index) => ({
+        ...capture,
+        animationPartId: `${animation.id}:capture:${index}`,
+      })) ?? []
+    );
   });
   const activePromotions = createMemo(() => {
     const animation = activeAnimation();
-    return animation?.promotion === null || animation === null ? [] : [animation.promotion];
+    return animation?.promotion === null || animation === null
+      ? []
+      : [{ ...animation.promotion, animationPartId: `${animation.id}:promotion` }];
   });
   const previewArrow = createMemo<PreviewArrow | null>(() => {
     const data = draggingData();
@@ -252,8 +262,34 @@ export function Chessboard(props: ChessboardProps) {
     setDraggingData(null);
   };
 
-  function finishAnimation(id: number) {
-    setActiveAnimation((current) => (current?.id === id ? null : current));
+  function animationPartCount(animation: BoardAnimation): number {
+    return (
+      animation.movements.length +
+      animation.captures.length +
+      (animation.promotion === null ? 0 : 1)
+    );
+  }
+
+  function settleAnimation(id: number, status: "finished" | "cancelled") {
+    const current = currentActiveAnimation;
+    if (current?.id !== id) return;
+    completedAnimationParts = new Set();
+    currentActiveAnimation = null;
+    setActiveAnimation(null);
+    untrack(() => props.onAnimationSettled?.(id, status));
+  }
+
+  function onBoardAnimationSettled(event: AnimationEvent) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const partId = target.getAttribute("data-board-animation-part");
+    const animation = currentActiveAnimation;
+    if (partId === null || animation === null || !partId.startsWith(`${animation.id}:`)) return;
+
+    completedAnimationParts.add(partId);
+    if (completedAnimationParts.size >= animationPartCount(animation)) {
+      settleAnimation(animation.id, event.type === "animationcancel" ? "cancelled" : "finished");
+    }
   }
 
   function updateBoardSize() {
@@ -337,19 +373,18 @@ export function Chessboard(props: ChessboardProps) {
     () => props.pieceToAnimate ?? null,
     (animation) => {
       if (animation === null) {
-        setActiveAnimation(null);
+        const current = currentActiveAnimation;
+        if (current !== null) settleAnimation(current.id, "cancelled");
         return;
       }
 
+      const current = currentActiveAnimation;
+      if (current !== null && current.id !== animation.id) {
+        settleAnimation(current.id, "cancelled");
+      }
+      completedAnimationParts = new Set();
+      currentActiveAnimation = animation;
       setActiveAnimation(animation);
-
-      const timeout = window.setTimeout(() => {
-        finishAnimation(animation.id);
-      }, MOVE_ANIMATION_DURATION_MS + 50);
-
-      return () => {
-        window.clearTimeout(timeout);
-      };
     },
   );
 
@@ -398,6 +433,8 @@ export function Chessboard(props: ChessboardProps) {
         <div
           class={`relative aspect-square h-auto max-h-full w-full [container-type:size] ${styles["Board"]}`}
           style={boardStyle()}
+          onAnimationEnd={onBoardAnimationSettled}
+          onAnimationCancel={onBoardAnimationSettled}
         >
           <svg
             class={styles["IntroGrid"]}
@@ -471,6 +508,7 @@ export function Chessboard(props: ChessboardProps) {
           <For each={activeCaptures()}>
             {(capture) => (
               <CapturedPiece
+                animationPartId={capture.animationPartId}
                 piece={capture.piece}
                 square={capture.square}
                 boardOrientation={props.boardOrientation}
@@ -480,6 +518,7 @@ export function Chessboard(props: ChessboardProps) {
           <For each={activePromotions()}>
             {(promotion) => (
               <PromotedPiece
+                animationPartId={promotion.animationPartId}
                 piece={promotion.piece}
                 square={promotion.square}
                 boardOrientation={props.boardOrientation}
