@@ -932,21 +932,38 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
 
   await page.goto(firstLearnHref.replace("/learn/", "/train/"));
   await expect(page.locator("[data-square]")).toHaveCount(64);
+  const cleanStat = page.locator('[data-training-stat="clean"]');
+  const mistakesStat = page.locator('[data-training-stat="mistakes"]');
+  const accuracyStat = page.locator('[data-training-stat="accuracy"]');
 
   await dragPiece(page, "g1", "f3");
+  await expect(page.getByText("Checking the move.")).toBeVisible();
   await expect(page.getByText("Try again.")).toBeVisible();
+  await expect(mistakesStat).toContainText("1");
+  await expect(accuracyStat).toContainText("0%");
+  await dragPiece(page, "g1", "f3");
+  await expect(page.getByText("Checking the move.")).toBeVisible();
+  await expect(page.getByText("Try again.")).toBeVisible();
+  await expect(mistakesStat).toContainText("2");
   await dragPiece(page, "e2", "e4");
   await expect(page.getByText("Replay the failed move.")).toBeVisible();
+  await expect(accuracyStat).toContainText("33%");
   await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
   await dragPiece(page, "e2", "e4");
   await expect(page.getByText("Replay the failed move.")).toBeVisible();
   await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
   await dragPiece(page, "e2", "e4");
   await expect(page.getByText("Good job!")).toBeVisible();
+  await expect(cleanStat).toContainText("0");
+  await expect(mistakesStat).toContainText("2");
+  await expect(accuracyStat).toContainText("60%");
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page.locator("[data-square]")).toHaveCount(64);
   await dragPiece(page, "d2", "d4");
   await expect(page.getByText("Good job!")).toBeVisible();
+  await expect(cleanStat).toContainText("1");
+  await expect(mistakesStat).toContainText("2");
+  await expect(accuracyStat).toContainText("67%");
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.getByText("2/2 trained")).toBeVisible();
   await expect(page.getByRole("link", { name: "Train all" })).not.toBeVisible();

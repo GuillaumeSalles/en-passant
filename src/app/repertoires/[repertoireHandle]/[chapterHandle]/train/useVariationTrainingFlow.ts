@@ -32,6 +32,7 @@ import {
   completeTrainingLine,
   completeTrainingReplayMove,
   discardTrainingLine,
+  markTrainingCorrectMove,
   markTrainingMistake,
   prepareTrainingReplayMove,
   startTrainingLine,
@@ -131,6 +132,7 @@ export function useVariationTrainingFlow(
   const onUpdateTrainingStatus = useMutation(updateTrainingStatus);
   const onStartTrainingLine = useMutation(startTrainingLine);
   const onDiscardTrainingLine = useMutation(discardTrainingLine);
+  const onMarkTrainingCorrectMove = useMutation(markTrainingCorrectMove);
   const onMarkTrainingMistake = useMutation(markTrainingMistake);
   const onPrepareTrainingReplayMove = useMutation(prepareTrainingReplayMove);
   const onCompleteTrainingLine = useMutation(completeTrainingLine, { context: true });
@@ -413,6 +415,7 @@ export function useVariationTrainingFlow(
       const finishesLine = completedRepetitions() + 1 >= repetitions();
       const line = activeLine();
       if (line === undefined) return;
+      onMarkTrainingCorrectMove();
       onCompleteTrainingReplayMove({
         lineId: props.lineId,
         uciPath: line.uciPath,
@@ -426,6 +429,7 @@ export function useVariationTrainingFlow(
       return;
     }
 
+    onMarkTrainingCorrectMove();
     const responseId = variation()[currentHalfMoveNumber + 2];
     const response = responseId === undefined ? undefined : pgn.moves[responseId];
     if (response === undefined) {

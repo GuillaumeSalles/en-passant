@@ -60,6 +60,7 @@ function createTrainingSessionDraft(ctx: Context, lineIds: string[]): TrainingSe
     chapterHandle: ctx.chapterHandle,
     lineIds,
     activeLineId: null,
+    currentMoveCount: 0,
     currentMistakeCount: 0,
     failedMoveIds: [],
     replayMoveIds: [],
@@ -88,23 +89,18 @@ export function ensureTrainingSession(
     ) {
       return;
     }
+    const activeLineIsRetained =
+      currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId);
     state.set("training", {
       ...state.training,
       session: {
         ...currentSession,
         lineIds,
-        activeLineId:
-          currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
-            ? currentSession.activeLineId
-            : null,
-        failedMoveIds:
-          currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
-            ? currentSession.failedMoveIds
-            : [],
-        replayMoveIds:
-          currentSession.activeLineId !== null && lineIdSet.has(currentSession.activeLineId)
-            ? currentSession.replayMoveIds
-            : [],
+        activeLineId: activeLineIsRetained ? currentSession.activeLineId : null,
+        currentMoveCount: activeLineIsRetained ? currentSession.currentMoveCount : 0,
+        currentMistakeCount: activeLineIsRetained ? currentSession.currentMistakeCount : 0,
+        failedMoveIds: activeLineIsRetained ? currentSession.failedMoveIds : [],
+        replayMoveIds: activeLineIsRetained ? currentSession.replayMoveIds : [],
         results,
       },
     });
@@ -135,6 +131,7 @@ export function startTrainingLine(
     session: {
       ...session,
       activeLineId: details.lineId,
+      currentMoveCount: 0,
       currentMistakeCount: 0,
       failedMoveIds: [],
       replayMoveIds: [],
@@ -168,6 +165,7 @@ export function discardTrainingLine(
     session: {
       ...session,
       activeLineId: null,
+      currentMoveCount: 0,
       currentMistakeCount: 0,
       failedMoveIds: [],
       replayMoveIds: [],
@@ -214,11 +212,24 @@ export function markTrainingMistake(
         ? null
         : {
             ...session,
+            currentMoveCount: session.currentMoveCount + 1,
             currentMistakeCount: session.currentMistakeCount + 1,
             failedMoveIds: session.failedMoveIds.includes(details.moveId)
               ? session.failedMoveIds
               : [...session.failedMoveIds, details.moveId],
           },
+  });
+}
+
+export function markTrainingCorrectMove(state: StoreState<AppState>, _ctx: Context): void {
+  const session = state.training.session;
+  if (session === null) return;
+  state.set("training", {
+    ...state.training,
+    session: {
+      ...session,
+      currentMoveCount: session.currentMoveCount + 1,
+    },
   });
 }
 
@@ -246,6 +257,7 @@ function finishTrainingLine(
 ): TrainingLineReview | null {
   const result = {
     lineId,
+    moveCount: session.currentMoveCount,
     mistakeCount: session.currentMistakeCount,
   };
   const results = [
@@ -271,6 +283,7 @@ function finishTrainingLine(
     session: {
       ...session,
       results,
+      currentMoveCount: 0,
       currentMistakeCount: 0,
       failedMoveIds: [],
       replayMoveIds: [],

@@ -3,9 +3,11 @@ import { getChapter, getPgn, getRepertoire } from "./state";
 import type { AppState, Context, EvalMove, Move, NormalizedPgn } from "./types";
 
 export type TrainingSessionSummary = {
+  accuracy: number | null;
   tried: number;
   clean: number;
   mistakes: number;
+  moves: number;
   total: number;
 };
 
@@ -87,11 +89,19 @@ export function selectTrainingSessionStats(
   if (session === null) return null;
 
   const tried = session.results.length;
-  const mistakes = session.results.filter((result) => result.mistakeCount > 0).length;
+  const clean = session.results.filter((result) => result.mistakeCount === 0).length;
+  const mistakes =
+    session.results.reduce((total, result) => total + result.mistakeCount, 0) +
+    session.currentMistakeCount;
+  const moves =
+    session.results.reduce((total, result) => total + result.moveCount, 0) +
+    session.currentMoveCount;
   return {
+    accuracy: moves === 0 ? null : (moves - mistakes) / moves,
     tried,
-    clean: tried - mistakes,
+    clean,
     mistakes,
+    moves,
     total: session.lineIds.length,
   };
 }

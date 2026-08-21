@@ -241,16 +241,15 @@ function TrainingSessionStats(props: {
           <VerticalDashedDivider />
           <StatCell label="Mistakes" value={result().mistakes.toString()} />
           <VerticalDashedDivider />
-          <StatCell
-            label="Accuracy"
-            value={
-              result().tried === 0 ? "-" : `${Math.round((result().clean / result().tried) * 100)}%`
-            }
-          />
+          <StatCell label="Accuracy" value={formatAccuracy(result().accuracy)} />
         </div>
       )}
     </Show>
   );
+}
+
+function formatAccuracy(accuracy: number | null): string {
+  return accuracy === null ? "-" : `${Math.round(accuracy * 100)}%`;
 }
 
 export function lineCounter(completed: number, total: number, isLineComplete: boolean): string {
@@ -260,7 +259,7 @@ export function lineCounter(completed: number, total: number, isLineComplete: bo
 
 function StatCell(props: { label: string; value: string }) {
   return (
-    <div class="bg-background px-2 py-2">
+    <div class="bg-background px-2 py-2" data-training-stat={props.label.toLowerCase()}>
       <div class="text-xs text-muted-foreground">{props.label}</div>
       <div class="font-medium">{props.value}</div>
     </div>

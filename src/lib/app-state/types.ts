@@ -178,6 +178,7 @@ export type TrainingState = "in-progress" | "failure" | "success" | "complete";
 
 export type TrainingLineResult = {
   lineId: string;
+  moveCount: number;
   mistakeCount: number;
 };
 
@@ -201,6 +202,7 @@ export type TrainingSessionDraft = {
   chapterHandle: string;
   lineIds: string[];
   activeLineId: string | null;
+  currentMoveCount: number;
   currentMistakeCount: number;
   failedMoveIds: number[];
   replayMoveIds: number[];

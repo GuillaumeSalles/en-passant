@@ -8,6 +8,7 @@ import {
   discardTrainingLine,
   ensureTrainingQueueReview,
   ensureTrainingSession,
+  markTrainingCorrectMove,
   markTrainingMistake,
   prepareTrainingReplayMove,
   resetTrainingSession,
@@ -17,6 +18,7 @@ import {
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 import { trainingLineScheduleKey, markLineLearned } from "@/mutations/learningSession";
+import { selectTrainingSessionStats } from "@/lib/AppState";
 
 afterEach(() => vi.useRealTimers());
 
@@ -77,7 +79,7 @@ describe("training session", () => {
 
     expect(context.state.training.session?.lineIds).toEqual(["line-a", "line-c"]);
     expect(context.state.training.session?.results).toEqual([
-      { lineId: "line-a", mistakeCount: 0 },
+      { lineId: "line-a", moveCount: 0, mistakeCount: 0 },
     ]);
   });
 
@@ -114,8 +116,30 @@ describe("training session", () => {
 
     expect(context.state.training.status).toBe("success");
     expect(context.state.training.session?.results).toEqual([
-      { lineId: "line-a", mistakeCount: 1 },
+      { lineId: "line-a", moveCount: 1, mistakeCount: 1 },
     ]);
+  });
+
+  test("counts every move attempt and every mistake in the live session summary", () => {
+    const context = createTrainingContext();
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+
+    markTrainingMistake(context.state, context.route, { moveId: 2 });
+    markTrainingMistake(context.state, context.route, { moveId: 2 });
+    markTrainingCorrectMove(context.state, context.route);
+
+    expect(selectTrainingSessionStats(context.state, context.route)).toEqual({
+      accuracy: 1 / 3,
+      tried: 0,
+      clean: 0,
+      mistakes: 2,
+      moves: 3,
+      total: 1,
+    });
   });
 
   test("advances a learned line after a clean review", () => {
@@ -250,7 +274,7 @@ describe("training session", () => {
     });
 
     expect(context.state.training.session?.results).toEqual([
-      { lineId: "line-a", mistakeCount: 0 },
+      { lineId: "line-a", moveCount: 0, mistakeCount: 0 },
     ]);
   });
 
@@ -299,7 +323,7 @@ describe("training session", () => {
       finishLine: true,
     });
     expect(context.state.training.session?.results).toEqual([
-      { lineId: "line-a", mistakeCount: 1 },
+      { lineId: "line-a", moveCount: 1, mistakeCount: 1 },
     ]);
   });
 
@@ -322,6 +346,7 @@ describe("training session", () => {
     expect(context.state.training.session).toMatchObject({
       lineIds: ["line-a", "line-b"],
       activeLineId: null,
+      currentMoveCount: 0,
       results: [],
     });
   });
@@ -344,10 +369,11 @@ describe("training session", () => {
       status: "failure",
       session: {
         ...session,
+        currentMoveCount: 3,
         currentMistakeCount: 2,
         failedMoveIds: [3],
         replayMoveIds: [3, 3],
-        results: [{ lineId: "line-a", mistakeCount: 0 }],
+        results: [{ lineId: "line-a", moveCount: 2, mistakeCount: 0 }],
       },
     });
 
@@ -363,10 +389,11 @@ describe("training session", () => {
       variation: { rootMoveIds: [], moves: {} },
       session: {
         activeLineId: null,
+        currentMoveCount: 0,
         currentMistakeCount: 0,
         failedMoveIds: [],
         replayMoveIds: [],
-        results: [{ lineId: "line-a", mistakeCount: 0 }],
+        results: [{ lineId: "line-a", moveCount: 2, mistakeCount: 0 }],
       },
     });
     expect(context.state.selectedMoveId).toBeNull();
