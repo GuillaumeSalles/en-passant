@@ -11,6 +11,7 @@ import {
   getChapterPgn,
   getTrainingLines,
   getVariationMoveIds,
+  findOpening,
   isMoveValid,
   moveFromChessboard,
   moveToEvalMove,
@@ -24,6 +25,7 @@ import { createPacingTimer } from "@/lib/createPacingTimer";
 import { learningLinePath, trainingPath } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
+import { useOpeningIndex } from "@/lib/useOpeningIndex";
 import { useRouteContext } from "@/lib/useRouteContext";
 import { useSelector } from "@/lib/useSelector";
 import {
@@ -99,6 +101,14 @@ export function LineLearning(props: {
     return pgn === null ? [] : getTrainingLines(pgn, orientation());
   });
   const activeLine = createMemo(() => lines().find((line) => line.id === props.lineId));
+  const openingIndex = useOpeningIndex();
+  const activeOpeningName = createMemo(() => {
+    const pgn = chapterPgn();
+    const line = activeLine();
+    const openings = openingIndex();
+    if (pgn === null || line === undefined || openings.status === "loading") return null;
+    return findOpening(pgn, line.terminalMoveId, openings.data)?.name ?? null;
+  });
   const nextLineToLearn = createMemo(() => {
     const allLines = lines();
     const activeLineIndex = allLines.findIndex((line) => line.id === props.lineId);
@@ -305,6 +315,7 @@ export function LineLearning(props: {
               showTraining={false}
               trainingLineId={null}
               learningLineId={props.lineId}
+              lineName={activeOpeningName()}
               readLine={false}
             />
           }

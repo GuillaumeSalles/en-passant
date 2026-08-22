@@ -17,7 +17,8 @@ const crumbLinkClass = "truncate transition-colors duration-150 ease-emil-out ho
 export function RepertoireBreadcrumb(props: {
   showTraining: boolean;
   trainingLineId: string | null;
-  learningLineId?: string | null;
+  learningLineId?: string | null | undefined;
+  lineName?: string | null | undefined;
   readLine: boolean;
 }) {
   const repertoireName = useSelector(getRepertoireName);
@@ -68,7 +69,7 @@ export function RepertoireBreadcrumb(props: {
                   class={crumbLinkClass}
                   href={trainingLinePath(ctx().repertoireHandle, ctx().chapterHandle, lineId())}
                 >
-                  Line
+                  {props.lineName ?? "Line"}
                 </a>
               </>
             )}
@@ -81,7 +82,9 @@ export function RepertoireBreadcrumb(props: {
                   class={crumbLinkClass}
                   href={learningLinePath(ctx().repertoireHandle, ctx().chapterHandle, lineId())}
                 >
-                  Learn line
+                  {props.lineName === undefined || props.lineName === null
+                    ? "Learn line"
+                    : `Learn ${props.lineName}`}
                 </a>
               </>
             )}

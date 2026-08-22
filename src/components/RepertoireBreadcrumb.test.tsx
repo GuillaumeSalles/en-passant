@@ -45,10 +45,22 @@ function Wrapper(props: { children: JSX.Element }) {
   return <TestRouter>{props.children}</TestRouter>;
 }
 
-function renderBreadcrumb(props: { trainingLineId: string | null } = { trainingLineId: null }) {
-  render(() => (
+function renderBreadcrumb(
+  props: {
+    trainingLineId: string | null;
+    learningLineId?: string | null;
+    lineName?: string | null;
+  } = { trainingLineId: null },
+) {
+  return render(() => (
     <Wrapper>
-      <RepertoireBreadcrumb showTraining trainingLineId={props.trainingLineId} readLine={false} />
+      <RepertoireBreadcrumb
+        showTraining
+        trainingLineId={props.trainingLineId}
+        learningLineId={props.learningLineId}
+        lineName={props.lineName}
+        readLine={false}
+      />
     </Wrapper>
   ));
 }
@@ -70,16 +82,26 @@ test("links the training breadcrumb trail", () => {
   );
 });
 
-test("links the current training line breadcrumb", () => {
+test("uses the opening name in training and learning line breadcrumbs", () => {
   selectorValues.repertoireName = "Untitled Repertoire";
   selectorValues.chapterName = "Chapter 1";
 
-  renderBreadcrumb({ trainingLineId: "v1-line" });
+  const view = renderBreadcrumb({ trainingLineId: "v1-line", lineName: "Italian Game" });
 
   expect(screen.getByRole("link", { name: "Training" }).getAttribute("href")).toBe(
     "/app/repertoires/untitled-repertoire/chapter-1/train",
   );
-  expect(screen.getByRole("link", { name: "Line" }).getAttribute("href")).toBe(
+  expect(screen.getByRole("link", { name: "Italian Game" }).getAttribute("href")).toBe(
     "/app/untitled-repertoire/chapter-1/v1-line/train",
+  );
+
+  view.unmount();
+  renderBreadcrumb({
+    trainingLineId: null,
+    learningLineId: "v1-line",
+    lineName: "Italian Game",
+  });
+  expect(screen.getByRole("link", { name: "Learn Italian Game" }).getAttribute("href")).toBe(
+    "/app/untitled-repertoire/chapter-1/v1-line/learn",
   );
 });

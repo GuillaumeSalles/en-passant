@@ -954,6 +954,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByText("0/2 trained")).toBeVisible();
 
   await page.goto(firstLearnHref.replace(/\/learn$/, "/train"));
+  await expect(page.getByRole("link", { name: "King's Pawn Game" })).toBeVisible();
   await expect(page.locator("[data-square]")).toHaveCount(64);
   const cleanStat = page.locator('[data-training-stat="clean"]');
   const mistakesStat = page.locator('[data-training-stat="mistakes"]');
@@ -1347,6 +1348,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
   );
   await firstLine.getByRole("link", { name: "Learn" }).click();
   await expect(page).toHaveURL(/\/v1-[A-Za-z0-9_-]+\/learn$/);
+  await expect(page.getByRole("link", { name: "Learn King's Knight Opening" })).toBeVisible();
 
   await expect(page.getByText("Watch this move.")).toBeVisible();
   await pausePacingClock(page);

@@ -8,7 +8,7 @@ import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Button } from "@/components/ui/button";
-import type { TrainingSessionSummary } from "@/lib/AppState";
+import { findOpening, type TrainingSessionSummary } from "@/lib/AppState";
 import {
   chapterTrainingLineReviewPath,
   repertoirePath,
@@ -19,6 +19,7 @@ import {
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
+import { useOpeningIndex } from "@/lib/useOpeningIndex";
 import { createEffect, createMemo, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { useState } from "@/app/AppStateProvider";
@@ -88,6 +89,14 @@ export function VariationTraining(props: {
     },
   });
   const squareHighlights = useSquareHighlights();
+  const openingIndex = useOpeningIndex();
+  const activeOpeningName = createMemo(() => {
+    const pgn = flow.chapterPgn();
+    const line = flow.activeLine();
+    const openings = openingIndex();
+    if (pgn === null || line === undefined || openings.status === "loading") return null;
+    return findOpening(pgn, line.terminalMoveId, openings.data)?.name ?? null;
+  });
 
   return (
     <Show when={flow.chapterPgn() !== null} fallback={null}>
@@ -104,7 +113,12 @@ export function VariationTraining(props: {
         <Show when={flow.isInitialized()}>
           <WorkspaceLayout
             title={
-              <RepertoireBreadcrumb showTraining trainingLineId={props.lineId} readLine={false} />
+              <RepertoireBreadcrumb
+                showTraining
+                trainingLineId={props.lineId}
+                lineName={activeOpeningName()}
+                readLine={false}
+              />
             }
             chessboard={
               <Chessboard
