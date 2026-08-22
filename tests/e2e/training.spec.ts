@@ -96,22 +96,24 @@ test("lists scheduled lines by training priority", async ({ page }) => {
   const lines = page.locator("[data-training-queue-line]");
   await expect(lines).toHaveCount(2);
   await expect(lines.nth(0)).toContainText("d4 d5");
+  await expect(lines.nth(0).locator("[data-training-opening]")).toHaveText("Queen's Pawn Game");
   await expect(lines.nth(0)).toContainText("Due");
   await expect(lines.nth(0).locator('[data-mastery-level="practiced"]')).toBeVisible();
   await expect(lines.nth(1)).toContainText("e4 e5");
+  await expect(lines.nth(1).locator("[data-training-opening]")).toHaveText("King's Pawn Game");
   await expect(lines.nth(1).locator('[data-mastery-level="familiar"]')).toBeVisible();
   await lines
     .nth(0)
     .getByRole("button", { name: /Actions for/ })
     .click();
-  await expect(page.getByText("Read line", { exact: true })).toHaveAttribute(
-    "aria-disabled",
-    "true",
+  await expect(page.getByRole("link", { name: "Read line" })).toHaveAttribute(
+    "href",
+    /\/app\/white-repertoire\/open-games\/v1-[A-Za-z0-9_-]+$/,
   );
   await expect(page.getByRole("link", { name: "View in chapter" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Review lines" })).toHaveAttribute(
     "href",
-    /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
+    /\/app\/white-repertoire\/open-games\/v1-[A-Za-z0-9_-]+\/train\?review=due$/,
   );
   await expect(
     page.getByRole("link", { name: "Review lines" }).locator("[data-review-count]"),
@@ -271,7 +273,7 @@ test("reviews every due line across chapters and stops before future lines", asy
   await page.getByRole("link", { name: "Review lines" }).click();
 
   await expect(page).toHaveURL(
-    /\/app\/repertoires\/white-repertoire\/open-games\/train\/v1-.*\?review=due$/,
+    /\/app\/white-repertoire\/open-games\/v1-[A-Za-z0-9_-]+\/train\?review=due$/,
   );
   await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   await pausePacingClock(page);
@@ -280,7 +282,7 @@ test("reviews every due line across chapters and stops before future lines", asy
   await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page).toHaveURL(
-    /\/app\/repertoires\/white-repertoire\/queens-pawn\/train\/v1-.*\?review=due$/,
+    /\/app\/white-repertoire\/queens-pawn\/v1-[A-Za-z0-9_-]+\/train\?review=due$/,
   );
   await expect(page.getByText("2/2", { exact: true })).toBeVisible();
 

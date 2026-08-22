@@ -8,7 +8,7 @@ import {
   type TrainingQueueRepertoireGroup,
 } from "@/components/TrainingQueueList";
 import { TrainingReviewButton } from "@/components/TrainingReviewButton";
-import { getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
+import { findOpening, getScheduledTrainingLines, movePositionKey } from "@/lib/AppState";
 import {
   importedGamePath,
   lineReaderPath,
@@ -20,6 +20,7 @@ import {
 import { useLoadPgns } from "@/lib/useLoadPgn";
 import { useLoadRepertoiresAndChapters } from "@/lib/useLoadRepertoiresAndChapters";
 import { useMutation } from "@/lib/useMutation";
+import { useOpeningIndex } from "@/lib/useOpeningIndex";
 import { trainingMistakeLinkKey, useTrainingMistakeLinks } from "@/lib/useTrainingMistakeLinks";
 import { ensureTrainingQueueReview } from "@/mutations/trainingSession";
 
@@ -91,6 +92,7 @@ export function Training() {
 
   useLoadRepertoiresAndChapters();
   const mistakeLinks = useTrainingMistakeLinks();
+  const openingIndex = useOpeningIndex();
 
   const scheduledPgnIds = createMemo(() => {
     if (state.chapters.status !== "success") return [];
@@ -102,6 +104,7 @@ export function Training() {
   useLoadPgns(() => scheduledPgnIds());
 
   const isLoading = createMemo(() => {
+    if (openingIndex().status === "loading") return true;
     if (state.repertoires.status !== "success" || state.chapters.status !== "success") return true;
     return scheduledPgnIds().some((pgnId) => {
       const result = state.pgns[pgnId];
@@ -140,6 +143,7 @@ export function Training() {
       const pgn = loadedPgns()[line.chapter.pgnId];
       const selectedPositionKey =
         pgn === undefined ? "" : (movePositionKey(pgn, line.line.terminalMoveId) ?? "");
+      const openings = openingIndex();
       return {
         repertoireId: line.repertoire.id,
         repertoireName: line.repertoire.name,
@@ -148,6 +152,10 @@ export function Training() {
         line: {
           id: line.line.id,
           label: line.label,
+          opening:
+            pgn === undefined || openings.status === "loading"
+              ? undefined
+              : findOpening(pgn, line.line.terminalMoveId, openings.data),
           intervalIndex: line.review.intervalIndex,
           isAlternative: line.line.isAlternative,
           isLearned: true,

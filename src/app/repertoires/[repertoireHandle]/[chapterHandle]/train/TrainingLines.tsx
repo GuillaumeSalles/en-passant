@@ -9,6 +9,7 @@ import {
   getChapterScopeFromData,
   getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
+  findOpening,
   isTrainingReviewDue,
   movePositionKey,
   prioritizeDueTrainingLines,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/routes";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
+import { useOpeningIndex } from "@/lib/useOpeningIndex";
 import { useSelector } from "@/lib/useSelector";
 import { ensureTrainingSession } from "@/mutations/trainingSession";
 import { trainingLineScheduleKey } from "@/mutations/learningSession";
@@ -49,8 +51,10 @@ export function TrainingLines(props: {
   const onEnsureTrainingSession = useMutation(ensureTrainingSession);
   const [now, setNow] = createSignal(Date.now());
   const mistakeLinks = useTrainingMistakeLinks();
+  const openingIndex = useOpeningIndex();
 
   const isLoading = createMemo(() => {
+    if (openingIndex().status === "loading") return true;
     if (state.repertoires.status !== "success" || state.chapters.status !== "success") {
       return true;
     }
@@ -159,9 +163,15 @@ export function TrainingLines(props: {
       const mistakeLink =
         mistakeLinks()[trainingMistakeLinkKey(review?.chapterId ?? "", line.uciPath)];
       const learningHref = learningLinePath(props.repertoireHandle, props.chapterHandle, line.id);
+      const pgn = chapterPgn();
+      const openings = openingIndex();
       return {
         id: line.id,
         label: lineLabel(line.terminalMoveId),
+        opening:
+          pgn === null || openings.status === "loading"
+            ? undefined
+            : findOpening(pgn, line.terminalMoveId, openings.data),
         intervalIndex: review?.intervalIndex,
         isAlternative: line.isAlternative,
         isLearned,

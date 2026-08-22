@@ -9,6 +9,7 @@ function trainingLine(id: string, label: string): TrainingLineListItem {
   return {
     id,
     label,
+    opening: undefined,
     intervalIndex: 1,
     isAlternative: false,
     isLearned: true,

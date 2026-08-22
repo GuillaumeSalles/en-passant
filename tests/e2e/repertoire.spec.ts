@@ -938,6 +938,8 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
   const lines = page.locator("[data-training-line]");
   await expect(lines).toHaveCount(2);
+  await expect(lines.first().locator("[data-training-opening]")).toHaveText("King's Pawn Game");
+  await expect(lines.nth(1).locator("[data-training-opening]")).toHaveText("Queen's Pawn Game");
   await expect(lines.first().getByRole("link", { name: "Learn" })).toHaveAttribute(
     "href",
     /\/v1-[A-Za-z0-9_-]+\/learn$/,
@@ -1341,10 +1343,10 @@ test("learns a line with demonstrations, responses, and progressive comments", a
 
   await expect(firstLine.getByRole("link", { name: "Learn" })).toHaveAttribute(
     "href",
-    /\/learn\/v1-[A-Za-z0-9_-]+$/,
+    /\/v1-[A-Za-z0-9_-]+\/learn$/,
   );
   await firstLine.getByRole("link", { name: "Learn" }).click();
-  await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
+  await expect(page).toHaveURL(/\/v1-[A-Za-z0-9_-]+\/learn$/);
 
   await expect(page.getByText("Watch this move.")).toBeVisible();
   await pausePacingClock(page);
@@ -1384,7 +1386,7 @@ test("learns a line with demonstrations, responses, and progressive comments", a
 
   await expect(page.getByText("Line learned.")).toBeVisible();
   await expect.poll(() => storedTrainingLineUciPaths(page)).toEqual(["e2e4 e7e5 g1f3"]);
-  await expect(page).toHaveURL(/\/learn\/v1-[A-Za-z0-9_-]+$/);
+  await expect(page).toHaveURL(/\/v1-[A-Za-z0-9_-]+\/learn$/);
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);
   await expect(page.locator('[data-mastery-level="learning"]')).toHaveText("Learning");

@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
+import type { Opening } from "@/lib/AppState";
 import { cn } from "@/lib/utils";
 
 type TrainingLineLink = {
@@ -35,6 +36,7 @@ function formatDueTime(dueAt: number, now: number): string {
 export type TrainingLineListItem = {
   id: string;
   label: string;
+  opening: Opening | undefined;
   intervalIndex: number | undefined;
   isAlternative: boolean;
   isLearned: boolean;
@@ -136,7 +138,33 @@ export function TrainingLineList(props: {
                 data-alternative-line={line.isAlternative ? "true" : "false"}
               >
                 <div class="min-w-0">
-                  <div class="text-sm font-medium text-foreground">{line.label}</div>
+                  <div class="flex min-w-0 items-baseline gap-2">
+                    <Show
+                      when={line.opening}
+                      fallback={
+                        <div class="truncate text-sm font-medium text-foreground">{line.label}</div>
+                      }
+                    >
+                      {(opening) => (
+                        <>
+                          <div
+                            class="min-w-0 truncate text-sm font-medium text-foreground"
+                            data-training-opening
+                            title={opening().name}
+                          >
+                            {opening().name}
+                          </div>
+                          <div
+                            class="min-w-0 truncate text-xs text-muted-foreground"
+                            data-training-moves
+                            title={line.label}
+                          >
+                            {line.label}
+                          </div>
+                        </>
+                      )}
+                    </Show>
+                  </div>
                   <div class="mt-1 flex flex-wrap items-center gap-2">
                     <TrainingMasteryBadge intervalIndex={line.intervalIndex} />
                     <Show when={line.isAlternative}>

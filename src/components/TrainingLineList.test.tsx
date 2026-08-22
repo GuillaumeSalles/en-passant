@@ -9,6 +9,7 @@ function trainingLine(overrides: Partial<TrainingLineListItem> = {}): TrainingLi
   return {
     id: "v1-line",
     label: "e4 e5 Nf3",
+    opening: undefined,
     intervalIndex: 1,
     isAlternative: false,
     isLearned: true,
@@ -26,6 +27,7 @@ test("renders the shared training-line structure and route-specific actions", ()
     <TrainingLineList
       lines={[
         trainingLine({
+          opening: { eco: "C50", name: "Italian Game" },
           detailLinks: [{ href: "/game", label: "Review game" }],
           queueKey: "review-key",
         }),
@@ -37,7 +39,10 @@ test("renders the shared training-line structure and route-specific actions", ()
   ));
 
   const row = screen.getByText("e4 e5 Nf3").closest("[data-training-line]");
-  expect(screen.getByText("e4 e5 Nf3").classList.contains("text-foreground")).toBe(true);
+  expect(screen.getByText("e4 e5 Nf3").classList.contains("text-muted-foreground")).toBe(true);
+  const opening = screen.getByText("Italian Game").closest("[data-training-opening]");
+  expect(opening?.classList.contains("text-foreground")).toBe(true);
+  expect(opening?.textContent).toBe("Italian Game");
   expect(row?.getAttribute("data-training-line")).toBe("v1-line");
   expect(row?.getAttribute("data-training-queue-line")).toBe("review-key");
   expect(row?.getAttribute("data-training-status")).toBe("due");
@@ -73,6 +78,7 @@ test("uses Learn as the primary action for a line that has never been learned", 
   expect(screen.getByRole("link", { name: "Learn" }).getAttribute("href")).toBe(
     "/app/white/main/v1-line/learn",
   );
+  expect(screen.getByText("e4 e5 Nf3").classList.contains("text-foreground")).toBe(true);
   expect(screen.queryByRole("link", { name: "Review" })).toBeNull();
 });
 

@@ -28,6 +28,9 @@ vi.mock("@/lib/useRouteContext", () => ({
 
 vi.mock("@/lib/useLoadPgn", () => ({ useLoadPgn: () => undefined }));
 vi.mock("@/lib/useMutation", () => ({ useMutation: () => () => undefined }));
+vi.mock("@/lib/useOpeningIndex", () => ({
+  useOpeningIndex: () => () => ({ status: "success" as const, data: new Map() }),
+}));
 vi.mock("@/lib/useTrainingMistakeLinks", () => ({
   trainingMistakeLinkKey: () => "mistake",
   useTrainingMistakeLinks: () => () => ({}),

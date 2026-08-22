@@ -190,7 +190,7 @@ test("shows the latest repertoire move on an imported game", async ({ page }) =>
   await expect(mistakeBanner).toContainText("You played 3. Bc4; your repertoire has 3. Bb5");
   await expect(mistakeBanner.getByRole("link", { name: "Train" })).toHaveAttribute(
     "href",
-    /\/app\/repertoires\/white\/italian\/train\/v1-/,
+    /\/app\/white\/italian\/v1-[A-Za-z0-9_-]+\/train$/,
   );
   await expect(
     coverageBanner.getByRole("link", { name: "White repertoire / Italian Game" }),

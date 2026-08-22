@@ -49,3 +49,14 @@ of the `stockfish@18.0.8` npm package.
 The bundled move and capture sounds are individual clips extracted from the
 Pixabay source file listed above. They are used under the Pixabay Content
 License and are not part of the GPL-licensed source distribution.
+
+## Lichess Chess Openings
+
+- Source: https://github.com/lichess-org/chess-openings
+- Source commit: https://github.com/lichess-org/chess-openings/tree/4b8622759e7ae6f93f011cc6c83a3823401ab45e
+- License: CC0-1.0
+- Local file: `public/openings-4b862275.json`
+  - sha256: `e5fee69abefad4d3a2746ff41b6940addfaa11cbd2ee9a697b2041c9a27c781e`
+
+The bundled opening-position index is generated from the source TSV files by
+`scripts/generate-openings.ts`.

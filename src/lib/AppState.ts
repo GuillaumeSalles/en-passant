@@ -43,6 +43,7 @@ export {
   type TrainingLine,
 } from "./app-state/trainingLines";
 export { getScheduledTrainingLines, type ScheduledTrainingLine } from "./app-state/trainingQueue";
+export { findOpening, type Opening, type OpeningIndex } from "./app-state/openings";
 export {
   DEFAULT_TRAINING_INTERVALS_MS,
   TRAINING_MASTERY_LEVELS,
