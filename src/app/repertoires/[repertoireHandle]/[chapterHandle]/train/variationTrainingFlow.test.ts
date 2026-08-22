@@ -12,6 +12,7 @@ describe("variation training flow", () => {
     { type: "initializing" },
     {
       type: "showing-feedback",
+      origin: "line",
       feedback: "mistake",
       square: "f3",
       playedMoveId: 1,
@@ -133,5 +134,24 @@ describe("variation training flow", () => {
     expect(
       reduceVariationTrainingFlow(animating, { type: "ANIMATION_SETTLED", animationId: 11 }),
     ).toEqual({ type: "awaiting-replay-move" });
+  });
+
+  test("returns to the isolated replay after rejecting a replayed move", () => {
+    const checking = reduceVariationTrainingFlow(
+      { type: "awaiting-replay-move" },
+      { type: "MOVE_SUBMITTED", origin: "replay" },
+    );
+    const feedback = reduceVariationTrainingFlow(checking, {
+      type: "MOVE_REJECTED",
+      feedback: "mistake",
+      square: "c3",
+      playedMoveId: 3,
+      expectedMoveId: 4,
+    });
+
+    expect(feedback).toMatchObject({ type: "showing-feedback", origin: "replay" });
+    expect(reduceVariationTrainingFlow(feedback, { type: "FEEDBACK_ELAPSED" })).toEqual({
+      type: "awaiting-replay-move",
+    });
   });
 });

@@ -1208,6 +1208,39 @@ test("retrying a failed training move animates the previous opponent move", asyn
   expect(consoleMessages).toEqual([]);
 });
 
+test("a mistake during a failed-move retry stays on the isolated move", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *");
+  await openFirstTrainingLine(page);
+  await pausePacingClock(page);
+
+  await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await expectTrainingInputReady(page);
+  await dragPiece(page, "b1", "c3");
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
+  await dragPiece(page, "g1", "f3");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await expectTrainingInputReady(page);
+  await dragPiece(page, "f1", "b5");
+  await advanceTrainingPacing(page, "waiting-for-response", 500);
+  await advanceTrainingPacing(page, "preparing-replay", 500);
+  await expect(page.locator('[data-training-flow-state="awaiting-replay-move"]')).toBeVisible();
+
+  await dragPiece(page, "b1", "c3");
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
+  await expect(page.locator('[data-training-flow-state="awaiting-replay-move"]')).toBeVisible();
+  await expect(page.getByText("Replay the failed move.")).toBeVisible();
+
+  await dragPiece(page, "g1", "f3");
+  await expect(page.locator('[data-training-flow-state="preparing-replay"]')).toBeVisible();
+  await advanceTrainingPacing(page, "preparing-replay", 500);
+  await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.locator('[data-square="f1"]')).toHaveAttribute("data-piece", "B");
+  expect(consoleMessages).toEqual([]);
+});
+
 test("highlights demonstrated and opponent moves while learning", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

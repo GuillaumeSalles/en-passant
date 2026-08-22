@@ -18,6 +18,7 @@ export type VariationTrainingPhase =
   | { type: "checking-move"; origin: TrainingMoveOrigin }
   | {
       type: "showing-feedback";
+      origin: TrainingMoveOrigin;
       feedback: TrainingMoveFeedback;
       square: string;
       playedMoveId: number | null;
@@ -92,6 +93,7 @@ export function reduceVariationTrainingFlow(
       if (event.type === "MOVE_REJECTED") {
         return {
           type: "showing-feedback",
+          origin: phase.origin,
           feedback: event.feedback,
           square: event.square,
           playedMoveId: event.playedMoveId,
@@ -112,9 +114,10 @@ export function reduceVariationTrainingFlow(
       }
       return event.type === "LINE_BOUNDARY_STARTED" ? { type: "line-boundary" } : phase;
     case "showing-feedback":
-      return event.type === "FEEDBACK_ELAPSED"
-        ? { type: "awaiting-line-move", notice: phase.feedback }
-        : phase;
+      if (event.type !== "FEEDBACK_ELAPSED") return phase;
+      return phase.origin === "replay"
+        ? { type: "awaiting-replay-move" }
+        : { type: "awaiting-line-move", notice: phase.feedback };
     case "waiting-for-response":
       return event.type === "RESPONSE_DELAY_ELAPSED"
         ? { ...phase, type: "starting-response" }
