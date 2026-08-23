@@ -137,25 +137,31 @@ export function TrainingLineList(props: {
                 data-learning-status={line.isLearned ? "learned" : "unlearned"}
                 data-alternative-line={line.isAlternative ? "true" : "false"}
               >
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <div class="flex min-w-0 items-baseline gap-2">
                     <Show
                       when={line.opening}
                       fallback={
-                        <div class="truncate text-sm font-medium text-foreground">{line.label}</div>
+                        <div
+                          class="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
+                          data-training-moves
+                          title={line.label}
+                        >
+                          {line.label}
+                        </div>
                       }
                     >
                       {(opening) => (
                         <>
                           <div
-                            class="min-w-0 truncate text-sm font-medium text-foreground"
+                            class="max-w-[65%] shrink-0 truncate text-sm font-medium text-foreground"
                             data-training-opening
                             title={opening().name}
                           >
                             {opening().name}
                           </div>
                           <div
-                            class="min-w-0 truncate text-xs text-muted-foreground"
+                            class="min-w-0 flex-1 truncate text-xs text-muted-foreground"
                             data-training-moves
                             title={line.label}
                           >

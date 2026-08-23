@@ -39,7 +39,10 @@ test("renders the shared training-line structure and route-specific actions", ()
   ));
 
   const row = screen.getByText("e4 e5 Nf3").closest("[data-training-line]");
-  expect(screen.getByText("e4 e5 Nf3").classList.contains("text-muted-foreground")).toBe(true);
+  const moves = screen.getByText("e4 e5 Nf3");
+  expect(moves.classList.contains("text-muted-foreground")).toBe(true);
+  expect(moves.classList.contains("flex-1")).toBe(true);
+  expect(moves.classList.contains("truncate")).toBe(true);
   const opening = screen.getByText("Italian Game").closest("[data-training-opening]");
   expect(opening?.classList.contains("text-foreground")).toBe(true);
   expect(opening?.textContent).toBe("Italian Game");
