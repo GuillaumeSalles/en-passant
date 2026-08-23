@@ -458,6 +458,7 @@ test("existing Google account sign in discards local repertoire data and loads s
     localPgn: "1. d4 d5 *",
     dirty: true,
   });
+  const appOrigin = new URL(page.url()).origin;
   const documentRequests: string[] = [];
   page.on("request", (request) => {
     if (request.resourceType() === "document") {
@@ -487,7 +488,7 @@ test("existing Google account sign in discards local repertoire data and loads s
   expect(JSON.stringify(uploadedChanges)).not.toContain("Local Draft Should Disappear");
   expect(consoleMessages).toEqual([]);
   expect(documentRequests).not.toContain(
-    "http://localhost:5174/app/repertoires/untitled-repertoire/chapter-1",
+    `${appOrigin}/app/repertoires/untitled-repertoire/chapter-1`,
   );
 });
 
@@ -804,16 +805,15 @@ test("starts Google sign in", async ({ page }) => {
   });
 
   await openAuthPage(page);
+  const appOrigin = new URL(page.url()).origin;
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with Google" }).click();
 
   expect(requestedGoogleStart).toBe(true);
   expect(requestBody).toMatchObject({
     provider: "google",
-    callbackURL:
-      "http://localhost:5174/app/repertoires/untitled-repertoire/chapter-1?auth_event=signin",
-    newUserCallbackURL:
-      "http://localhost:5174/app/repertoires/untitled-repertoire/chapter-1?auth_event=signup",
+    callbackURL: `${appOrigin}/app/repertoires/untitled-repertoire/chapter-1?auth_event=signin`,
+    newUserCallbackURL: `${appOrigin}/app/repertoires/untitled-repertoire/chapter-1?auth_event=signup`,
     disableRedirect: true,
   });
 });

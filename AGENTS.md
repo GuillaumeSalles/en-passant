@@ -98,9 +98,10 @@ effects.
   `/stockfish-17-lite-single.js`; avoid `/favicon.ico`.
 - Wait for user-ready controls, preferably helpers such as
   `expectRepertoireReady(page)`.
-- Playwright starts Vite on `localhost:5174` with `--force` and
-  `reuseExistingServer: false`. If the port is busy, identify the listener with
-  `lsof -nP -iTCP:5174 -sTCP:LISTEN` and stop it.
+- `npm run test:e2e` allocates an available localhost port and starts Vite with
+  `--force` and `reuseExistingServer: false`. Direct Playwright CLI invocations
+  default to port 5174; prefer the npm script so unrelated dev servers do not
+  block the run.
 - For auth/storage work, iterate with
   `npm run test:e2e -- tests/e2e/auth.spec.ts`.
 

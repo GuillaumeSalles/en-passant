@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "deploy": "npm run build && npx wrangler pages deploy dist --project-name enpassant",
     "test": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "type-check": "tsc --noEmit",
     "lint": "oxlint src tests scripts --deny-warnings -A no-unassigned-vars",
     "check:filenames": "node scripts/check-filenames.mjs",
