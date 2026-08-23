@@ -48,4 +48,7 @@ async function main(): Promise<void> {
   console.log(`Generated ${rows.length} openings at ${path.relative(process.cwd(), OUTPUT_PATH)}`);
 }
 
-void main();
+main().catch((error: unknown) => {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});

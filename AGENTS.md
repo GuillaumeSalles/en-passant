@@ -108,6 +108,9 @@ effects.
 ## Formatting And Names
 
 - Oxfmt is the formatter; do not hand-format around it.
+- TypeScript scripts run through `tsx` use the repository's CommonJS mode. Put
+  asynchronous entry-point work in `main()` and call it with `main().catch(...)`
+  instead of using top-level `await`.
 - Oxlint runs with `--deny-warnings`; keep new warnings at zero.
 - Guardrails forbid `any`, `@ts-ignore`, unexplained `@ts-expect-error`,
   `as unknown as`, production non-null assertions, and core `src/lib` imports
