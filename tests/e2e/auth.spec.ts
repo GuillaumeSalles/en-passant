@@ -565,12 +565,18 @@ test("authenticated API rejection immediately clears IndexedDB data", async ({ p
   await page.getByRole("button", { name: "Move to last main line move" }).click();
 
   auth.signOut();
+  const unauthorizedResponse = page.waitForResponse((response) => {
+    const path = new URL(response.url()).pathname;
+    return (
+      response.status() === 401 && (path === "/api/sync" || path === "/api/games/position-moves")
+    );
+  });
   await dragPiece(page, "g1", "f3");
+  await unauthorizedResponse;
 
   await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
   await expect(page.getByText("Demo repertoire").first()).toBeVisible();
   expect(await storedRepertoireHandles(page)).toEqual(["demo-repertoire"]);
-  expect(consoleMessages.some((message) => message.includes("/api/sync:0"))).toBe(true);
   expect(
     consoleMessages.filter(
       (message) =>
