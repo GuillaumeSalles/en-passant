@@ -328,6 +328,8 @@ export function LineLearning(props: {
                   ? reinforcement.canDrag()
                   : acceptsLearningMove(flow())
               }
+              readOnly={false}
+              animateIntro
               onPieceDrop={
                 flow().type === "reinforcement" ? reinforcement.onPieceDrop : onPieceDrop
               }

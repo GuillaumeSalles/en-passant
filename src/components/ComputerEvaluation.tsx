@@ -11,6 +11,7 @@ import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { StoreState } from "@/lib/createStore";
+import { PositionPreviewBoundary, PositionPreviewProvider } from "./PositionPreview";
 
 export function getEvaluationLineIndexes(numberOfLines: number): number[] {
   return Array.from({ length: numberOfLines }, (_, index) => index);
@@ -60,93 +61,95 @@ export function ComputerEvaluation(props: {
   );
 
   return (
-    <div class="flex flex-col">
-      <div class="flex items-center justify-between p-2">
-        <div class="flex items-center space-x-2 pl-2">
-          <Switch
-            id="evaluation"
-            checked={isEnabled()}
-            disabled={false}
-            onCheckedChange={onToggleEngine}
+    <PositionPreviewProvider>
+      <div class="flex flex-col">
+        <div class="flex items-center justify-between p-2">
+          <div class="flex items-center space-x-2 pl-2">
+            <Switch
+              id="evaluation"
+              checked={isEnabled()}
+              disabled={false}
+              onCheckedChange={onToggleEngine}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+              }}
+            />
+            <Label for="evaluation">Computer evaluation</Label>
+          </div>
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="Evaluation settings"
+            onClick={() => setIsSettingsOpen(!isSettingsOpen())}
             onKeyDown={(e) => {
               e.stopPropagation();
             }}
-          />
-          <Label for="evaluation">Computer evaluation</Label>
+          >
+            <Settings />
+          </Button>
         </div>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="Evaluation settings"
-          onClick={() => setIsSettingsOpen(!isSettingsOpen())}
-          onKeyDown={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <Settings />
-        </Button>
-      </div>
-      <Show when={isSettingsOpen()}>
-        <div class="flex flex-col gap-2 px-4 pb-4 pt-2">
-          <div class="flex items-center space-x-2">
-            <Checkbox
-              id="show-eval-bar"
-              checked={showEvalBar()}
-              disabled={false}
-              onCheckedChange={onToggleShowEvalBar}
-            />
-            <Label for="show-eval-bar">Show evaluation bar</Label>
-          </div>
-          <div class="flex items-center space-x-2">
-            <Checkbox
-              id="show-best-move-arrow"
-              checked={showBestMoveArrow()}
-              disabled={false}
-              onCheckedChange={onToggleShowBestMoveArrow}
-            />
-            <Label for="show-best-move-arrow">Show best move arrow</Label>
-          </div>
-          <Label for="number-of-lines">Number of lines ({numberOfLines()} / 5)</Label>
-          <Slider
-            id="number-of-lines"
-            min={1}
-            max={5}
-            value={[numberOfLines()]}
-            onValueChange={(value) => {
-              const numberOfLines = value[0];
-              if (numberOfLines === undefined) return;
-
-              props.onNumberOfLinesChange(numberOfLines);
-            }}
-          />
-          <Label for="depth">Depth ({depth()})</Label>
-          <Slider
-            id="depth"
-            min={1}
-            max={30}
-            value={[depth()]}
-            onValueChange={(value) => {
-              const depth = value[0];
-              if (depth === undefined) return;
-
-              onUpdateDepth(depth);
-            }}
-          />
-        </div>
-      </Show>
-      <HorizontalDashedDivider direction="right-to-left" />
-      <div class="flex flex-col">
-        <Show when={isEnabled()}>
-          <For each={evaluationLineIndexes()}>
-            {(lineIndex) => (
-              <EvaluationLineSlot
-                evaluation={evaluationsByIndex().get(lineIndex)}
-                onAddEvalMoves={props.onAddEvalMoves}
+        <Show when={isSettingsOpen()}>
+          <div class="flex flex-col gap-2 px-4 pb-4 pt-2">
+            <div class="flex items-center space-x-2">
+              <Checkbox
+                id="show-eval-bar"
+                checked={showEvalBar()}
+                disabled={false}
+                onCheckedChange={onToggleShowEvalBar}
               />
-            )}
-          </For>
+              <Label for="show-eval-bar">Show evaluation bar</Label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <Checkbox
+                id="show-best-move-arrow"
+                checked={showBestMoveArrow()}
+                disabled={false}
+                onCheckedChange={onToggleShowBestMoveArrow}
+              />
+              <Label for="show-best-move-arrow">Show best move arrow</Label>
+            </div>
+            <Label for="number-of-lines">Number of lines ({numberOfLines()} / 5)</Label>
+            <Slider
+              id="number-of-lines"
+              min={1}
+              max={5}
+              value={[numberOfLines()]}
+              onValueChange={(value) => {
+                const numberOfLines = value[0];
+                if (numberOfLines === undefined) return;
+
+                props.onNumberOfLinesChange(numberOfLines);
+              }}
+            />
+            <Label for="depth">Depth ({depth()})</Label>
+            <Slider
+              id="depth"
+              min={1}
+              max={30}
+              value={[depth()]}
+              onValueChange={(value) => {
+                const depth = value[0];
+                if (depth === undefined) return;
+
+                onUpdateDepth(depth);
+              }}
+            />
+          </div>
         </Show>
+        <HorizontalDashedDivider direction="right-to-left" />
+        <PositionPreviewBoundary>
+          <Show when={isEnabled()}>
+            <For each={evaluationLineIndexes()}>
+              {(lineIndex) => (
+                <EvaluationLineSlot
+                  evaluation={evaluationsByIndex().get(lineIndex)}
+                  onAddEvalMoves={props.onAddEvalMoves}
+                />
+              )}
+            </For>
+          </Show>
+        </PositionPreviewBoundary>
       </div>
-    </div>
+    </PositionPreviewProvider>
   );
 }

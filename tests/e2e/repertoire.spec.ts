@@ -304,6 +304,89 @@ async function expectRepertoireReady(page: Page) {
   await expect(page.getByRole("button", { name: "Next move" })).toBeEnabled();
 }
 
+test("keeps a stable evaluation preview open until the pointer leaves the lines", async ({
+  page,
+}) => {
+  await enableEngine(page);
+  await openRepertoire(page);
+
+  const evaluationLine = page.locator('[data-evaluation-depth="20"]').first();
+  await expect(evaluationLine).toBeVisible({ timeout: 15_000 });
+  const evaluationMoves = evaluationLine.locator("[data-eval-move]");
+  const evaluationLines = page.locator("[data-evaluation-lines]");
+  const firstMove = evaluationMoves.first();
+  await expect(firstMove).toBeVisible();
+  await firstMove.hover();
+
+  const preview = page.locator("[data-position-preview]");
+  await expect(preview).toHaveAttribute("data-visible", "true");
+  const firstFrom = await firstMove.getAttribute("data-from");
+  const firstTo = await firstMove.getAttribute("data-to");
+  if (firstFrom === null || firstTo === null) {
+    throw new Error("Expected the evaluation move to expose its squares");
+  }
+  await expect(preview.locator(`[data-square="${firstFrom}"]`)).not.toHaveAttribute("data-piece");
+  await expect(preview.locator(`[data-square="${firstTo}"]`)).toHaveAttribute(
+    "data-piece",
+    /^[KQRBNP]$/,
+  );
+
+  const previewBox = await preview.boundingBox();
+  const evaluationLinesBox = await evaluationLines.boundingBox();
+  if (previewBox === null || evaluationLinesBox === null) {
+    throw new Error("Expected the evaluation lines and their preview to have visible boxes");
+  }
+  expect(previewBox.width).toBe(300);
+  expect(previewBox.height).toBe(300);
+  expect(previewBox.y).toBeCloseTo(evaluationLinesBox.y + evaluationLinesBox.height + 8, 0);
+  expect(previewBox.x + previewBox.width / 2).toBeCloseTo(
+    evaluationLinesBox.x + evaluationLinesBox.width / 2,
+    0,
+  );
+
+  await preview.evaluate((element) => {
+    element.setAttribute("data-preview-instance", "original");
+  });
+  const evaluationLineBox = await evaluationLine.boundingBox();
+  if (evaluationLineBox === null) {
+    throw new Error("Expected the evaluation line to have a visible box");
+  }
+  await page.mouse.move(
+    evaluationLinesBox.x + evaluationLinesBox.width - 4,
+    evaluationLineBox.y + evaluationLineBox.height / 2,
+  );
+  await expect(preview).toHaveAttribute("data-visible", "true");
+
+  const secondMove = evaluationMoves.nth(1);
+  await expect(secondMove).toBeVisible();
+  const secondFrom = await secondMove.getAttribute("data-from");
+  const secondTo = await secondMove.getAttribute("data-to");
+  if (secondFrom === null || secondTo === null) {
+    throw new Error("Expected the second evaluation move to expose its squares");
+  }
+  await secondMove.hover();
+  await expect(preview).toHaveAttribute("data-preview-instance", "original");
+  const secondPreviewBox = await preview.boundingBox();
+  expect(secondPreviewBox).toEqual(previewBox);
+  await expect(preview.locator(`[data-square="${secondFrom}"]`)).not.toHaveAttribute("data-piece");
+  await expect(preview.locator(`[data-square="${secondTo}"]`)).toHaveAttribute(
+    "data-piece",
+    /^[kqrbnp]$/,
+  );
+
+  await preview.locator(`[data-square="${firstTo}"]`).dispatchEvent("pointerdown", {
+    button: 2,
+    buttons: 2,
+  });
+  await preview.locator(`[data-square="${secondTo}"]`).dispatchEvent("pointermove", {
+    buttons: 2,
+  });
+  await expect(preview.locator('[data-arrow-preview="true"]')).toHaveCount(0);
+
+  await page.locator('[aria-label="Move e4"]').hover();
+  await expect(preview).toHaveAttribute("data-visible", "false");
+});
+
 async function expectDrawerLayout(page: Page) {
   const trainLink = page.getByRole("link", { name: "Train" });
   const drawerButton = page.getByRole("button", { name: "Open navigation" });

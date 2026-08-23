@@ -7,6 +7,7 @@ export type {
   Chapter,
   Context,
   Eval,
+  EvalLineMove,
   EvalMove,
   FenPiece,
   HighlightKind,

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { afterEach, expect, test } from "vitest";
 import { createMemo, createSignal, For, flush } from "solid-js";
-import type { Eval } from "@/lib/AppState";
+import type { Eval, EvalLineMove } from "@/lib/AppState";
 import { getEvaluationLineIndexes } from "./ComputerEvaluation";
 import { EvaluationLineSlot } from "./EvalLine";
 
@@ -13,6 +13,13 @@ function evaluation(value: number): Eval {
     depth: 20,
     score: { type: "cp", value },
     moves: [],
+  };
+}
+
+function evaluationWithMove(move: EvalLineMove): Eval {
+  return {
+    ...evaluation(12),
+    moves: [move],
   };
 }
 
@@ -48,4 +55,46 @@ test("keeps evaluation line frame mounted when the evaluation updates", () => {
   const updatedRow = screen.getByText("0.2").parentElement;
   expect(updatedRow).toBe(row);
   expect(updatedRow?.nextElementSibling).toBe(divider);
+});
+
+test("keeps evaluation move tokens mounted when a deeper line replaces their moves", () => {
+  function TestComponent() {
+    const [currentEvaluation, setCurrentEvaluation] = createSignal(
+      evaluationWithMove({
+        from: "e2",
+        to: "e4",
+        promotion: null,
+        san: "e4",
+        fen: "fen-after-e4",
+      }),
+    );
+
+    return (
+      <>
+        <button
+          onClick={() =>
+            setCurrentEvaluation(
+              evaluationWithMove({
+                from: "d2",
+                to: "d4",
+                promotion: null,
+                san: "d4",
+                fen: "fen-after-d4",
+              }),
+            )
+          }
+        >
+          Update move
+        </button>
+        <EvaluationLineSlot evaluation={currentEvaluation()} onAddEvalMoves={() => undefined} />
+      </>
+    );
+  }
+
+  render(() => <TestComponent />);
+  const moveToken = screen.getByText("e4");
+
+  flush(() => fireEvent.click(screen.getByText("Update move")));
+
+  expect(screen.getByText("d4")).toBe(moveToken);
 });

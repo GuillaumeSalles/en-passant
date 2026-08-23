@@ -307,6 +307,8 @@ export function GameViewer(props: { gameId: string }) {
               onDrawArrow={noOpArrow}
               onHighlightSquare={noOpHighlight}
               canDrag={false}
+              readOnly={false}
+              animateIntro
               pieceToAnimate={animation()}
               annotations={{}}
             />

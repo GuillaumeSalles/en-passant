@@ -198,6 +198,8 @@ export function Repertoire(props: {
           onDrawArrow={onDrawArrow}
           onHighlightSquare={onHighlightSquare}
           canDrag={true}
+          readOnly={false}
+          animateIntro
           pieceToAnimate={animation()}
           annotations={nagAnnotations()}
         />

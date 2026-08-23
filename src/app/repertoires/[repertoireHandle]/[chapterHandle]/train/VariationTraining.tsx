@@ -125,6 +125,8 @@ export function VariationTraining(props: {
                 boardOrientation={flow.orientation()}
                 position={flow.currentFen()}
                 canDrag={flow.canDrag()}
+                readOnly={false}
+                animateIntro
                 onPieceDrop={flow.onPieceDrop}
                 pieceToAnimate={flow.animation()}
                 arrows={{}}

@@ -22,6 +22,7 @@ function engineEvalToEval(evaluation: EngineEval, fen: string): Eval {
 
       return {
         from,
+        fen: move.fen,
         to,
         promotion,
         san: move.san,

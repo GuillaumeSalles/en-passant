@@ -97,6 +97,8 @@ export function LineReader(props: LineReaderProps) {
             boardOrientation={orientation()}
             position={currentFen()}
             canDrag={false}
+            readOnly={false}
+            animateIntro
             onPieceDrop={() => {}}
             pieceToAnimate={animation()}
             arrows={highlights().arrows}

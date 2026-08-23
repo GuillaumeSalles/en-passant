@@ -472,6 +472,9 @@ test("ignores stale engine evaluations", () => {
   expect(state.evaluations).toHaveLength(1);
   expect(state.evaluations[0]?.score).toEqual({ type: "cp", value: -34 });
   expect(state.evaluations[0]?.moves[0]?.san).toBe("e5");
+  expect(state.evaluations[0]?.moves[0]?.fen).toBe(
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2",
+  );
 });
 
 test("spacebar plays the best move in chapter editing", () => {

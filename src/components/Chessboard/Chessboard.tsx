@@ -14,7 +14,7 @@ import {
   parseFen,
   squares,
 } from "./utils";
-import { createSignal, createMemo, createEffect, onSettled, For, untrack } from "solid-js";
+import { createSignal, createMemo, createEffect, onSettled, For, Show, untrack } from "solid-js";
 import styles from "./Chessboard.module.css";
 import { DraggedHoverSquare } from "./DraggedHoverSquare";
 import { DraggedPiece } from "./DraggedPiece";
@@ -40,6 +40,8 @@ type ChessboardProps = {
   canDrag: boolean;
   pieceToAnimate?: BoardAnimation | null;
   annotations: { [square: string]: MoveAnnotationData[] };
+  readOnly: boolean;
+  animateIntro: boolean;
   onIntroComplete?: () => void;
   onAnimationSettled?: (animationId: number, status: "finished" | "cancelled") => void;
 };
@@ -103,10 +105,12 @@ function isDragButtonPressed(event: Pick<PointerEvent, "buttons">, data: Draggin
 
 export function Chessboard(props: ChessboardProps) {
   const canDrag = () => props.canDrag;
+  const readOnly = untrack(() => props.readOnly);
+  const animateIntro = untrack(() => props.animateIntro);
   const [draggingData, setDraggingData] = createSignal<DraggingData | null>(null);
   const [activeAnimation, setActiveAnimation] = createSignal<BoardAnimation | null>(null);
   let currentActiveAnimation: BoardAnimation | null = null;
-  const [introActive, setIntroActive] = createSignal(true);
+  const [introActive, setIntroActive] = createSignal(animateIntro);
   const [useMeasuredBoardSize, setUseMeasuredBoardSize] = createSignal(false);
   const [boardSize, setBoardSize] = createSignal<number | null>(null);
   let boardFrameRef: HTMLDivElement | undefined;
@@ -326,6 +330,8 @@ export function Chessboard(props: ChessboardProps) {
   };
 
   const onPointerDown = (event: PointerEvent, sourceSquare: string, piece?: FenPiece) => {
+    if (readOnly) return;
+
     if (event.button === 2) {
       setDraggingData({
         type: "arrow",
@@ -360,6 +366,8 @@ export function Chessboard(props: ChessboardProps) {
   };
 
   onSettled(() => {
+    if (readOnly) return;
+
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("blur", onWindowBlur);
     window.addEventListener("pointerup", onWindowPointerUp);
@@ -389,6 +397,11 @@ export function Chessboard(props: ChessboardProps) {
   );
 
   onSettled(() => {
+    if (!animateIntro) {
+      untrack(() => props.onIntroComplete?.());
+      return;
+    }
+
     const introAnimations = boardFrameRef?.getAnimations({ subtree: true }) ?? [];
     let cancelled = false;
 
@@ -436,35 +449,37 @@ export function Chessboard(props: ChessboardProps) {
           onAnimationEnd={onBoardAnimationSettled}
           onAnimationCancel={onBoardAnimationSettled}
         >
-          <svg
-            class={styles["IntroGrid"]}
-            aria-hidden="true"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            <For each={constructionGridLines}>
-              {(line) => (
-                <>
-                  <line
-                    class={`${styles["IntroGridLine"]} ${styles["IntroGridLineVertical"]}`}
-                    x1={line.position}
-                    y1="0"
-                    x2={line.position}
-                    y2="100"
-                    style={{ "--grid-delay": line.delay }}
-                  />
-                  <line
-                    class={`${styles["IntroGridLine"]} ${styles["IntroGridLineHorizontal"]}`}
-                    x1="0"
-                    y1={line.position}
-                    x2="100"
-                    y2={line.position}
-                    style={{ "--grid-delay": line.delay }}
-                  />
-                </>
-              )}
-            </For>
-          </svg>
+          <Show when={introActive()}>
+            <svg
+              class={styles["IntroGrid"]}
+              aria-hidden="true"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+            >
+              <For each={constructionGridLines}>
+                {(line) => (
+                  <>
+                    <line
+                      class={`${styles["IntroGridLine"]} ${styles["IntroGridLineVertical"]}`}
+                      x1={line.position}
+                      y1="0"
+                      x2={line.position}
+                      y2="100"
+                      style={{ "--grid-delay": line.delay }}
+                    />
+                    <line
+                      class={`${styles["IntroGridLine"]} ${styles["IntroGridLineHorizontal"]}`}
+                      x1="0"
+                      y1={line.position}
+                      x2="100"
+                      y2={line.position}
+                      style={{ "--grid-delay": line.delay }}
+                    />
+                  </>
+                )}
+              </For>
+            </svg>
+          </Show>
           <For each={squareItems()}>
             {(item) => (
               <Square

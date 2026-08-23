@@ -241,6 +241,10 @@ export type EvalMove = {
   san: string;
 };
 
+export type EvalLineMove = EvalMove & {
+  fen: string;
+};
+
 export type NormalizedEvalScore =
   | {
       type: "cp";
@@ -262,5 +266,5 @@ export type Eval = {
   index: number;
   depth: number;
   score: NormalizedEvalScore;
-  moves: EvalMove[];
+  moves: EvalLineMove[];
 };
