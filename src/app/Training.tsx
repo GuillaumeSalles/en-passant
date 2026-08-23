@@ -200,7 +200,7 @@ export function Training() {
         navigate(trainingQueuePath(), { replace: true });
         return;
       }
-      if (reviewQueue === null || reviewQueue.total < reviewQueue.reviewed + dueCount) {
+      if (reviewQueue === null || reviewQueue.total < reviewQueue.results.length + dueCount) {
         onEnsureTrainingQueueReview(dueCount);
       }
       navigate(

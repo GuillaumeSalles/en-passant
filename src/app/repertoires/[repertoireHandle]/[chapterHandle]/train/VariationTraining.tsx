@@ -141,7 +141,6 @@ export function VariationTraining(props: {
               <>
                 <TrainingSessionStats
                   result={flow.trainingSessionStats()}
-                  reviewQueue={state.training.reviewQueue}
                   isLineComplete={flow.isLineComplete()}
                 />
                 <ProgressBar progress={flow.progress()} />
@@ -234,7 +233,6 @@ export default function VariationTrainingRoute() {
 
 function TrainingSessionStats(props: {
   result: TrainingSessionSummary | null;
-  reviewQueue: { clean: number; reviewed: number; total: number } | null;
   isLineComplete: boolean;
 }) {
   return (
@@ -243,25 +241,10 @@ function TrainingSessionStats(props: {
         <div class="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] text-center text-sm">
           <StatCell
             label="Lines"
-            value={
-              props.reviewQueue === null
-                ? lineCounter(result().tried, result().total, props.isLineComplete)
-                : lineCounter(
-                    props.reviewQueue.reviewed,
-                    props.reviewQueue.total,
-                    props.isLineComplete,
-                  )
-            }
+            value={lineCounter(result().tried, result().total, props.isLineComplete)}
           />
           <VerticalDashedDivider />
-          <StatCell
-            label="Clean"
-            value={
-              props.reviewQueue === null
-                ? cleanCounter(result().clean, result().total)
-                : cleanCounter(props.reviewQueue.clean, props.reviewQueue.total)
-            }
-          />
+          <StatCell label="Clean" value={cleanCounter(result().clean, result().total)} />
           <VerticalDashedDivider />
           <StatCell label="Mistakes" value={result().mistakes.toString()} />
           <VerticalDashedDivider />

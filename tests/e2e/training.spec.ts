@@ -277,14 +277,24 @@ test("reviews every due line across chapters and stops before future lines", asy
   );
   await expect(page.getByText("1/2", { exact: true })).toBeVisible();
   await pausePacingClock(page);
+  await dragPiece(page, "e2", "e3");
+  await advanceTrainingPacing(page, "showing-feedback", 1000);
+  await expect(page.locator('[data-training-stat="mistakes"]')).toContainText("1");
+  await expect(page.locator('[data-training-stat="accuracy"]')).toContainText("0%");
   await dragPiece(page, "e2", "e4");
   await advanceTrainingPacing(page, "waiting-for-response", 500);
+  for (let replay = 0; replay < 2; replay += 1) {
+    await advanceTrainingPacing(page, "preparing-replay", 500);
+    await dragPiece(page, "e2", "e4");
+  }
   await advanceTrainingPacing(page, "line-boundary", 1000);
 
   await expect(page).toHaveURL(
     /\/app\/white-repertoire\/queens-pawn\/v1-[A-Za-z0-9_-]+\/train\?review=due$/,
   );
   await expect(page.getByText("2/2", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-training-stat="mistakes"]')).toContainText("1");
+  await expect(page.locator('[data-training-stat="accuracy"]')).toContainText("50%");
 
   await page.locator('a[href="/app/training"]').click();
   await expect(page.getByText("1 due · 3 scheduled")).toBeVisible();

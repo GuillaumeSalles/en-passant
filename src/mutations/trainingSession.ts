@@ -22,7 +22,8 @@ export function startTrainingQueueReview(
 ): void {
   state.set("training", {
     ...state.training,
-    reviewQueue: { clean: 0, reviewed: 0, total },
+    session: null,
+    reviewQueue: { results: [], total },
   });
 }
 
@@ -32,25 +33,28 @@ export function ensureTrainingQueueReview(
   remaining: number,
 ): void {
   const queue = state.training.reviewQueue;
-  const total = queue === null ? remaining : Math.max(queue.total, queue.reviewed + remaining);
+  const total =
+    queue === null ? remaining : Math.max(queue.total, queue.results.length + remaining);
   if (queue !== null && queue.total === total) return;
   state.set("training", {
     ...state.training,
-    reviewQueue: { clean: queue?.clean ?? 0, reviewed: queue?.reviewed ?? 0, total },
+    session: queue === null ? null : state.training.session,
+    reviewQueue: { results: queue?.results ?? [], total },
   });
 }
 
 export function completeTrainingQueueReviewLine(state: StoreState<AppState>, _ctx: Context): void {
   const queue = state.training.reviewQueue;
-  if (queue === null || queue.reviewed >= queue.total) return;
+  if (queue === null || queue.results.length >= queue.total) return;
   const session = state.training.session;
   const activeResult = session?.results.find((result) => result.lineId === session.activeLineId);
+  if (activeResult === undefined) return;
   state.set("training", {
     ...state.training,
+    session: null,
     reviewQueue: {
       ...queue,
-      clean: queue.clean + (activeResult?.mistakeCount === 0 ? 1 : 0),
-      reviewed: queue.reviewed + 1,
+      results: [...queue.results, activeResult],
     },
   });
 }

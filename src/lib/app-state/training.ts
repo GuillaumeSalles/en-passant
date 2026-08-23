@@ -86,22 +86,24 @@ export function selectTrainingSessionStats(
   _ctx: Context,
 ): TrainingSessionSummary | null {
   const session = state.training.session;
-  if (session === null) return null;
+  const reviewQueue = state.training.reviewQueue;
+  if (session === null && reviewQueue === null) return null;
 
-  const tried = session.results.length;
-  const clean = session.results.filter((result) => result.mistakeCount === 0).length;
+  const results = [...(reviewQueue?.results ?? []), ...(session?.results ?? [])];
+  const tried = results.length;
+  const clean = results.filter((result) => result.mistakeCount === 0).length;
   const mistakes =
-    session.results.reduce((total, result) => total + result.mistakeCount, 0) +
-    session.currentMistakeCount;
+    results.reduce((total, result) => total + result.mistakeCount, 0) +
+    (session?.currentMistakeCount ?? 0);
   const moves =
-    session.results.reduce((total, result) => total + result.moveCount, 0) +
-    session.currentMoveCount;
+    results.reduce((total, result) => total + result.moveCount, 0) +
+    (session?.currentMoveCount ?? 0);
   return {
     accuracy: moves === 0 ? null : (moves - mistakes) / moves,
     tried,
     clean,
     mistakes,
     moves,
-    total: session.lineIds.length,
+    total: reviewQueue?.total ?? session?.lineIds.length ?? 0,
   };
 }
