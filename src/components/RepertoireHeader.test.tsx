@@ -113,6 +113,12 @@ test("places the secondary merge action before Train and merges pasted PGN", asy
   expect(screen.getByRole("button", { name: "Cancel" })).not.toBeNull();
   const pgn = "1. e4 c5 2. Nf3 *";
   fireEvent.input(screen.getByRole("textbox"), { target: { value: pgn } });
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Merge PGN" })).toBeNull());
+
+  fireEvent.click(mergeButton);
+  expect(((await screen.findByRole("textbox")) as HTMLTextAreaElement).value).toBe("");
+  fireEvent.input(screen.getByRole("textbox"), { target: { value: pgn } });
   await Promise.resolve();
   fireEvent.click(screen.getByRole("button", { name: "Merge" }));
 

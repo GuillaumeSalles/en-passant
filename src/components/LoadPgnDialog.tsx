@@ -48,7 +48,10 @@ export function LoadPGNDialog(props: {
     } else {
       controlledState.onOpenChange(open);
     }
-    if (!open) setError(null);
+    if (!open) {
+      setPgn("");
+      setError(null);
+    }
   }
 
   function focusPgnTextarea(element: HTMLTextAreaElement) {
