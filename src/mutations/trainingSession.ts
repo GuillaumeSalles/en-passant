@@ -3,6 +3,8 @@ import {
   Context,
   emptyNormalizedPgn,
   EvalMove,
+  getChapterPgn,
+  getTrainingLinePgn,
   moveFromEvalMove,
   nextTrainingReview,
   TrainingSessionDraft,
@@ -57,6 +59,24 @@ export function completeTrainingQueueReviewLine(state: StoreState<AppState>, _ct
       results: [...queue.results, activeResult],
     },
   });
+}
+
+export function revealCompletedTrainingLine(
+  state: StoreState<AppState>,
+  ctx: Context,
+  lineId: string,
+): void {
+  if (state.training.session?.activeLineId !== lineId) return;
+  const chapterPgn = getChapterPgn(state, ctx);
+  if (chapterPgn === null) return;
+  const linePgn = getTrainingLinePgn(chapterPgn, lineId);
+  if (linePgn === null) return;
+  const terminalMove = Object.values(linePgn.moves).find((move) => move.next.length === 0);
+  if (terminalMove === undefined) return;
+
+  state.set("training", { ...state.training, variation: linePgn });
+  state.set("selectedMoveId", terminalMove.id);
+  state.set("preselectedVariation", null);
 }
 
 export function clearTrainingQueueReview(state: StoreState<AppState>, _ctx: Context): void {

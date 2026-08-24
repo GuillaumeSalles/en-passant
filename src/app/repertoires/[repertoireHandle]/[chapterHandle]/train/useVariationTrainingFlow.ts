@@ -35,6 +35,7 @@ import {
   markTrainingCorrectMove,
   markTrainingMistake,
   prepareTrainingReplayMove,
+  revealCompletedTrainingLine,
   startTrainingLine,
 } from "@/mutations/trainingSession";
 import { trainingLineScheduleKey } from "@/mutations/learningSession";
@@ -140,6 +141,7 @@ export function useVariationTrainingFlow(
   const onMarkTrainingCorrectMove = useMutation(markTrainingCorrectMove);
   const onMarkTrainingMistake = useMutation(markTrainingMistake);
   const onPrepareTrainingReplayMove = useMutation(prepareTrainingReplayMove);
+  const onRevealCompletedTrainingLine = useMutation(revealCompletedTrainingLine);
   const onCompleteTrainingLine = useMutation(completeTrainingLine, { context: true });
   const onCompleteTrainingReplayMove = useMutation(completeTrainingReplayMove, {
     context: true,
@@ -276,6 +278,7 @@ export function useVariationTrainingFlow(
     }
     dispatch({ type: "LINE_BOUNDARY_ELAPSED", finished, orientation: orientation() });
     if (finished) {
+      onRevealCompletedTrainingLine(props.lineId);
       options.onLineComplete?.();
     }
   }

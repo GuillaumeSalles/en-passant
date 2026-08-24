@@ -8,7 +8,12 @@ import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Button } from "@/components/ui/button";
-import { findOpening, type TrainingSessionSummary } from "@/lib/AppState";
+import {
+  findOpening,
+  selectHighlights,
+  selectNagAnnotations,
+  type TrainingSessionSummary,
+} from "@/lib/AppState";
 import {
   chapterTrainingLineReviewPath,
   repertoirePath,
@@ -20,6 +25,7 @@ import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import { useLoadPgn } from "@/lib/useLoadPgn";
 import { useMutation } from "@/lib/useMutation";
 import { useOpeningIndex } from "@/lib/useOpeningIndex";
+import { useSelector } from "@/lib/useSelector";
 import { createEffect, createMemo, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { useState } from "@/app/AppStateProvider";
@@ -64,6 +70,8 @@ export function VariationTraining(props: {
   );
 
   const flow = useVariationTrainingFlow(props);
+  const completedLineHighlights = useSelector(selectHighlights);
+  const completedLineAnnotations = useSelector(selectNagAnnotations);
   const isReviewingMultipleLines = () => isReviewingQueue() || isReviewingChapter();
   const hasNextReviewLine = () => {
     if (isReviewingQueue()) {
@@ -130,13 +138,15 @@ export function VariationTraining(props: {
                 animateIntro
                 onPieceDrop={flow.onPieceDrop}
                 pieceToAnimate={flow.animation()}
-                arrows={{}}
+                arrows={flow.isLineComplete() ? completedLineHighlights().arrows : {}}
                 squareHighlights={squareHighlights()}
                 onHighlightSquare={() => {}}
                 onDrawArrow={() => {}}
                 onIntroComplete={flow.onIntroComplete}
                 onAnimationSettled={flow.onAnimationSettled}
-                annotations={flow.annotations()}
+                annotations={
+                  flow.isLineComplete() ? completedLineAnnotations() : flow.annotations()
+                }
               />
             }
             evalBar={null}
@@ -210,7 +220,9 @@ export function VariationTraining(props: {
                   animationKey="variation-training-moves"
                   direction="right-to-left"
                 />
-                <MovesTree readOnly={false} />
+                <Show when={flow.isLineComplete()} fallback={<MovesTree readOnly={false} />}>
+                  <MovesTree readOnly />
+                </Show>
                 <PgnExplorerToolbar />
               </>
             }

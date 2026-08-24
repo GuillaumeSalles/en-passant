@@ -978,6 +978,30 @@ test("highlights the last move during training", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
+test("reveals line comments and annotations when training completes", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await seedRepertoire(page, "1. e4 $1 {King pawn [%csl Rd4] [%cal Yb1c3]} *");
+  await openFirstTrainingLine(page);
+
+  await expect(page.getByText("King pawn", { exact: true })).toHaveCount(0);
+  await dragPiece(page, "e2", "e4");
+
+  await expect(page.getByText("Good job!")).toBeVisible();
+  await expect(page.getByText("King pawn", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-arrow="b1c3"]')).toHaveAttribute("data-arrow-kind", "normal");
+  await expect(page.locator('[data-square="highlight-square-d4"]')).toHaveAttribute(
+    "data-highlight-kind",
+    "normal",
+  );
+  await expect(page.locator('[data-annotation="nag"][data-annotation-square="e4"]')).toHaveText(
+    "!",
+  );
+  await page.locator('[aria-label="Move e4"]').dblclick();
+  await expect(page.getByLabel("Move comment")).toHaveCount(0);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("black repertoire learning waits for the board intro before the first white move", async ({
   page,
 }) => {

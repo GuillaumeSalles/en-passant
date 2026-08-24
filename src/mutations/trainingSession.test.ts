@@ -11,6 +11,7 @@ import {
   markTrainingCorrectMove,
   markTrainingMistake,
   prepareTrainingReplayMove,
+  revealCompletedTrainingLine,
   resetTrainingSession,
   startTrainingQueueReview,
   startTrainingLine,
@@ -18,7 +19,7 @@ import {
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 import { trainingLineScheduleKey, markLineLearned } from "@/mutations/learningSession";
-import { selectTrainingSessionStats } from "@/lib/AppState";
+import { getTrainingLines, normalizePgn, selectTrainingSessionStats } from "@/lib/AppState";
 
 afterEach(() => vi.useRealTimers());
 
@@ -46,6 +47,40 @@ function scheduledLineKey(context: ReturnType<typeof createTrainingContext>): st
 }
 
 describe("training session", () => {
+  test("reveals the canonical annotated line after training completes", () => {
+    const context = createTrainingContext();
+    const chapterPgn = normalizePgn(
+      "1. e4 $1 {King pawn [%csl Rd4] [%cal Yb1c3]} e5 {Black reply} *",
+    );
+    const line = getTrainingLines(chapterPgn, "white")[0];
+    if (line === undefined) throw new Error("Expected a training line");
+    context.state.set("pgns", {
+      [chapter.pgnId]: { status: "success", data: chapterPgn },
+    });
+    startTrainingLine(context.state, context.route, {
+      lineIds: [line.id],
+      lineId: line.id,
+      variationIndex: 0,
+    });
+
+    revealCompletedTrainingLine(context.state, context.route, line.id);
+
+    expect(context.state.training.variation.moves[line.terminalMoveId]).toMatchObject({
+      commentAfter: "Black reply",
+    });
+    expect(Object.values(context.state.training.variation.moves)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          san: "e4",
+          nags: [1],
+          commentAfter: "King pawn",
+          metadata: ["[%csl Rd4]", "[%cal Yb1c3]"],
+        }),
+      ]),
+    );
+    expect(context.state.selectedMoveId).toBe(line.terminalMoveId);
+  });
+
   test("keeps queue progress in memory and clears it when review stops", () => {
     const context = createTrainingContext();
 
