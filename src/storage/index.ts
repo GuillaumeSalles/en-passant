@@ -15,6 +15,13 @@ import {
   subscribeToDatabaseClearResults,
   type StorageRecordRef,
 } from "./recordChanges";
+import {
+  getAllRecords,
+  getRecord,
+  putRecord,
+  runTransaction,
+  waitForTransaction,
+} from "./indexedDb";
 
 const DB_NAME = "en-passant";
 const DB_VERSION = 4;
@@ -222,35 +229,6 @@ function toPgnMutationChange(pgn: StoredPgn): PgnMutationChange {
   };
 }
 
-function transactionDone(transaction: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    transaction.oncomplete = () => {
-      resolve();
-    };
-    transaction.onerror = () => {
-      reject(transaction.error);
-    };
-    transaction.onabort = () => {
-      reject(transaction.error);
-    };
-  });
-}
-
-async function waitForTransaction<T>(
-  transaction: IDBTransaction,
-  requests: Promise<T>,
-): Promise<T> {
-  const done = transactionDone(transaction);
-  try {
-    const result = await requests;
-    await done;
-    return result;
-  } catch (error) {
-    await done.catch(() => undefined);
-    throw error;
-  }
-}
-
 /**
  * Initializes the IndexedDB database and ensures the object store exists
  * @param dbName - Optional database name (defaults to 'chess-app')
@@ -305,42 +283,6 @@ async function connect(
   });
 }
 
-function get<T>(store: IDBObjectStore, key: string): Promise<T | undefined> {
-  return new Promise((resolve, reject) => {
-    const request = store.get(key);
-    request.onerror = () => {
-      reject(request.error);
-    };
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-  });
-}
-
-function getAll<T>(store: IDBObjectStore): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const request = store.getAll();
-    request.onerror = () => {
-      reject(request.error);
-    };
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-  });
-}
-
-function put<T>(store: IDBObjectStore, key: string, value: T): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const request = store.put(value, key);
-    request.onerror = () => {
-      reject(request.error);
-    };
-    request.onsuccess = () => {
-      resolve();
-    };
-  });
-}
-
 export async function savePgnMutation(
   id: string,
   pgn: string,
@@ -351,15 +293,13 @@ export async function savePgnMutation(
     throw new Error("PGN creation must use a chapter creation operation");
   }
   const db = await init();
-  const readTransaction = db.transaction([PGNS_STORE_NAME], "readonly");
-  const existing = await get<StoredPgn>(readTransaction.objectStore(PGNS_STORE_NAME), id);
-  if (existing === undefined || existing.deletedAt != null) {
-    throw new Error("Cannot mutate a missing PGN");
-  }
-  const transaction = db.transaction([PGNS_STORE_NAME], "readwrite");
-  await waitForTransaction(
-    transaction,
-    put(transaction.objectStore(PGNS_STORE_NAME), id, {
+  await runTransaction(db, PGNS_STORE_NAME, "readwrite", async (transaction) => {
+    const store = transaction.objectStore(PGNS_STORE_NAME);
+    const existing = await getRecord<StoredPgn>(store, id);
+    if (existing === undefined || existing.deletedAt != null) {
+      throw new Error("Cannot mutate a missing PGN");
+    }
+    await putRecord(store, id, {
       id,
       pgn,
       revision: existing.revision,
@@ -368,8 +308,8 @@ export async function savePgnMutation(
       metadataDirty: isPgnMetadataDirty(existing),
       updatedAt: nowIso(),
       deletedAt: null,
-    } satisfies StoredPgn),
-  );
+    } satisfies StoredPgn);
+  });
   publishRecordChanges([{ kind: "pgn", id }]);
 }
 
@@ -392,7 +332,7 @@ export async function createRepertoireAndChapter(
   await waitForTransaction(
     transaction,
     Promise.all([
-      put(
+      putRecord(
         repertoireStore,
         repertoire.id,
         withLocalChange(
@@ -405,7 +345,7 @@ export async function createRepertoireAndChapter(
           updatedAt,
         ),
       ),
-      put(
+      putRecord(
         chapterStore,
         chapter.id,
         withLocalChange(
@@ -419,7 +359,7 @@ export async function createRepertoireAndChapter(
           updatedAt,
         ),
       ),
-      put(pgnStore, chapter.pgnId, {
+      putRecord(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
         revision: null,
@@ -443,96 +383,100 @@ export async function getPgn(pgnId: string): Promise<string | undefined> {
   const transaction = db.transaction([PGNS_STORE_NAME], "readonly");
   const store = transaction.objectStore(PGNS_STORE_NAME);
 
-  const value = await get<StoredPgn>(store, pgnId);
+  const value = await getRecord<StoredPgn>(store, pgnId);
   return value?.deletedAt == null ? value?.pgn : undefined;
 }
 
 export async function cacheRemotePgn(pgnId: string, revision: string, pgn: string): Promise<void> {
   const db = await init();
-  const readTransaction = db.transaction([PGNS_STORE_NAME], "readonly");
-  const existing = await get<StoredPgn>(readTransaction.objectStore(PGNS_STORE_NAME), pgnId);
-  if (
-    existing === undefined ||
-    existing.deletedAt != null ||
-    existing.revision !== revision ||
-    isPgnDirty(existing)
-  ) {
-    return;
-  }
+  const cached = await runTransaction(db, PGNS_STORE_NAME, "readwrite", async (transaction) => {
+    const store = transaction.objectStore(PGNS_STORE_NAME);
+    const existing = await getRecord<StoredPgn>(store, pgnId);
+    if (
+      existing === undefined ||
+      existing.deletedAt != null ||
+      existing.revision !== revision ||
+      isPgnDirty(existing)
+    ) {
+      return false;
+    }
 
-  const writeTransaction = db.transaction([PGNS_STORE_NAME], "readwrite");
-  await waitForTransaction(
-    writeTransaction,
-    put(writeTransaction.objectStore(PGNS_STORE_NAME), pgnId, {
+    await putRecord(store, pgnId, {
       ...existing,
       pgn,
-    } satisfies StoredPgn),
-  );
-  publishRecordChanges([{ kind: "pgn", id: pgnId }]);
+    } satisfies StoredPgn);
+    return true;
+  });
+  if (cached) publishRecordChanges([{ kind: "pgn", id: pgnId }]);
 }
 
 export async function deleteChapter(chapterId: string, pgnId: string): Promise<void> {
   const db = await init();
-  const readTransaction = db.transaction([CHAPTERS_STORE_NAME, PGNS_STORE_NAME], "readonly");
-  const [chapter, pgn] = await Promise.all([
-    get<StoredChapter>(readTransaction.objectStore(CHAPTERS_STORE_NAME), chapterId),
-    get<StoredPgn>(readTransaction.objectStore(PGNS_STORE_NAME), pgnId),
-  ]);
-  if (chapter === undefined && pgn === undefined) {
-    return;
-  }
-
-  const writeTransaction = db.transaction([CHAPTERS_STORE_NAME, PGNS_STORE_NAME], "readwrite");
-  const chapterStore = writeTransaction.objectStore(CHAPTERS_STORE_NAME);
-  const pgnStore = writeTransaction.objectStore(PGNS_STORE_NAME);
-  const deletedAt = nowIso();
-  const requests: Promise<void>[] = [];
-  if (chapter !== undefined) {
-    requests.push(
-      put(chapterStore, chapterId, {
-        ...chapter,
-        updatedAt: deletedAt,
-        deletedAt,
-        dirty: true,
-      }),
-    );
-  }
-  if (pgn !== undefined) {
-    requests.push(
-      put(pgnStore, pgnId, {
-        ...pgn,
-        updatedAt: deletedAt,
-        deletedAt,
-        metadataDirty: true,
-      } satisfies StoredPgn),
-    );
-  }
-  await waitForTransaction(writeTransaction, Promise.all(requests));
-  publishRecordChanges([
-    ...(chapter === undefined ? [] : [{ kind: "chapter", id: chapterId } as const]),
-    ...(pgn === undefined ? [] : [{ kind: "pgn", id: pgnId } as const]),
-  ]);
+  const changedRecords = await runTransaction(
+    db,
+    [CHAPTERS_STORE_NAME, PGNS_STORE_NAME],
+    "readwrite",
+    async (transaction): Promise<StorageRecordRef[]> => {
+      const chapterStore = transaction.objectStore(CHAPTERS_STORE_NAME);
+      const pgnStore = transaction.objectStore(PGNS_STORE_NAME);
+      const [chapter, pgn] = await Promise.all([
+        getRecord<StoredChapter>(chapterStore, chapterId),
+        getRecord<StoredPgn>(pgnStore, pgnId),
+      ]);
+      const deletedAt = nowIso();
+      const requests: Promise<void>[] = [];
+      if (chapter !== undefined) {
+        requests.push(
+          putRecord(chapterStore, chapterId, {
+            ...chapter,
+            updatedAt: deletedAt,
+            deletedAt,
+            dirty: true,
+          }),
+        );
+      }
+      if (pgn !== undefined) {
+        requests.push(
+          putRecord(pgnStore, pgnId, {
+            ...pgn,
+            updatedAt: deletedAt,
+            deletedAt,
+            metadataDirty: true,
+          } satisfies StoredPgn),
+        );
+      }
+      await Promise.all(requests);
+      return [
+        ...(chapter === undefined ? [] : [{ kind: "chapter", id: chapterId } as const]),
+        ...(pgn === undefined ? [] : [{ kind: "pgn", id: pgnId } as const]),
+      ];
+    },
+  );
+  publishRecordChanges(changedRecords);
 }
 
 export async function deleteRepertoire(repertoireId: string): Promise<void> {
   const db = await init();
-  const readTransaction = db.transaction([REPERTOIRE_STORE_NAME], "readonly");
-  const repertoire = await get<StoredRepertoire>(
-    readTransaction.objectStore(REPERTOIRE_STORE_NAME),
-    repertoireId,
-  );
-  if (repertoire === undefined) {
-    return;
-  }
+  const deleted = await runTransaction(
+    db,
+    REPERTOIRE_STORE_NAME,
+    "readwrite",
+    async (transaction) => {
+      const store = transaction.objectStore(REPERTOIRE_STORE_NAME);
+      const repertoire = await getRecord<StoredRepertoire>(store, repertoireId);
+      if (repertoire === undefined) return false;
 
-  const writeTransaction = db.transaction([REPERTOIRE_STORE_NAME], "readwrite");
-  const store = writeTransaction.objectStore(REPERTOIRE_STORE_NAME);
-  const deletedAt = nowIso();
-  await waitForTransaction(
-    writeTransaction,
-    put(store, repertoireId, { ...repertoire, updatedAt: deletedAt, deletedAt, dirty: true }),
+      const deletedAt = nowIso();
+      await putRecord(store, repertoireId, {
+        ...repertoire,
+        updatedAt: deletedAt,
+        deletedAt,
+        dirty: true,
+      });
+      return true;
+    },
   );
-  publishRecordChanges([{ kind: "repertoire", id: repertoireId }]);
+  if (deleted) publishRecordChanges([{ kind: "repertoire", id: repertoireId }]);
 }
 
 export async function updateRepertoire(repertoire: NewSerializedRepertoire): Promise<void> {
@@ -541,7 +485,7 @@ export async function updateRepertoire(repertoire: NewSerializedRepertoire): Pro
   const store = transaction.objectStore(REPERTOIRE_STORE_NAME);
   await waitForTransaction(
     transaction,
-    put(store, repertoire.id, withLocalChange(limitRepertoire(repertoire), nowIso())),
+    putRecord(store, repertoire.id, withLocalChange(limitRepertoire(repertoire), nowIso())),
   );
   publishRecordChanges([{ kind: "repertoire", id: repertoire.id }]);
 }
@@ -552,7 +496,7 @@ export async function updateChapter(chapter: SerializedChapter): Promise<void> {
   const store = transaction.objectStore(CHAPTERS_STORE_NAME);
   await waitForTransaction(
     transaction,
-    put(store, chapter.id, withLocalChange(limitChapter(chapter), nowIso())),
+    putRecord(store, chapter.id, withLocalChange(limitChapter(chapter), nowIso())),
   );
   publishRecordChanges([{ kind: "chapter", id: chapter.id }]);
 }
@@ -563,7 +507,7 @@ export async function saveTrainingLineSchedule(schedule: TrainingLineReview): Pr
   const store = transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
   await waitForTransaction(
     transaction,
-    put(store, trainingLineScheduleStorageKey(schedule), {
+    putRecord(store, trainingLineScheduleStorageKey(schedule), {
       ...schedule,
       updatedAt: nowIso(),
       dirty: true,
@@ -577,7 +521,7 @@ export async function saveTrainingLineSchedule(schedule: TrainingLineReview): Pr
 export async function getAllTrainingLineSchedules(): Promise<TrainingLineReview[]> {
   const db = await init();
   const transaction = db.transaction([TRAINING_LINE_SCHEDULES_STORE_NAME], "readonly");
-  const values = await getAll<StoredTrainingLineSchedule>(
+  const values = await getAllRecords<StoredTrainingLineSchedule>(
     transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME),
   );
   return values.map(({ dirty: _dirty, updatedAt: _updatedAt, ...value }) => value);
@@ -592,8 +536,8 @@ export async function createChapter(chapter: SerializedChapter, pgn: string): Pr
   await waitForTransaction(
     transaction,
     Promise.all([
-      put(chapterStore, chapter.id, withLocalChange(limitChapter(chapter), updatedAt)),
-      put(pgnStore, chapter.pgnId, {
+      putRecord(chapterStore, chapter.id, withLocalChange(limitChapter(chapter), updatedAt)),
+      putRecord(pgnStore, chapter.pgnId, {
         id: chapter.pgnId,
         pgn,
         revision: null,
@@ -615,7 +559,7 @@ export async function getAllRepertoires(): Promise<NewSerializedRepertoire[]> {
   const db = await init();
   const transaction = db.transaction([REPERTOIRE_STORE_NAME], "readonly");
   const store = transaction.objectStore(REPERTOIRE_STORE_NAME);
-  const values = await getAll<StoredRepertoire>(store);
+  const values = await getAllRecords<StoredRepertoire>(store);
   return values.filter((value) => value.deletedAt == null).map(limitRepertoire);
 }
 
@@ -624,7 +568,7 @@ export async function getAllChapters(): Promise<SerializedChapter[]> {
 
   const transaction = db.transaction([CHAPTERS_STORE_NAME], "readonly");
   const store = transaction.objectStore(CHAPTERS_STORE_NAME);
-  const values = await getAll<StoredChapter>(store);
+  const values = await getAllRecords<StoredChapter>(store);
   return values.filter((value) => value.deletedAt == null).map(limitChapter);
 }
 
@@ -636,13 +580,30 @@ export type InitialRepertoireLoad = {
 };
 
 export async function getStoredRepertoiresAndChapters(): Promise<InitialRepertoireLoad> {
-  const [repertoires, chapters, trainingLineSchedules] = await Promise.all([
-    getAllRepertoires(),
-    getAllChapters(),
-    getAllTrainingLineSchedules(),
-  ]);
+  const db = await init();
+  return await runTransaction(
+    db,
+    [REPERTOIRE_STORE_NAME, CHAPTERS_STORE_NAME, TRAINING_LINE_SCHEDULES_STORE_NAME],
+    "readonly",
+    async (transaction) => {
+      const [storedRepertoires, storedChapters, storedTrainingLineSchedules] = await Promise.all([
+        getAllRecords<StoredRepertoire>(transaction.objectStore(REPERTOIRE_STORE_NAME)),
+        getAllRecords<StoredChapter>(transaction.objectStore(CHAPTERS_STORE_NAME)),
+        getAllRecords<StoredTrainingLineSchedule>(
+          transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME),
+        ),
+      ]);
+      const repertoires = storedRepertoires
+        .filter((value) => value.deletedAt == null)
+        .map(limitRepertoire);
+      const chapters = storedChapters.filter((value) => value.deletedAt == null).map(limitChapter);
+      const trainingLineSchedules = storedTrainingLineSchedules.map(
+        ({ dirty: _dirty, updatedAt: _updatedAt, ...value }) => value,
+      );
 
-  return { repertoires, chapters, trainingLineSchedules, createdDemo: false };
+      return { repertoires, chapters, trainingLineSchedules, createdDemo: false };
+    },
+  );
 }
 
 export async function createDemoInitialRepertoire(): Promise<InitialRepertoireLoad> {
@@ -683,10 +644,10 @@ export async function getRepertoireSyncRequest(): Promise<RepertoireSyncRequest>
   const pgnStore = transaction.objectStore(PGNS_STORE_NAME);
   const scheduleStore = transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
   const [rawRepertoires, rawChapters, rawPgns, rawTrainingLineSchedules] = await Promise.all([
-    getAll<StoredRepertoire>(repertoireStore),
-    getAll<StoredChapter>(chapterStore),
-    getAll<StoredPgn>(pgnStore),
-    getAll<StoredTrainingLineSchedule>(scheduleStore),
+    getAllRecords<StoredRepertoire>(repertoireStore),
+    getAllRecords<StoredChapter>(chapterStore),
+    getAllRecords<StoredPgn>(pgnStore),
+    getAllRecords<StoredTrainingLineSchedule>(scheduleStore),
   ]);
 
   return {
@@ -734,69 +695,8 @@ export async function applyRepertoireSyncResponse(
   request: RepertoireSyncRequest,
 ): Promise<RepertoireSyncChanges> {
   const db = await init();
-  const readTransaction = db.transaction(
-    [
-      REPERTOIRE_STORE_NAME,
-      CHAPTERS_STORE_NAME,
-      PGNS_STORE_NAME,
-      TRAINING_LINE_SCHEDULES_STORE_NAME,
-    ],
-    "readonly",
-  );
-  const repertoireStore = readTransaction.objectStore(REPERTOIRE_STORE_NAME);
-  const chapterStore = readTransaction.objectStore(CHAPTERS_STORE_NAME);
-  const pgnStore = readTransaction.objectStore(PGNS_STORE_NAME);
-  const scheduleStore = readTransaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
-  const [existingRepertoires, existingChapters, existingPgns, existingSchedules] =
-    await Promise.all([
-      getAll<StoredRepertoire>(repertoireStore),
-      getAll<StoredChapter>(chapterStore),
-      getAll<StoredPgn>(pgnStore),
-      getAll<StoredTrainingLineSchedule>(scheduleStore),
-    ]);
-  const repertoireById = new Map(
-    existingRepertoires.map((repertoire) => [repertoire.id, repertoire]),
-  );
-  const chapterById = new Map(existingChapters.map((chapter) => [chapter.id, chapter]));
-  const pgnById = new Map(existingPgns.map((pgn) => [pgn.id, pgn]));
-  const scheduleByKey = new Map(
-    existingSchedules.map((schedule) => [trainingLineScheduleStorageKey(schedule), schedule]),
-  );
-  const sentRepertoireUpdatedAt = sentUpdatedAtById(request.changes.repertoires);
-  const sentChapterUpdatedAt = sentUpdatedAtById(request.changes.chapters);
-  const sentPgnUpdatedAt = sentUpdatedAtById(request.changes.pgns);
-  const sentScheduleUpdatedAt = new Map(
-    request.changes.trainingLineSchedules.map((schedule) => [
-      trainingLineScheduleStorageKey(schedule),
-      schedule.updatedAt,
-    ]),
-  );
-  const appliedChanges: RepertoireSyncChanges = {
-    repertoires: response.changes.repertoires.filter((repertoire) =>
-      shouldApplySyncedChange(repertoireById.get(repertoire.id), sentRepertoireUpdatedAt),
-    ),
-    chapters: response.changes.chapters.filter((chapter) =>
-      shouldApplySyncedChange(chapterById.get(chapter.id), sentChapterUpdatedAt),
-    ),
-    pgns: response.changes.pgns.filter((pgn) => {
-      const existing = pgnById.get(pgn.id);
-      return (
-        existing === undefined ||
-        !isPgnDirty(existing) ||
-        sentPgnUpdatedAt.get(pgn.id) === existing.updatedAt
-      );
-    }),
-    trainingLineSchedules: (response.changes.trainingLineSchedules ?? []).filter((schedule) => {
-      const existing = scheduleByKey.get(trainingLineScheduleStorageKey(schedule));
-      return (
-        existing === undefined ||
-        !existing.dirty ||
-        sentScheduleUpdatedAt.get(trainingLineScheduleStorageKey(schedule)) === existing.updatedAt
-      );
-    }),
-  };
-
-  const writeTransaction = db.transaction(
+  const appliedChanges = await runTransaction(
+    db,
     [
       REPERTOIRE_STORE_NAME,
       CHAPTERS_STORE_NAME,
@@ -804,70 +704,121 @@ export async function applyRepertoireSyncResponse(
       TRAINING_LINE_SCHEDULES_STORE_NAME,
     ],
     "readwrite",
-  );
-  const writeRepertoireStore = writeTransaction.objectStore(REPERTOIRE_STORE_NAME);
-  const writeChapterStore = writeTransaction.objectStore(CHAPTERS_STORE_NAME);
-  const writePgnStore = writeTransaction.objectStore(PGNS_STORE_NAME);
-  const writeScheduleStore = writeTransaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
-  const acknowledgmentWrites: Promise<void>[] = [];
-  if (response.acknowledgedPgn != null) {
-    const acknowledgment = response.acknowledgedPgn;
-    const existing = pgnById.get(acknowledgment.id);
-    const sent = request.changes.pgns.find((pgn) => pgn.id === acknowledgment.id);
-    if (existing === undefined || sent === undefined) {
-      throw new Error("The server acknowledged an unknown PGN mutation");
-    }
-    const existingMutations = pendingMutationsFor(existing);
-    const sentPrefix = existingMutations.slice(0, sent.mutations.length);
-    const prefixMatches = JSON.stringify(sentPrefix) === JSON.stringify(sent.mutations);
-    const remainingMutations = prefixMatches
-      ? existingMutations.slice(sent.mutations.length)
-      : existingMutations;
-    const acknowledgedRemainingMutations = sent.deletedAt == null ? remainingMutations : [];
-    acknowledgmentWrites.push(
-      put(writePgnStore, acknowledgment.id, {
-        ...existing,
-        revision: acknowledgment.revision,
-        byteSize: acknowledgment.byteSize,
-        pendingMutations: acknowledgedRemainingMutations,
-        metadataDirty: existing.deletedAt === sent.deletedAt ? false : isPgnMetadataDirty(existing),
-        updatedAt:
-          acknowledgedRemainingMutations.length === 0
-            ? acknowledgment.updatedAt
-            : existing.updatedAt,
-        deletedAt: acknowledgment.deletedAt ?? null,
-      } satisfies StoredPgn),
-    );
-  }
-
-  await waitForTransaction(
-    writeTransaction,
-    Promise.all([
-      ...appliedChanges.repertoires.map((repertoire) =>
-        put(writeRepertoireStore, repertoire.id, cleanRepertoire(repertoire)),
-      ),
-      ...appliedChanges.chapters.map((chapter) =>
-        put(writeChapterStore, chapter.id, cleanChapter(chapter)),
-      ),
-      ...appliedChanges.pgns.map((pgn) => {
-        const existing = pgnById.get(pgn.id);
-        const sent = request.changes.pgns.find((change) => change.id === pgn.id);
-        const sentCreation = sent?.mutations.some((mutation) => mutation.type === "createPgn");
-        const cachedPgn =
-          existing !== undefined && (existing.revision === pgn.revision || sentCreation === true)
-            ? existing.pgn
-            : undefined;
-        return put(writePgnStore, pgn.id, cleanPgn(pgn, cachedPgn));
-      }),
-      ...appliedChanges.trainingLineSchedules.map((schedule) =>
-        put(
-          writeScheduleStore,
+    async (transaction): Promise<RepertoireSyncChanges> => {
+      const repertoireStore = transaction.objectStore(REPERTOIRE_STORE_NAME);
+      const chapterStore = transaction.objectStore(CHAPTERS_STORE_NAME);
+      const pgnStore = transaction.objectStore(PGNS_STORE_NAME);
+      const scheduleStore = transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME);
+      const [existingRepertoires, existingChapters, existingPgns, existingSchedules] =
+        await Promise.all([
+          getAllRecords<StoredRepertoire>(repertoireStore),
+          getAllRecords<StoredChapter>(chapterStore),
+          getAllRecords<StoredPgn>(pgnStore),
+          getAllRecords<StoredTrainingLineSchedule>(scheduleStore),
+        ]);
+      const repertoireById = new Map(
+        existingRepertoires.map((repertoire) => [repertoire.id, repertoire]),
+      );
+      const chapterById = new Map(existingChapters.map((chapter) => [chapter.id, chapter]));
+      const pgnById = new Map(existingPgns.map((pgn) => [pgn.id, pgn]));
+      const scheduleByKey = new Map(
+        existingSchedules.map((schedule) => [trainingLineScheduleStorageKey(schedule), schedule]),
+      );
+      const sentRepertoireUpdatedAt = sentUpdatedAtById(request.changes.repertoires);
+      const sentChapterUpdatedAt = sentUpdatedAtById(request.changes.chapters);
+      const sentPgnUpdatedAt = sentUpdatedAtById(request.changes.pgns);
+      const sentScheduleUpdatedAt = new Map(
+        request.changes.trainingLineSchedules.map((schedule) => [
           trainingLineScheduleStorageKey(schedule),
-          cleanTrainingLineSchedule(schedule),
+          schedule.updatedAt,
+        ]),
+      );
+      const changes: RepertoireSyncChanges = {
+        repertoires: response.changes.repertoires.filter((repertoire) =>
+          shouldApplySyncedChange(repertoireById.get(repertoire.id), sentRepertoireUpdatedAt),
         ),
-      ),
-      ...acknowledgmentWrites,
-    ]),
+        chapters: response.changes.chapters.filter((chapter) =>
+          shouldApplySyncedChange(chapterById.get(chapter.id), sentChapterUpdatedAt),
+        ),
+        pgns: response.changes.pgns.filter((pgn) => {
+          const existing = pgnById.get(pgn.id);
+          return (
+            existing === undefined ||
+            !isPgnDirty(existing) ||
+            sentPgnUpdatedAt.get(pgn.id) === existing.updatedAt
+          );
+        }),
+        trainingLineSchedules: (response.changes.trainingLineSchedules ?? []).filter((schedule) => {
+          const existing = scheduleByKey.get(trainingLineScheduleStorageKey(schedule));
+          return (
+            existing === undefined ||
+            !existing.dirty ||
+            sentScheduleUpdatedAt.get(trainingLineScheduleStorageKey(schedule)) ===
+              existing.updatedAt
+          );
+        }),
+      };
+
+      const acknowledgmentWrites: Promise<void>[] = [];
+      if (response.acknowledgedPgn != null) {
+        const acknowledgment = response.acknowledgedPgn;
+        const existing = pgnById.get(acknowledgment.id);
+        const sent = request.changes.pgns.find((pgn) => pgn.id === acknowledgment.id);
+        if (existing === undefined || sent === undefined) {
+          throw new Error("The server acknowledged an unknown PGN mutation");
+        }
+        const existingMutations = pendingMutationsFor(existing);
+        const sentPrefix = existingMutations.slice(0, sent.mutations.length);
+        const prefixMatches = JSON.stringify(sentPrefix) === JSON.stringify(sent.mutations);
+        const remainingMutations = prefixMatches
+          ? existingMutations.slice(sent.mutations.length)
+          : existingMutations;
+        const acknowledgedRemainingMutations = sent.deletedAt == null ? remainingMutations : [];
+        acknowledgmentWrites.push(
+          putRecord(pgnStore, acknowledgment.id, {
+            ...existing,
+            revision: acknowledgment.revision,
+            byteSize: acknowledgment.byteSize,
+            pendingMutations: acknowledgedRemainingMutations,
+            metadataDirty:
+              existing.deletedAt === sent.deletedAt ? false : isPgnMetadataDirty(existing),
+            updatedAt:
+              acknowledgedRemainingMutations.length === 0
+                ? acknowledgment.updatedAt
+                : existing.updatedAt,
+            deletedAt: acknowledgment.deletedAt ?? null,
+          } satisfies StoredPgn),
+        );
+      }
+
+      await Promise.all([
+        ...changes.repertoires.map((repertoire) =>
+          putRecord(repertoireStore, repertoire.id, cleanRepertoire(repertoire)),
+        ),
+        ...changes.chapters.map((chapter) =>
+          putRecord(chapterStore, chapter.id, cleanChapter(chapter)),
+        ),
+        ...changes.pgns.map((pgn) => {
+          const existing = pgnById.get(pgn.id);
+          const sent = request.changes.pgns.find((change) => change.id === pgn.id);
+          const sentCreation = sent?.mutations.some((mutation) => mutation.type === "createPgn");
+          const cachedPgn =
+            existing !== undefined && (existing.revision === pgn.revision || sentCreation === true)
+              ? existing.pgn
+              : undefined;
+          return putRecord(pgnStore, pgn.id, cleanPgn(pgn, cachedPgn));
+        }),
+        ...changes.trainingLineSchedules.map((schedule) =>
+          putRecord(
+            scheduleStore,
+            trainingLineScheduleStorageKey(schedule),
+            cleanTrainingLineSchedule(schedule),
+          ),
+        ),
+        ...acknowledgmentWrites,
+      ]);
+      return changes;
+    },
   );
   setLastSyncedAt(response.cursor);
 
@@ -966,7 +917,10 @@ export async function getIndexedDbAuthenticatedUserId(): Promise<string | null> 
   const transaction = db.transaction([METADATA_STORE_NAME], "readonly");
   const value = await waitForTransaction(
     transaction,
-    get<unknown>(transaction.objectStore(METADATA_STORE_NAME), AUTHENTICATED_USER_ID_METADATA_KEY),
+    getRecord<unknown>(
+      transaction.objectStore(METADATA_STORE_NAME),
+      AUTHENTICATED_USER_ID_METADATA_KEY,
+    ),
   );
   return typeof value === "string" ? value : null;
 }
@@ -976,7 +930,11 @@ export async function setIndexedDbAuthenticatedUserId(userId: string): Promise<v
   const transaction = db.transaction([METADATA_STORE_NAME], "readwrite");
   await waitForTransaction(
     transaction,
-    put(transaction.objectStore(METADATA_STORE_NAME), AUTHENTICATED_USER_ID_METADATA_KEY, userId),
+    putRecord(
+      transaction.objectStore(METADATA_STORE_NAME),
+      AUTHENTICATED_USER_ID_METADATA_KEY,
+      userId,
+    ),
   );
 }
 
