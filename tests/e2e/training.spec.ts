@@ -157,13 +157,13 @@ test("reviews only due lines from a chapter", async ({ page }) => {
   await pausePacingClock(page);
   await dragPiece(page, "e2", "e4");
   await advanceTrainingPacing(page, "waiting-for-response", 500);
-  await advanceTrainingPacing(page, "line-boundary", 1000);
+  await page.getByRole("button", { name: "Go to next line" }).click();
 
   await expect(page).toHaveURL(/\/v1-.*\/train\?review=chapter$/);
   await expect(page.getByText("2/2", { exact: true })).toBeVisible();
   await dragPiece(page, "d2", "d4");
   await advanceTrainingPacing(page, "waiting-for-response", 500);
-  await advanceTrainingPacing(page, "line-boundary", 1000);
+  await page.getByRole("button", { name: "Finish review" }).click();
 
   await expect(page).toHaveURL("/app/repertoires/white-repertoire/open-games/train");
   const reviewLinesButton = page.getByRole("button", { name: "Review lines" });
@@ -174,7 +174,7 @@ test("reviews only due lines from a chapter", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
-test("waits one second before advancing to the next training line", async ({ page }) => {
+test("waits for the user before advancing to the next training line", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   const now = Date.now();
   await seedIndexedDb(page, {
@@ -201,11 +201,12 @@ test("waits one second before advancing to the next training line", async ({ pag
   await dragPiece(page, "e2", "e4");
 
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
-  await page.clock.runFor(999);
+  await expect(page.getByRole("button", { name: "Go to next line" })).toBeVisible();
+  await page.clock.runFor(10_000);
   await expect(page).toHaveURL(firstLineUrl);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
 
-  await page.clock.runFor(1);
+  await page.getByRole("button", { name: "Go to next line" }).click();
   await expect(page.getByText("2/2", { exact: true })).toBeVisible();
   expect(page.url()).not.toBe(firstLineUrl);
   expect(consoleMessages).toEqual([]);
@@ -287,7 +288,7 @@ test("reviews every due line across chapters and stops before future lines", asy
     await advanceTrainingPacing(page, "preparing-replay", 500);
     await dragPiece(page, "e2", "e4");
   }
-  await advanceTrainingPacing(page, "line-boundary", 1000);
+  await page.getByRole("button", { name: "Go to next line" }).click();
 
   await expect(page).toHaveURL(
     /\/app\/white-repertoire\/queens-pawn\/v1-[A-Za-z0-9_-]+\/train\?review=due$/,
@@ -303,7 +304,7 @@ test("reviews every due line across chapters and stops before future lines", asy
 
   await dragPiece(page, "d2", "d4");
   await advanceTrainingPacing(page, "waiting-for-response", 500);
-  await advanceTrainingPacing(page, "line-boundary", 1000);
+  await page.getByRole("button", { name: "Finish review" }).click();
 
   await expect(page).toHaveURL("/app/training");
   await expect(page.getByText("0 due · 3 scheduled")).toBeVisible();

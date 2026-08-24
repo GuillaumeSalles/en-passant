@@ -28,8 +28,6 @@ import { completeTrainingQueueReviewLine } from "@/mutations/trainingSession";
 import { TrainingLines } from "./TrainingLines";
 import { useVariationTrainingFlow } from "./useVariationTrainingFlow";
 
-const REVIEW_LINE_BOUNDARY_DELAY = 1000;
-
 export function VariationTraining(props: {
   repertoireHandle: string;
   chapterHandle: string;
@@ -65,29 +63,32 @@ export function VariationTraining(props: {
     },
   );
 
-  const flow = useVariationTrainingFlow(props, {
-    boundaryDelayMs: () =>
-      isReviewingQueue() || isReviewingChapter() ? REVIEW_LINE_BOUNDARY_DELAY : 0,
-    onLineComplete: () => {
-      if (isReviewingQueue()) {
-        onCompleteTrainingQueueReviewLine();
-        navigate(trainingQueueReviewPath(), { replace: true });
-      } else if (isReviewingChapter()) {
-        onCompleteTrainingQueueReviewLine();
-        const nextLine = flow.nextDueLine();
-        navigate(
-          nextLine === undefined
-            ? trainingPath(props.repertoireHandle, props.chapterHandle)
-            : chapterTrainingLineReviewPath(
-                props.repertoireHandle,
-                props.chapterHandle,
-                nextLine.id,
-              ),
-          { replace: true },
-        );
-      }
-    },
-  });
+  const flow = useVariationTrainingFlow(props);
+  const isReviewingMultipleLines = () => isReviewingQueue() || isReviewingChapter();
+  const hasNextReviewLine = () => {
+    if (isReviewingQueue()) {
+      const queue = state.training.reviewQueue;
+      return queue !== null && queue.results.length + 1 < queue.total;
+    }
+    return isReviewingChapter() && flow.nextDueLine() !== undefined;
+  };
+
+  function advanceReview(): void {
+    if (isReviewingQueue()) {
+      onCompleteTrainingQueueReviewLine();
+      navigate(trainingQueueReviewPath(), { replace: true });
+      return;
+    }
+    if (!isReviewingChapter()) return;
+    const nextLine = flow.nextDueLine();
+    onCompleteTrainingQueueReviewLine();
+    navigate(
+      nextLine === undefined
+        ? trainingPath(props.repertoireHandle, props.chapterHandle)
+        : chapterTrainingLineReviewPath(props.repertoireHandle, props.chapterHandle, nextLine.id),
+      { replace: true },
+    );
+  }
   const squareHighlights = useSquareHighlights();
   const openingIndex = useOpeningIndex();
   const activeOpeningName = createMemo(() => {
@@ -170,28 +171,37 @@ export function VariationTraining(props: {
                     <span data-training-flow-state={flow.phase().type}>{flow.instruction()}</span>
                     <Show when={flow.isLineComplete()}>
                       <Show
-                        when={flow.nextUntrainedLine()}
+                        when={isReviewingMultipleLines()}
                         fallback={
-                          <Button
-                            size="sm"
-                            href={trainingPath(props.repertoireHandle, props.chapterHandle)}
+                          <Show
+                            when={flow.nextUntrainedLine()}
+                            fallback={
+                              <Button
+                                size="sm"
+                                href={trainingPath(props.repertoireHandle, props.chapterHandle)}
+                              >
+                                Back to lines
+                              </Button>
+                            }
                           >
-                            Back to lines
-                          </Button>
+                            {(nextLine) => (
+                              <Button
+                                size="sm"
+                                href={trainingLinePath(
+                                  props.repertoireHandle,
+                                  props.chapterHandle,
+                                  nextLine().id,
+                                )}
+                              >
+                                Go to next line
+                              </Button>
+                            )}
+                          </Show>
                         }
                       >
-                        {(nextLine) => (
-                          <Button
-                            size="sm"
-                            href={trainingLinePath(
-                              props.repertoireHandle,
-                              props.chapterHandle,
-                              nextLine().id,
-                            )}
-                          >
-                            Next line
-                          </Button>
-                        )}
+                        <Button size="sm" type="button" onClick={advanceReview}>
+                          {hasNextReviewLine() ? "Go to next line" : "Finish review"}
+                        </Button>
                       </Show>
                     </Show>
                   </Show>
