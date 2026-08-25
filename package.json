@@ -14,11 +14,12 @@
     "deploy": "npm run build && npx wrangler pages deploy dist --project-name enpassant",
     "test": "vitest",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:offline": "npm run build && node scripts/run-e2e.mjs --offline",
     "type-check": "tsc --noEmit",
     "lint": "oxlint src tests scripts --deny-warnings -A no-unassigned-vars",
     "check:filenames": "node scripts/check-filenames.mjs",
     "check:guardrails": "node scripts/check-code-guardrails.mjs",
-    "check": "npm run format:check && npm run lint && npm run check:filenames && npm run check:guardrails && npm run type-check && npm test -- --run && npm run build && npm run test:e2e",
+    "check": "npm run format:check && npm run lint && npm run check:filenames && npm run check:guardrails && npm run type-check && npm test -- --run && npm run build && npm run test:e2e && node scripts/run-e2e.mjs --offline",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "prepare": "lefthook install"

@@ -5,3 +5,6 @@
 
 /openings-4b862275.json
   Cache-Control: public, max-age=31536000, immutable
+
+/service-worker.js
+  Cache-Control: no-cache

@@ -24,7 +24,11 @@ async function availablePort() {
 async function main() {
   const port = await availablePort();
   const playwrightBin = path.join(process.cwd(), "node_modules", ".bin", "playwright");
-  const child = spawn(playwrightBin, ["test", ...process.argv.slice(2)], {
+  const forwardedArguments = process.argv.slice(2);
+  const offline = forwardedArguments.includes("--offline");
+  const testArguments = forwardedArguments.filter((argument) => argument !== "--offline");
+  const configArguments = offline ? ["--config", "playwright.offline.config.ts"] : [];
+  const child = spawn(playwrightBin, ["test", ...configArguments, ...testArguments], {
     env: { ...process.env, E2E_PORT: String(port) },
     stdio: "inherit",
   });
