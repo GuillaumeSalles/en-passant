@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { createStore } from "@/lib/createStore";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 import { mergeChapterPgn } from "./mutations";
-import { emptyState, getPgn } from "./state";
+import { emptyState, getPgn, selectSelectedMoveId } from "./state";
 import { normalizePgn, toPgn } from "./pgnTree";
 import type { Context } from "./types";
 
@@ -60,6 +60,17 @@ describe("mergeChapterPgn", () => {
         ]),
       }),
     );
+  });
+
+  test("selects the last move of the merged PGN main line", () => {
+    const state = chapterState("1. e4 e5 2. Nf3 *");
+
+    mergeChapterPgn(state, ctx, "1. e4 c5 2. Nf3 d6 *");
+
+    const merged = getPgn(state, ctx);
+    const selectedMoveId = selectSelectedMoveId(state, ctx);
+    expect(selectedMoveId).not.toBeNull();
+    expect(merged?.moves[selectedMoveId ?? -1]?.san).toBe("d6");
   });
 
   test("is safe when the current chapter PGN is unavailable", () => {

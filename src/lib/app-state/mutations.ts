@@ -7,7 +7,7 @@ import {
   type AppliedMoveAnimation,
 } from "@/lib/chess";
 import type { MutationEffect, MutationResult } from "@/lib/useMutation";
-import { mergeNormalizedPgn } from "@/lib/mergePgns";
+import { PgnMerger } from "@/lib/mergePgns";
 import { applyNagToList } from "./nags";
 import { highlightsFromPgnMetadata, withPgnHighlightMetadata } from "./pgnHighlights";
 import { toPgn } from "./pgnTree";
@@ -260,7 +260,9 @@ export function mergeChapterPgn(state: MutableAppState, ctx: Context, pgn: strin
   const pgnId = getPgnId(state, ctx);
   if (currentPgn === null || pgnId === null) return;
 
-  const mergedPgn = mergeNormalizedPgn(currentPgn, pgn);
+  const merger = new PgnMerger(currentPgn);
+  const mergedMainLineTerminalMoveId = merger.add(pgn);
+  const mergedPgn = merger.toNormalizedPgn();
   const mutations = mergedPgnMutations(currentPgn, mergedPgn);
   const serializedPgn = toPgn(mergedPgn);
 
@@ -268,6 +270,7 @@ export function mergeChapterPgn(state: MutableAppState, ctx: Context, pgn: strin
     ...state.pgns,
     [pgnId]: { status: "success", data: mergedPgn },
   });
+  setChapterSelection(state, ctx, mergedMainLineTerminalMoveId, null);
 
   if (mutations.length === 0) return;
   return {

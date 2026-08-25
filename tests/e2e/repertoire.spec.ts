@@ -733,6 +733,7 @@ test("merges a pasted PGN into the current chapter", async ({ page }) => {
   await expect(dialog).toBeHidden();
   await expect(page.locator('[data-san="c5"]')).toBeVisible();
   await expect(page.locator('[data-san="d6"]')).toBeVisible();
+  await expect(page.locator('[data-san="d6"]')).toHaveAttribute("data-selected", "true");
   await expect(page.locator('[aria-label="Move e4"] [data-nag="1"]')).toHaveText("!");
   await expect.poll(() => firstStoredPgn(page)).toContain("(1... c5 2. Nf3 d6)");
   expect(consoleMessages).toEqual([]);

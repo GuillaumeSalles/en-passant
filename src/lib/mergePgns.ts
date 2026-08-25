@@ -34,9 +34,10 @@ export class PgnMerger {
     this.#merged = clonePgn(typeof firstPgn === "string" ? normalizePgn(firstPgn) : firstPgn);
   }
 
-  add(pgn: string): void {
+  add(pgn: string): number | null {
     const source = normalizePgn(pgn);
     mergeMoveList(this.#merged, source, source.rootMoveIds, null);
+    return findMergedMainLineTerminalMoveId(this.#merged, source);
   }
 
   toPgn(): string {
@@ -47,6 +48,27 @@ export class PgnMerger {
     const cloned = clonePgn(this.#merged);
     return createReactiveNormalizedPgn(cloned);
   }
+}
+
+function findMergedMainLineTerminalMoveId(
+  target: MutableMergePgn,
+  source: NormalizedPgn,
+): number | null {
+  let sourceMoveId = source.rootMoveIds[0];
+  let targetMoveId: number | null = null;
+
+  while (sourceMoveId !== undefined) {
+    const sourceMove = requireMove(source, sourceMoveId);
+    const matchingTargetMoveId = requireMoveIndex(target, targetMoveId).get(sourceMove.san);
+    if (matchingTargetMoveId === undefined) {
+      throw new Error(`Missing merged PGN move ${sourceMove.san}`);
+    }
+
+    targetMoveId = matchingTargetMoveId;
+    sourceMoveId = sourceMove.next[0];
+  }
+
+  return targetMoveId;
 }
 
 function parseTags(pgn: string): PgnTags {
