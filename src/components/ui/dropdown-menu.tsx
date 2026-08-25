@@ -183,6 +183,8 @@ function DropdownMenuItem(props: {
   disabled: boolean;
   href?: string;
   onClick?: () => void;
+  rel?: string;
+  target?: JSX.AnchorHTMLAttributes<HTMLAnchorElement>["target"];
 }) {
   const ctx = useContext(DropdownMenuContext);
 
@@ -212,6 +214,8 @@ function DropdownMenuItem(props: {
         aria-disabled={props.disabled ? "true" : undefined}
         class={cn(menuItemClass, props.disabled && "pointer-events-none opacity-50", props.class)}
         href={props.disabled ? undefined : props.href}
+        rel={props.rel}
+        target={props.target}
         onMouseDown={(e) => e.preventDefault()}
         onClick={closeMenu}
       >

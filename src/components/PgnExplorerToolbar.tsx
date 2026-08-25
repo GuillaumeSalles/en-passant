@@ -1,6 +1,19 @@
-import { ArrowLeft, ArrowLeftToLine, ArrowRight, ArrowRightToLine, Repeat2 } from "./Icons";
+import {
+  ArrowLeft,
+  ArrowLeftToLine,
+  ArrowRight,
+  ArrowRightToLine,
+  ExternalLink,
+  Repeat2,
+} from "./Icons";
 import { HorizontalDashedDivider } from "./ui/HorizontalDashedDivider";
 import { TooltipIconButton } from "./ui/tooltip-icon-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { useMutation } from "@/lib/useMutation";
 import {
   back,
@@ -9,9 +22,15 @@ import {
   getPgn,
   moveToLastMainLineMove,
   moveToStart,
+  selectFen,
   selectNextMoveIds,
   selectSelectedMoveId,
 } from "@/lib/AppState";
+import {
+  chessablePositionUrl,
+  chessComPositionUrl,
+  lichessPositionUrl,
+} from "@/lib/positionShareUrls";
 import { useSelector } from "@/lib/useSelector";
 
 export function PgnExplorerToolbar() {
@@ -23,6 +42,7 @@ export function PgnExplorerToolbar() {
   const canMoveToStart = useSelector((state, ctx) => selectSelectedMoveId(state, ctx) !== null);
   const canMoveBack = useSelector((state, ctx) => selectSelectedMoveId(state, ctx) !== null);
   const canMoveForward = useSelector((state, ctx) => selectNextMoveIds(state, ctx).length > 0);
+  const currentFen = useSelector(selectFen);
   const canMoveToLastMainLineMove = useSelector((state, ctx) => {
     const pgn = getPgn(state, ctx);
     if (pgn === null) return null;
@@ -82,6 +102,43 @@ export function PgnExplorerToolbar() {
             onClick={onMoveToLastMainLineMove}
             disabled={!canMoveToLastMainLineMove()}
           />
+        </div>
+        <div class="ml-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <TooltipIconButton
+                aria-label="Share position"
+                icon={<ExternalLink />}
+                tooltip="Open position in…"
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top">
+              <DropdownMenuItem
+                disabled={false}
+                href={chessComPositionUrl(currentFen())}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open position in Chess.com
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={false}
+                href={lichessPositionUrl(currentFen())}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open position on Lichess
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={false}
+                href={chessablePositionUrl(currentFen())}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open position in Chessable
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </>
