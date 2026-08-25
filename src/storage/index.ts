@@ -579,53 +579,97 @@ export type InitialRepertoireLoad = {
   createdDemo: boolean;
 };
 
+async function readInitialRepertoireLoad(
+  transaction: IDBTransaction,
+): Promise<InitialRepertoireLoad> {
+  const [storedRepertoires, storedChapters, storedTrainingLineSchedules] = await Promise.all([
+    getAllRecords<StoredRepertoire>(transaction.objectStore(REPERTOIRE_STORE_NAME)),
+    getAllRecords<StoredChapter>(transaction.objectStore(CHAPTERS_STORE_NAME)),
+    getAllRecords<StoredTrainingLineSchedule>(
+      transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME),
+    ),
+  ]);
+  const repertoires = storedRepertoires
+    .filter((value) => value.deletedAt == null)
+    .map(limitRepertoire);
+  const chapters = storedChapters.filter((value) => value.deletedAt == null).map(limitChapter);
+  const trainingLineSchedules = storedTrainingLineSchedules.map(
+    ({ dirty: _dirty, updatedAt: _updatedAt, ...value }) => value,
+  );
+
+  return { repertoires, chapters, trainingLineSchedules, createdDemo: false };
+}
+
 export async function getStoredRepertoiresAndChapters(): Promise<InitialRepertoireLoad> {
   const db = await init();
   return await runTransaction(
     db,
     [REPERTOIRE_STORE_NAME, CHAPTERS_STORE_NAME, TRAINING_LINE_SCHEDULES_STORE_NAME],
     "readonly",
-    async (transaction) => {
-      const [storedRepertoires, storedChapters, storedTrainingLineSchedules] = await Promise.all([
-        getAllRecords<StoredRepertoire>(transaction.objectStore(REPERTOIRE_STORE_NAME)),
-        getAllRecords<StoredChapter>(transaction.objectStore(CHAPTERS_STORE_NAME)),
-        getAllRecords<StoredTrainingLineSchedule>(
-          transaction.objectStore(TRAINING_LINE_SCHEDULES_STORE_NAME),
-        ),
-      ]);
-      const repertoires = storedRepertoires
-        .filter((value) => value.deletedAt == null)
-        .map(limitRepertoire);
-      const chapters = storedChapters.filter((value) => value.deletedAt == null).map(limitChapter);
-      const trainingLineSchedules = storedTrainingLineSchedules.map(
-        ({ dirty: _dirty, updatedAt: _updatedAt, ...value }) => value,
-      );
-
-      return { repertoires, chapters, trainingLineSchedules, createdDemo: false };
-    },
+    readInitialRepertoireLoad,
   );
 }
 
-export async function createDemoInitialRepertoire(): Promise<InitialRepertoireLoad> {
-  const demo = createDemoRepertoireSeed();
-  await createRepertoireAndChapter(demo.repertoire, demo.chapter, demo.pgn);
-
-  return {
-    repertoires: [demo.repertoire],
-    chapters: [demo.chapter],
-    trainingLineSchedules: [],
-    createdDemo: true,
-  };
-}
-
 export async function getInitialRepertoiresAndChapters(): Promise<InitialRepertoireLoad> {
-  const stored = await getStoredRepertoiresAndChapters();
+  const db = await init();
+  const load = await runTransaction(
+    db,
+    [
+      REPERTOIRE_STORE_NAME,
+      CHAPTERS_STORE_NAME,
+      PGNS_STORE_NAME,
+      TRAINING_LINE_SCHEDULES_STORE_NAME,
+    ],
+    "readwrite",
+    async (transaction): Promise<InitialRepertoireLoad> => {
+      const stored = await readInitialRepertoireLoad(transaction);
+      if (stored.repertoires.length > 0 || stored.chapters.length > 0) return stored;
 
-  if (stored.repertoires.length > 0 || stored.chapters.length > 0) {
-    return stored;
+      const demo = createDemoRepertoireSeed();
+      const updatedAt = nowIso();
+      await Promise.all([
+        putRecord(
+          transaction.objectStore(REPERTOIRE_STORE_NAME),
+          demo.repertoire.id,
+          withLocalChange(limitRepertoire(demo.repertoire), updatedAt),
+        ),
+        putRecord(
+          transaction.objectStore(CHAPTERS_STORE_NAME),
+          demo.chapter.id,
+          withLocalChange(limitChapter(demo.chapter), updatedAt),
+        ),
+        putRecord(transaction.objectStore(PGNS_STORE_NAME), demo.chapter.pgnId, {
+          id: demo.chapter.pgnId,
+          pgn: demo.pgn,
+          revision: null,
+          byteSize: new TextEncoder().encode(demo.pgn).byteLength,
+          pendingMutations: [{ type: "createPgn", pgn: demo.pgn }],
+          metadataDirty: true,
+          updatedAt,
+          deletedAt: null,
+        } satisfies StoredPgn),
+      ]);
+      return {
+        repertoires: [demo.repertoire],
+        chapters: [demo.chapter],
+        trainingLineSchedules: [],
+        createdDemo: true,
+      };
+    },
+  );
+
+  if (load.createdDemo) {
+    const [repertoire] = load.repertoires;
+    const [chapter] = load.chapters;
+    if (repertoire !== undefined && chapter !== undefined) {
+      publishRecordChanges([
+        { kind: "repertoire", id: repertoire.id },
+        { kind: "chapter", id: chapter.id },
+        { kind: "pgn", id: chapter.pgnId },
+      ]);
+    }
   }
-
-  return await createDemoInitialRepertoire();
+  return load;
 }
 
 export async function getRepertoireSyncRequest(): Promise<RepertoireSyncRequest> {

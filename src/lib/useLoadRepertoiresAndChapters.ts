@@ -1,5 +1,5 @@
 import {
-  createDemoInitialRepertoire,
+  getInitialRepertoiresAndChapters,
   getStoredRepertoiresAndChapters,
   type InitialRepertoireLoad,
 } from "@/storage";
@@ -50,7 +50,7 @@ async function loadInitialRepertoiresAndChapters(
     }
   }
 
-  return await createDemoInitialRepertoire();
+  return await getInitialRepertoiresAndChapters();
 }
 
 export function useLoadRepertoiresAndChapters() {
