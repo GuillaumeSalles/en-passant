@@ -69,7 +69,7 @@ function isOptionalAsset(pathname) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response.status === 200) {
       const cache = await caches.open(RUNTIME_CACHE);
       await cache.put(request, response.clone());
     }
@@ -92,6 +92,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (request.headers.has("range")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

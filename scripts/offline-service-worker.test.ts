@@ -19,6 +19,14 @@ describe("offline service worker", () => {
 
     expect(source).toContain('pathname === "/stockfish-18-lite-single.wasm"');
     expect(source).toContain('pathname.startsWith("/sounds/default/")');
+    expect(source).toContain("response.status === 200");
     expect(source).toContain("await cache.put(request, response.clone())");
+  });
+
+  test("does not intercept range requests or cache partial responses", () => {
+    const source = createOfflineServiceWorkerSource("test-version", ["/index.html"]);
+
+    expect(source).toContain('if (request.headers.has("range")) return;');
+    expect(source).not.toContain("if (response.ok)");
   });
 });
