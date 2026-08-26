@@ -367,7 +367,7 @@ export function GameViewer(props: { gameId: string }) {
                   </>
                 )}
               </Show>
-              <MovesTree readOnly moveIndicators={moveIndicators()} />
+              <MovesTree readOnly canAnnotate={false} moveIndicators={moveIndicators()} />
               <PgnExplorerToolbar />
             </>
           }

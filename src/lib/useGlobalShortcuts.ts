@@ -1,4 +1,4 @@
-import { onSettled } from "solid-js";
+import { onSettled, type Accessor } from "solid-js";
 import {
   back,
   forward,
@@ -23,8 +23,15 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function useGlobalShortcuts(options: { allowEditing: boolean } = { allowEditing: true }) {
-  const allowEditing = options.allowEditing;
+type ShortcutOption = boolean | Accessor<boolean>;
+
+function optionValue(option: ShortcutOption): boolean {
+  return typeof option === "function" ? option() : option;
+}
+
+export function useGlobalShortcuts(
+  options: { allowEditing: ShortcutOption; enabled?: ShortcutOption } = { allowEditing: true },
+) {
   const onBack = useMutation(back);
   const onForward = useMutation(forward);
   const onArrowUp = useMutation(arrowUp);
@@ -34,6 +41,9 @@ export function useGlobalShortcuts(options: { allowEditing: boolean } = { allowE
   const onSetNagOnSelectedMove = useMutation(setNagOnSelectedMove);
 
   const onKeyDown = (e: KeyboardEvent) => {
+    if (options.enabled !== undefined && !optionValue(options.enabled)) {
+      return;
+    }
     if (isEditableTarget(e.target)) {
       return;
     }
@@ -52,10 +62,16 @@ export function useGlobalShortcuts(options: { allowEditing: boolean } = { allowE
       onSpacebar();
     } else if (key === "f") {
       onFlipBoard();
-    } else if (allowEditing && !e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
+    } else if (
+      optionValue(options.allowEditing) &&
+      !e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      /^[1-9]$/.test(e.key)
+    ) {
       e.preventDefault();
       onSetNagOnSelectedMove(Number(e.key));
-    } else if (allowEditing && key === "c") {
+    } else if (optionValue(options.allowEditing) && key === "c") {
       e.preventDefault();
       dispatchCommentShortcut(e.shiftKey ? "before" : "after");
     }

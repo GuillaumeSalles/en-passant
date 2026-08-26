@@ -21,6 +21,8 @@ import {
 } from "./reactivePgn";
 import {
   getNextMoveIds,
+  getChapterPgn,
+  getChapterScope,
   getPgn,
   getPgnId,
   selectFen,
@@ -141,6 +143,72 @@ function pgnMutationEffect(
   };
 }
 
+function moveIdAtPath(pgn: NormalizedPgn, path: MovePath): number | null {
+  let candidateIds = pgn.rootMoveIds;
+  let matchedMoveId: number | null = null;
+
+  for (const pathMove of path) {
+    const moveId = candidateIds.find((candidateId) => {
+      const move = pgn.moves[candidateId];
+      return move !== undefined && uci(move) === pathMove;
+    });
+    if (moveId === undefined) return null;
+    matchedMoveId = moveId;
+    candidateIds = pgn.moves[moveId]?.next ?? [];
+  }
+
+  return matchedMoveId;
+}
+
+function annotationMutationEffect(
+  state: MutableAppState,
+  ctx: Context,
+  sourcePgn: NormalizedPgn,
+  updatedMove: Move,
+): MutationEffect | undefined {
+  const path = movePath(sourcePgn, updatedMove.id);
+  const mutation: PgnMutation = {
+    type: "setAnnotations",
+    path,
+    annotations: moveAnnotations(updatedMove),
+  };
+
+  if (ctx.type === "repertoire-builder") {
+    return pgnMutationEffect(state, ctx, sourcePgn, mutation);
+  }
+  if (ctx.type !== "variation-training" || state.training.status !== "success") {
+    return undefined;
+  }
+
+  const chapterPgn = getChapterPgn(state, ctx);
+  const chapterScope = getChapterScope(state, ctx);
+  if (chapterPgn === null || chapterScope === null) return undefined;
+
+  const chapterMoveId = moveIdAtPath(chapterPgn, path);
+  if (chapterMoveId === null) return undefined;
+  const chapterMove = chapterPgn.moves[chapterMoveId];
+  if (chapterMove === undefined) return undefined;
+
+  const updatedChapterMove = {
+    ...chapterMove,
+    nags: [...updatedMove.nags],
+    commentBefore: updatedMove.commentBefore,
+    commentAfter: updatedMove.commentAfter,
+    metadata: [...updatedMove.metadata],
+  };
+  setPgnMove(chapterPgn, updatedChapterMove);
+
+  return {
+    type: "persist-pgn-mutation",
+    pgnId: chapterScope.chapter.pgnId,
+    pgn: toPgn(chapterPgn),
+    mutation: {
+      ...mutation,
+      annotations: moveAnnotations(updatedChapterMove),
+    },
+  };
+}
+
 function updateSelectedMoveHighlights(
   state: MutableAppState,
   ctx: Context,
@@ -160,11 +228,7 @@ function updateSelectedMoveHighlights(
     metadata: withPgnHighlightMetadata(move.metadata, highlights),
   };
   setPgnMove(pgn, updatedMove);
-  return pgnMutationEffect(state, ctx, pgn, {
-    type: "setAnnotations",
-    path: movePath(pgn, selectedMoveId),
-    annotations: moveAnnotations(updatedMove),
-  });
+  return annotationMutationEffect(state, ctx, pgn, updatedMove);
 }
 
 export function toggleArrowOnSelectedMove(
@@ -731,11 +795,7 @@ export function updateMoveCommentAfter(
     commentAfter: commentAfter.trim() === "" ? null : commentAfter,
   };
   setPgnMove(pgn, updatedMove);
-  return pgnMutationEffect(state, ctx, pgn, {
-    type: "setAnnotations",
-    path: movePath(pgn, moveId),
-    annotations: moveAnnotations(updatedMove),
-  });
+  return annotationMutationEffect(state, ctx, pgn, updatedMove);
 }
 
 export function updateMoveCommentBefore(
@@ -759,11 +819,7 @@ export function updateMoveCommentBefore(
     commentBefore: commentBefore.trim() === "" ? null : commentBefore,
   };
   setPgnMove(pgn, updatedMove);
-  return pgnMutationEffect(state, ctx, pgn, {
-    type: "setAnnotations",
-    path: movePath(pgn, moveId),
-    annotations: moveAnnotations(updatedMove),
-  });
+  return annotationMutationEffect(state, ctx, pgn, updatedMove);
 }
 
 export function copyMoveLearningDetails(
@@ -808,11 +864,7 @@ export function setNagOnSelectedMove(
     nags: applyNagToList(move.nags, nag),
   };
   setPgnMove(pgn, updatedMove);
-  return pgnMutationEffect(state, ctx, pgn, {
-    type: "setAnnotations",
-    path: movePath(pgn, selectedMoveId),
-    annotations: moveAnnotations(updatedMove),
-  });
+  return annotationMutationEffect(state, ctx, pgn, updatedMove);
 }
 
 function findStartOfVariation(pgn: NormalizedPgn, moveId: number): VariationStart {

@@ -25,7 +25,10 @@ import {
   AppState,
   getNagGlyph,
   getNagMeaning,
+  getChapterPgn,
   getPgn,
+  getTrainingLinePgn,
+  getTrainingLines,
   Move,
   NormalizedPgn,
   Repertoire,
@@ -354,6 +357,40 @@ test("persists selected-position arrows and square highlights as PGN annotations
   toggleArrowOnSelectedMove(state, ctx, "b1", "c3", "normal");
   toggleSquareOnSelectedMove(state, ctx, "d4", "shift");
   expect(toPgn(pgn)).toBe("1. e4 {[%eval 0.23] note} e5 *");
+});
+
+test("persists completed training annotations to the chapter without changing its moves", () => {
+  const state = fromPgn("1. e4 e5 2. Nf3 *");
+  const trainingCtx: Context = { ...ctx, type: "variation-training" };
+  const chapterPgn = getChapterPgn(state, trainingCtx)!;
+  const line = getTrainingLines(chapterPgn, "white")[0]!;
+  const linePgn = getTrainingLinePgn(chapterPgn, line.id)!;
+  const terminalMoveId = Object.values(linePgn.moves).find((move) => move.next.length === 0)!.id;
+
+  state.set("training", {
+    ...state.training,
+    status: "success",
+    variation: linePgn,
+  });
+  state.set("selectedMoveId", terminalMoveId);
+
+  updateMoveCommentAfter(state, trainingCtx, terminalMoveId, "Review note");
+  setNagOnSelectedMove(state, trainingCtx, 1);
+  toggleArrowOnSelectedMove(state, trainingCtx, "b1", "c3", "normal");
+  const result = toggleSquareOnSelectedMove(state, trainingCtx, "d4", "normal");
+
+  expect(toPgn(state.training.variation)).toBe(
+    "1. e4 e5 2. Nf3 $1 {[%csl Rd4] [%cal Yb1c3] Review note} *",
+  );
+  expect(toPgn(chapterPgn)).toBe("1. e4 e5 2. Nf3 $1 {[%csl Rd4] [%cal Yb1c3] Review note} *");
+  expect(result).toMatchObject({
+    type: "persist-pgn-mutation",
+    pgn: "1. e4 e5 2. Nf3 $1 {[%csl Rd4] [%cal Yb1c3] Review note} *",
+    mutation: {
+      type: "setAnnotations",
+      path: ["e2e4", "e7e5", "g1f3"],
+    },
+  });
 });
 
 test("provides glyphs and meanings for NAGs up to 19", () => {

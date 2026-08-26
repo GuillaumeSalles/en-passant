@@ -12,6 +12,8 @@ import {
   findOpening,
   selectHighlights,
   selectNagAnnotations,
+  toggleArrowOnSelectedMove,
+  toggleSquareOnSelectedMove,
   type TrainingSessionSummary,
 } from "@/lib/AppState";
 import {
@@ -43,7 +45,6 @@ export function VariationTraining(props: {
   const navigate = useNavigate();
   const state = useState();
   const onCompleteTrainingQueueReviewLine = useMutation(completeTrainingQueueReviewLine);
-  useGlobalShortcuts();
   useLoadPgn(
     () => props.repertoireHandle,
     () => props.chapterHandle,
@@ -70,8 +71,11 @@ export function VariationTraining(props: {
   );
 
   const flow = useVariationTrainingFlow(props);
+  useGlobalShortcuts({ allowEditing: flow.isLineComplete });
   const completedLineHighlights = useSelector(selectHighlights);
   const completedLineAnnotations = useSelector(selectNagAnnotations);
+  const onDrawArrow = useMutation(toggleArrowOnSelectedMove);
+  const onHighlightSquare = useMutation(toggleSquareOnSelectedMove);
   const isReviewingMultipleLines = () => isReviewingQueue() || isReviewingChapter();
   const hasNextReviewLine = () => {
     if (isReviewingQueue()) {
@@ -140,8 +144,12 @@ export function VariationTraining(props: {
                 pieceToAnimate={flow.animation()}
                 arrows={flow.isLineComplete() ? completedLineHighlights().arrows : {}}
                 squareHighlights={squareHighlights()}
-                onHighlightSquare={() => {}}
-                onDrawArrow={() => {}}
+                onHighlightSquare={(square, highlight) => {
+                  if (flow.isLineComplete()) onHighlightSquare(square, highlight);
+                }}
+                onDrawArrow={(from, to, highlight) => {
+                  if (flow.isLineComplete()) onDrawArrow(from, to, highlight);
+                }}
                 onIntroComplete={flow.onIntroComplete}
                 onAnimationSettled={flow.onAnimationSettled}
                 annotations={
@@ -220,8 +228,11 @@ export function VariationTraining(props: {
                   animationKey="variation-training-moves"
                   direction="right-to-left"
                 />
-                <Show when={flow.isLineComplete()} fallback={<MovesTree readOnly={false} />}>
-                  <MovesTree readOnly />
+                <Show
+                  when={flow.isLineComplete()}
+                  fallback={<MovesTree readOnly={false} canAnnotate={false} />}
+                >
+                  <MovesTree readOnly canAnnotate={true} />
                 </Show>
                 <PgnExplorerToolbar />
               </>

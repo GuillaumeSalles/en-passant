@@ -74,13 +74,22 @@ function isMoveListBesideBoard() {
   return window.matchMedia(`(min-width: ${SIDE_PANEL_BREAKPOINT})`).matches;
 }
 
-export function MovesTree(props: { readOnly: boolean; moveIndicators?: MoveIndicators }) {
+export function MovesTree(props: {
+  readOnly: boolean;
+  canAnnotate: boolean;
+  moveIndicators?: MoveIndicators;
+}) {
   const isReadOnly = untrack(() => props.readOnly);
+  const annotationOnly = untrack(() => props.canAnnotate);
   const moves = useSelector((state, ctx) => getPgn(state, ctx)?.moves ?? {});
   const selectedMove = useSelector(selectSelectedMoveId);
   const preselectedVariation = useSelector(selectPreselectedVariation);
   const readOnly = () => isReadOnly;
-  const canComment = useSelector((_state, ctx) => ctx.type === "repertoire-builder" && !readOnly());
+  const canComment = useSelector(
+    (_state, ctx) =>
+      (ctx.type === "repertoire-builder" && !readOnly()) ||
+      (ctx.type === "variation-training" && annotationOnly),
+  );
   const [commentEditorRequest, setCommentEditorRequest] = createSignal<CommentEditorRequest | null>(
     null,
   );
@@ -100,15 +109,13 @@ export function MovesTree(props: { readOnly: boolean; moveIndicators?: MoveIndic
     }));
   }
 
-  if (!isReadOnly) {
-    const removeCommentShortcutListener = addCommentShortcutListener((placement) => {
-      const moveId = selectedMove();
-      if (moveId !== null) {
-        requestComment(moveId, placement);
-      }
-    });
-    onCleanup(removeCommentShortcutListener);
-  }
+  const removeCommentShortcutListener = addCommentShortcutListener((placement) => {
+    const moveId = selectedMove();
+    if (moveId !== null) {
+      requestComment(moveId, placement);
+    }
+  });
+  onCleanup(removeCommentShortcutListener);
 
   return (
     <MovesTreeIndicatorsContext value={() => props.moveIndicators ?? {}}>
@@ -457,6 +464,7 @@ function MoveComponent(props: {
   const canEditMoves = useSelector(
     (_state, ctx) => ctx.type === "repertoire-builder" && !readOnly(),
   );
+  const canComment = useMovesTreeCanComment();
   const move = useSelector((state, ctx) => selectMoveById(state, ctx, props.moveId));
   const isSelected = createMemo(() => props.isSelected());
   const indicator = createMemo(() => moveIndicators()[props.moveId]);
@@ -482,7 +490,7 @@ function MoveComponent(props: {
   return (
     <ContextMenu>
       <ContextMenuTrigger
-        disabled={!canEditMoves()}
+        disabled={!canEditMoves() && !canComment()}
         onContextMenu={() => onSelectMove(props.moveId)}
       >
         <div
@@ -600,23 +608,25 @@ function MoveComponent(props: {
             Delete comment after
           </ContextMenuItem>
         </Show>
-        <ContextMenuItem class="text-xs" onClick={() => onDeleteMove(props.moveId)}>
-          Delete move
-        </ContextMenuItem>
-        <Show when={props.canPromoteVariation}>
-          <ContextMenuItem class="text-xs" onClick={() => onPromoteVariation(props.moveId)}>
-            Promote variation
+        <Show when={canEditMoves()}>
+          <ContextMenuItem class="text-xs" onClick={() => onDeleteMove(props.moveId)}>
+            Delete move
           </ContextMenuItem>
-        </Show>
-        <Show when={props.canMoveVariationUp}>
-          <ContextMenuItem class="text-xs" onClick={() => onMoveVariationUp(props.moveId)}>
-            Move variation up
-          </ContextMenuItem>
-        </Show>
-        <Show when={props.canMoveVariationDown}>
-          <ContextMenuItem class="text-xs" onClick={() => onMoveVariationDown(props.moveId)}>
-            Move variation down
-          </ContextMenuItem>
+          <Show when={props.canPromoteVariation}>
+            <ContextMenuItem class="text-xs" onClick={() => onPromoteVariation(props.moveId)}>
+              Promote variation
+            </ContextMenuItem>
+          </Show>
+          <Show when={props.canMoveVariationUp}>
+            <ContextMenuItem class="text-xs" onClick={() => onMoveVariationUp(props.moveId)}>
+              Move variation up
+            </ContextMenuItem>
+          </Show>
+          <Show when={props.canMoveVariationDown}>
+            <ContextMenuItem class="text-xs" onClick={() => onMoveVariationDown(props.moveId)}>
+              Move variation down
+            </ContextMenuItem>
+          </Show>
         </Show>
       </ContextMenuContent>
     </ContextMenu>

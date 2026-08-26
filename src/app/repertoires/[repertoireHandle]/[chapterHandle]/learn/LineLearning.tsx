@@ -17,9 +17,13 @@ import {
   moveToEvalMove,
   selectAnimation,
   selectFen,
+  selectHighlights,
+  selectNagAnnotations,
   selectOrientation,
   selectSelectedMoveId,
   selectTraining,
+  toggleArrowOnSelectedMove,
+  toggleSquareOnSelectedMove,
 } from "@/lib/AppState";
 import { createPacingTimer } from "@/lib/createPacingTimer";
 import { learningLinePath, trainingPath } from "@/lib/routes";
@@ -28,6 +32,7 @@ import { useMutation } from "@/lib/useMutation";
 import { useOpeningIndex } from "@/lib/useOpeningIndex";
 import { useRouteContext } from "@/lib/useRouteContext";
 import { useSelector } from "@/lib/useSelector";
+import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
 import {
   markLineLearned,
   playLearningMove,
@@ -79,6 +84,15 @@ export function LineLearning(props: {
   let currentFlow = initialLearningFlowState;
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
   const pacingTimer = createPacingTimer();
+  const completedLineHighlights = useSelector(selectHighlights);
+  const completedLineAnnotations = useSelector(selectNagAnnotations);
+  const onDrawArrow = useMutation(toggleArrowOnSelectedMove);
+  const onHighlightSquare = useMutation(toggleSquareOnSelectedMove);
+
+  useGlobalShortcuts({
+    allowEditing: true,
+    enabled: () => flow().type === "complete",
+  });
 
   const onStartLearningLine = useMutation(startLearningLine);
   const onPlayLearningMove = useMutation(playLearningMove);
@@ -334,10 +348,14 @@ export function LineLearning(props: {
                 flow().type === "reinforcement" ? reinforcement.onPieceDrop : onPieceDrop
               }
               pieceToAnimate={animation()}
-              arrows={{}}
+              arrows={flow().type === "complete" ? completedLineHighlights().arrows : {}}
               squareHighlights={squareHighlights()}
-              onHighlightSquare={() => {}}
-              onDrawArrow={() => {}}
+              onHighlightSquare={(square, highlight) => {
+                if (flow().type === "complete") onHighlightSquare(square, highlight);
+              }}
+              onDrawArrow={(from, to, highlight) => {
+                if (flow().type === "complete") onDrawArrow(from, to, highlight);
+              }}
               onIntroComplete={() => {
                 setBoardIntroComplete(true);
                 reinforcement.onIntroComplete();
@@ -347,11 +365,13 @@ export function LineLearning(props: {
                 reinforcement.onAnimationSettled(animationId);
               }}
               annotations={
-                flow().type === "reinforcement"
-                  ? reinforcement.annotations()
-                  : wrongSquare() !== null
-                    ? { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
-                    : {}
+                flow().type === "complete"
+                  ? completedLineAnnotations()
+                  : flow().type === "reinforcement"
+                    ? reinforcement.annotations()
+                    : wrongSquare() !== null
+                      ? { [wrongSquare() ?? ""]: [{ type: "wrongMove" }] }
+                      : {}
               }
             />
           }
@@ -401,7 +421,12 @@ export function LineLearning(props: {
                 </Show>
               </div>
               <HorizontalDashedDivider animation="none" />
-              <MovesTree readOnly />
+              <Show
+                when={flow().type === "complete"}
+                fallback={<MovesTree readOnly canAnnotate={false} />}
+              >
+                <MovesTree readOnly canAnnotate={true} />
+              </Show>
             </>
           }
         />

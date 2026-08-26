@@ -979,7 +979,9 @@ test("highlights the last move during training", async ({ page }) => {
   expect(consoleMessages).toEqual([]);
 });
 
-test("reveals line comments and annotations when training completes", async ({ page }) => {
+test("edits chapter annotations without reopening moves when training completes", async ({
+  page,
+}) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
   await seedRepertoire(page, "1. e4 $1 {King pawn [%csl Rd4] [%cal Yb1c3]} *");
@@ -998,8 +1000,27 @@ test("reveals line comments and annotations when training completes", async ({ p
   await expect(page.locator('[data-annotation="nag"][data-annotation-square="e4"]')).toHaveText(
     "!",
   );
-  await page.locator('[aria-label="Move e4"]').dblclick();
-  await expect(page.getByLabel("Move comment")).toHaveCount(0);
+  await page.getByText("King pawn", { exact: true }).dblclick();
+  await expect(page.getByLabel("Move comment")).toBeFocused();
+  await page.getByLabel("Move comment").fill("Updated after review");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("2");
+  await expect(page.locator('[aria-label="Move e4"] [data-nag="2"]')).toHaveText("?");
+  await expect(page.locator('[aria-label="Move e4"] [data-nag="1"]')).toHaveCount(0);
+
+  await dragBetweenSquares(page, "c3", "f6", { button: "right" });
+  await expect(page.locator('[data-arrow="c3f6"]')).toHaveAttribute("data-arrow-kind", "normal");
+
+  await page.locator('[aria-label="Move e4"]').click({ button: "right" });
+  await expect(page.getByText("Delete comment after", { exact: true })).toBeVisible();
+  await expect(page.getByText("Delete move", { exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  await dragPiece(page, "e4", "e5");
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect
+    .poll(() => firstStoredPgn(page))
+    .toContain("e4 $2 {[%csl Rd4] [%cal Yb1c3,Yc3f6] Updated after review}");
   expect(consoleMessages).toEqual([]);
 });
 
@@ -1278,19 +1299,21 @@ test("keeps training input locked until the actual response animation settles", 
   expect(consoleMessages).toEqual([]);
 });
 
-test("does not allow adding move comments during training", async ({ page }) => {
+test("does not allow annotations before training completes", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
   await recordPlayedSounds(page);
-  await seedRepertoire(page, "1. e4 *");
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
   await openFirstTrainingLine(page);
-  await dragPiece(page, "e2", "e4");
-  await expect(page.getByText("Good job!")).toBeVisible();
 
   await page.keyboard.press("c");
   await expect(page.getByLabel("Move comment")).toHaveCount(0);
   await page.keyboard.press("Shift+C");
   await expect(page.getByLabel("Move comment")).toHaveCount(0);
+  await page.keyboard.press("1");
+  await expect(page.locator("[data-nag]")).toHaveCount(0);
+  await dragBetweenSquares(page, "c3", "f6", { button: "right" });
+  await expect(page.locator('[data-arrow="c3f6"]')).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
 
@@ -1554,6 +1577,16 @@ test("continues learning with the next unlearned line", async ({ page }) => {
     secondLearnHref,
   );
   await expect(page.getByRole("link", { name: "Back to lines" })).toHaveCount(0);
+  await page.keyboard.press("1");
+  await page.keyboard.press("c");
+  await expect(page.getByLabel("Move comment")).toBeFocused();
+  await page.getByLabel("Move comment").fill("Learned note");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => firstStoredPgn(page)).toContain("e4 $1 {Learned note}");
+  await page.locator('[aria-label="Move e4"]').click({ button: "right" });
+  await expect(page.getByText("Comment before", { exact: true })).toBeVisible();
+  await expect(page.getByText("Delete move", { exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page).toHaveURL(secondLearnHref);
   await advanceLearningPacing(page, 480);

@@ -222,7 +222,7 @@ export function Repertoire(props: {
               }
             }}
           />
-          <MovesTree readOnly={false} />
+          <MovesTree readOnly={false} canAnnotate={false} />
           <Show when={nextMoveIds().length > 1}>
             <VariationSelector />
           </Show>

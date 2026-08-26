@@ -111,7 +111,7 @@ export function LineReader(props: LineReaderProps) {
         evalBar={null}
         panelChildren={
           <>
-            <MovesTree readOnly />
+            <MovesTree readOnly canAnnotate={false} />
             <PgnExplorerToolbar />
           </>
         }

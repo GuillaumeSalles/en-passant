@@ -1,4 +1,5 @@
 import type { Move, NormalizedPgn, Orientation } from "./types";
+import { createReactiveNormalizedPgn } from "./reactivePgn";
 
 export type TrainingLine = {
   id: string;
@@ -153,11 +154,11 @@ export function getTrainingLinePgn(pgn: NormalizedPgn, lineId: string): Normaliz
 
   const rootMoveId = moveIds[0];
   if (rootMoveId === undefined) return null;
-  return {
+  return createReactiveNormalizedPgn({
     rootMoveIds: [rootMoveId],
     moves,
     moveIdCounter: pgn.moveIdCounter,
-  };
+  });
 }
 
 function isUserMove(move: Move, orientation: Orientation): boolean {
