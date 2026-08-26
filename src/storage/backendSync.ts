@@ -275,3 +275,16 @@ const repertoireSyncQueue = createRepertoireSyncQueue({
 export function queueRepertoireSync(): void {
   void repertoireSyncQueue.queue();
 }
+
+type OnlineEventTarget = {
+  addEventListener: (type: "online", listener: () => void) => void;
+  removeEventListener: (type: "online", listener: () => void) => void;
+};
+
+export function startRepertoireSyncOnReconnect(
+  sync: () => void = queueRepertoireSync,
+  eventTarget: OnlineEventTarget = window,
+): () => void {
+  eventTarget.addEventListener("online", sync);
+  return () => eventTarget.removeEventListener("online", sync);
+}

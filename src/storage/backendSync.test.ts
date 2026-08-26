@@ -1,5 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
-import { createRepertoireSyncQueue, withoutInlinePgnCreation } from "./backendSync";
+import {
+  createRepertoireSyncQueue,
+  startRepertoireSyncOnReconnect,
+  withoutInlinePgnCreation,
+} from "./backendSync";
 import type { RepertoireSyncRequest } from "@/storage";
 
 type Deferred<T> = {
@@ -118,5 +122,28 @@ describe("withoutInlinePgnCreation", () => {
       },
     ]);
     expect(request.changes.pgns[0]?.mutations).toHaveLength(2);
+  });
+});
+
+describe("startRepertoireSyncOnReconnect", () => {
+  test("queues a retry when connectivity returns and removes the listener on cleanup", () => {
+    const sync = vi.fn();
+    let onlineListener: (() => void) | undefined;
+    const eventTarget = {
+      addEventListener: (_type: "online", listener: () => void) => {
+        onlineListener = listener;
+      },
+      removeEventListener: (_type: "online", listener: () => void) => {
+        if (onlineListener === listener) onlineListener = undefined;
+      },
+    };
+
+    const stop = startRepertoireSyncOnReconnect(sync, eventTarget);
+    onlineListener?.();
+    expect(sync).toHaveBeenCalledOnce();
+
+    stop();
+    onlineListener?.();
+    expect(sync).toHaveBeenCalledOnce();
   });
 });

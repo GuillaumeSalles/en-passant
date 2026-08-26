@@ -12,6 +12,7 @@ describe("offline service worker", () => {
     expect(source).toContain('["/index.html","/assets/index.js"]');
     expect(source).toContain('url.pathname.startsWith("/api/")');
     expect(source).toContain('caches.match("/index.html")');
+    expect(source).toContain('event.data?.type === "SKIP_WAITING"');
   });
 
   test("only runtime-caches optional assets after they are requested", () => {

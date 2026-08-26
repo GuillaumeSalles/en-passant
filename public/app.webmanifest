@@ -1,0 +1,70 @@
+{
+  "id": "/app",
+  "name": "En passant",
+  "short_name": "En passant",
+  "description": "Build, study, and train your chess repertoire.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "categories": ["education", "games"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/repertoire-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "A chess repertoire with its board and move tree"
+    },
+    {
+      "src": "/screenshots/repertoire-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "A chess repertoire on mobile"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open repertoire",
+      "short_name": "Repertoire",
+      "url": "/app"
+    },
+    {
+      "name": "Review training queue",
+      "short_name": "Training",
+      "url": "/app/training"
+    },
+    {
+      "name": "View imported games",
+      "short_name": "Games",
+      "url": "/app/games"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
+}
