@@ -614,6 +614,29 @@ async function dragPieceWithCapturedTouch(page: Page, from: string, to: string) 
   );
 }
 
+async function touchSquare(page: Page, square: string) {
+  const point = await squareCenter(page, square);
+
+  await page.locator(`[data-square="${square}"]`).dispatchEvent("pointerdown", {
+    button: 0,
+    buttons: 1,
+    clientX: point.x,
+    clientY: point.y,
+    isPrimary: true,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+  await page.locator(`[data-square="${square}"]`).dispatchEvent("pointerup", {
+    button: 0,
+    buttons: 0,
+    clientX: point.x,
+    clientY: point.y,
+    isPrimary: true,
+    pointerId: 1,
+    pointerType: "touch",
+  });
+}
+
 async function dragBetweenSquares(
   page: Page,
   from: string,
@@ -827,6 +850,33 @@ test("touch dragging pieces uses finger position and does not allow board scroll
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollYBeforeDrag);
+  expect(consoleMessages).toEqual([]);
+});
+
+test("touching a piece and then a target square moves the piece", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openRepertoire(page);
+
+  await touchSquare(page, "e2");
+  await expect(page.locator('[data-selected-piece-square="e2"]')).toBeVisible();
+  await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
+
+  await touchSquare(page, "d2");
+  await expect(page.locator('[data-selected-piece-square="d2"]')).toBeVisible();
+
+  await touchSquare(page, "d2");
+  await expect(page.locator("[data-selected-piece-square]")).toHaveCount(0);
+  await expect(page.locator('[data-square="d2"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e2"]')).toHaveAttribute("data-piece", "P");
+
+  await touchSquare(page, "e2");
+  await touchSquare(page, "e4");
+
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
+  await expect(page.locator("[data-selected-piece-square]")).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
 

@@ -18,6 +18,7 @@ import { createSignal, createMemo, createEffect, onSettled, For, Show, untrack }
 import styles from "./Chessboard.module.css";
 import { DraggedHoverSquare } from "./DraggedHoverSquare";
 import { DraggedPiece } from "./DraggedPiece";
+import { SelectedPieceSquare } from "./SelectedPieceSquare";
 import { Coordinates } from "./Coordinates";
 import { HighlightSquare } from "./HighlightSquare";
 import { Square } from "./Square";
@@ -57,9 +58,29 @@ const MOVE_ANIMATION_STAGGER_MS = 110;
 const INTRO_GRID_LINE_STAGGER_MS = 22;
 const INTRO_DELAY_FILE_MS = 26;
 const INTRO_DELAY_RANK_MS = 29;
+const DRAG_START_DISTANCE_PX = 4;
+
+type SelectedPiece = {
+  sourceSquare: string;
+  piece: FenPiece;
+};
+
+type PendingPrimaryPress =
+  | (SelectedPiece & {
+      type: "piece";
+      startPosition: { x: number; y: number };
+      size: number;
+    })
+  | (SelectedPiece & {
+      type: "selected-piece-target";
+    });
 
 function pieceKey(square: string, piece: FenPiece): PieceKey {
   return `${square}:${piece}`;
+}
+
+function arePiecesSameColor(first: FenPiece, second: FenPiece): boolean {
+  return (first === first.toUpperCase()) === (second === second.toUpperCase());
 }
 
 function squareFromPointer(
@@ -108,7 +129,9 @@ export function Chessboard(props: ChessboardProps) {
   const readOnly = untrack(() => props.readOnly);
   const animateIntro = untrack(() => props.animateIntro);
   const [draggingData, setDraggingData] = createSignal<DraggingData | null>(null);
+  const [selectedPiece, setSelectedPiece] = createSignal<SelectedPiece | null>(null);
   const [activeAnimation, setActiveAnimation] = createSignal<BoardAnimation | null>(null);
+  let pendingPrimaryPress: PendingPrimaryPress | null = null;
   let currentActiveAnimation: BoardAnimation | null = null;
   const [introActive, setIntroActive] = createSignal(animateIntro);
   const [useMeasuredBoardSize, setUseMeasuredBoardSize] = createSignal(false);
@@ -128,6 +151,11 @@ export function Chessboard(props: ChessboardProps) {
   });
 
   const board = createMemo(() => parseFen(props.position));
+  const activeSelectedPiece = createMemo(() => {
+    const selected = selectedPiece();
+    if (selected === null || !canDrag()) return null;
+    return board()[selected.sourceSquare] === selected.piece ? selected : null;
+  });
   const squareItems = createMemo(() =>
     squares.map((square) => ({
       square,
@@ -227,7 +255,34 @@ export function Chessboard(props: ChessboardProps) {
   });
 
   const onWindowPointerMove = (e: PointerEvent) => {
-    const data = draggingData();
+    let data = draggingData();
+    const pending = pendingPrimaryPress;
+
+    if (pending !== null) {
+      if ((e.buttons & 1) === 0) {
+        pendingPrimaryPress = null;
+        return;
+      }
+
+      if (pending.type === "selected-piece-target") return;
+
+      const distanceX = e.clientX - pending.startPosition.x;
+      const distanceY = e.clientY - pending.startPosition.y;
+      if (distanceX ** 2 + distanceY ** 2 < DRAG_START_DISTANCE_PX ** 2) return;
+
+      data = {
+        type: "piece",
+        sourceSquare: pending.sourceSquare,
+        piece: pending.piece,
+        position: { x: e.clientX, y: e.clientY },
+        size: pending.size,
+        hoverSquare: squareFromPointer(e, boardFrameRef, props.boardOrientation),
+      };
+      pendingPrimaryPress = null;
+      setSelectedPiece(null);
+      setDraggingData(data);
+    }
+
     if (data !== null && !isDragButtonPressed(e, data)) {
       setDraggingData(null);
       return;
@@ -253,16 +308,21 @@ export function Chessboard(props: ChessboardProps) {
   };
 
   const onWindowBlur = () => {
+    pendingPrimaryPress = null;
     setDraggingData(null);
+    setSelectedPiece(null);
   };
 
   const onVisibilityChange = () => {
     if (document.visibilityState === "hidden") {
+      pendingPrimaryPress = null;
       setDraggingData(null);
+      setSelectedPiece(null);
     }
   };
 
   const onWindowPointerCancel = () => {
+    pendingPrimaryPress = null;
     setDraggingData(null);
   };
 
@@ -306,6 +366,29 @@ export function Chessboard(props: ChessboardProps) {
   }
 
   const onWindowPointerUp = (e: PointerEvent) => {
+    const pending = pendingPrimaryPress;
+    if (pending !== null) {
+      pendingPrimaryPress = null;
+      const targetSquare = squareFromPointer(e, boardFrameRef, props.boardOrientation);
+
+      if (pending.type === "piece") {
+        if (targetSquare === pending.sourceSquare) {
+          setSelectedPiece({ sourceSquare: pending.sourceSquare, piece: pending.piece });
+        } else if (targetSquare !== null) {
+          setSelectedPiece(null);
+          props.onPieceDrop(pending.sourceSquare, targetSquare, fenPieceToPiece(pending.piece));
+        }
+        return;
+      }
+
+      if (targetSquare === null) return;
+      setSelectedPiece(null);
+      if (targetSquare !== pending.sourceSquare) {
+        props.onPieceDrop(pending.sourceSquare, targetSquare, fenPieceToPiece(pending.piece));
+      }
+      return;
+    }
+
     const data = draggingData();
     if (data == null) return;
 
@@ -331,8 +414,10 @@ export function Chessboard(props: ChessboardProps) {
 
   const onPointerDown = (event: PointerEvent, sourceSquare: string, piece?: FenPiece) => {
     if (readOnly) return;
+    if (draggingData() !== null || pendingPrimaryPress !== null) return;
 
     if (event.button === 2) {
+      setSelectedPiece(null);
       setDraggingData({
         type: "arrow",
         sourceSquare,
@@ -343,17 +428,43 @@ export function Chessboard(props: ChessboardProps) {
     }
 
     if (event.button === 0 && canDrag()) {
+      const selected = activeSelectedPiece();
+      if (selected !== null) {
+        if (
+          piece !== undefined &&
+          sourceSquare !== selected.sourceSquare &&
+          arePiecesSameColor(selected.piece, piece)
+        ) {
+          const source = event.target as HTMLElement;
+          setSelectedPiece(null);
+          pendingPrimaryPress = {
+            type: "piece",
+            sourceSquare,
+            piece,
+            startPosition: { x: event.clientX, y: event.clientY },
+            size: source.getBoundingClientRect().width,
+          };
+          return;
+        }
+
+        pendingPrimaryPress = {
+          type: "selected-piece-target",
+          sourceSquare: selected.sourceSquare,
+          piece: selected.piece,
+        };
+        return;
+      }
+
       if (piece == null) return;
 
       const source = event.target as HTMLElement;
-      setDraggingData({
+      pendingPrimaryPress = {
         type: "piece",
         sourceSquare,
         piece,
-        position: { x: event.clientX, y: event.clientY },
+        startPosition: { x: event.clientX, y: event.clientY },
         size: source.getBoundingClientRect().width,
-        hoverSquare: sourceSquare,
-      });
+      };
     }
   };
 
@@ -376,6 +487,15 @@ export function Chessboard(props: ChessboardProps) {
 
     return cleanupWindowListeners;
   });
+
+  createEffect(
+    () => [props.position, canDrag()] as const,
+    () => {
+      pendingPrimaryPress = null;
+      setDraggingData(null);
+      setSelectedPiece(null);
+    },
+  );
 
   createEffect(
     () => props.pieceToAnimate ?? null,
@@ -507,6 +627,14 @@ export function Chessboard(props: ChessboardProps) {
             boardOrientation={props.boardOrientation}
             draggingData={draggingData}
           />
+          <Show when={activeSelectedPiece()}>
+            {(selected) => (
+              <SelectedPieceSquare
+                square={selected().sourceSquare}
+                boardOrientation={props.boardOrientation}
+              />
+            )}
+          </Show>
           <For each={pieceEntries()}>
             {(entry) => {
               return (
