@@ -493,6 +493,7 @@ export function moveFromChessboard(
   from: string,
   to: string,
   piece: string,
+  animate = false,
 ): MutationResult {
   const appliedMove = applyMoveFromCurrentPosition(state, ctx, {
     from,
@@ -501,7 +502,7 @@ export function moveFromChessboard(
   });
   if (appliedMove === null) return;
 
-  return move(state, ctx, { ...appliedMove, animate: false });
+  return move(state, ctx, { ...appliedMove, animate });
 }
 
 export function moveFromEvalMove(

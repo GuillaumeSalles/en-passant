@@ -229,11 +229,20 @@ export function LineLearning(props: {
           dispatch({ type: "RESET" });
           return;
         }
-        onPlayLearningMove({ sourceMove, input: command.input, animate: false });
+        onPlayLearningMove({
+          sourceMove,
+          input: command.input,
+          animate: command.input.animate,
+        });
         return;
       }
       case "PLAY_WRONG_MOVE": {
-        onMoveFromChessboard(command.input.from, command.input.to, command.input.piece);
+        onMoveFromChessboard(
+          command.input.from,
+          command.input.to,
+          command.input.piece,
+          command.input.animate,
+        );
         const moveId = selectSelectedMoveId(state, ctx());
         if (moveId === null) {
           dispatch({ type: "RESET" });
@@ -286,7 +295,12 @@ export function LineLearning(props: {
     },
   );
 
-  function onPieceDrop(sourceSquare: string, targetSquare: string, piece: string) {
+  function onPieceDrop(
+    sourceSquare: string,
+    targetSquare: string,
+    piece: string,
+    animate: boolean,
+  ) {
     if (!acceptsLearningMove(currentFlow)) return;
 
     const pgn = chapterPgn();
@@ -300,14 +314,14 @@ export function LineLearning(props: {
       dispatch({
         type: "CORRECT_MOVE",
         sourceMoveId: sourceMove.id,
-        input: { from: sourceSquare, to: targetSquare, piece },
+        input: { from: sourceSquare, to: targetSquare, piece, animate },
       });
       return;
     }
 
     dispatch({
       type: "WRONG_MOVE",
-      input: { from: sourceSquare, to: targetSquare, piece },
+      input: { from: sourceSquare, to: targetSquare, piece, animate },
     });
   }
 

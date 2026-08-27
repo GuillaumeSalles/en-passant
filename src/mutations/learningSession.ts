@@ -61,7 +61,14 @@ export function playLearningMove(
 ): MutationResult {
   const result =
     "piece" in details.input
-      ? moveFromChessboard(state, ctx, details.input.from, details.input.to, details.input.piece)
+      ? moveFromChessboard(
+          state,
+          ctx,
+          details.input.from,
+          details.input.to,
+          details.input.piece,
+          details.animate,
+        )
       : moveFromEvalMove(state, ctx, details.input, details.animate);
   copyMoveLearningDetails(state, ctx, details.sourceMove);
   return result;

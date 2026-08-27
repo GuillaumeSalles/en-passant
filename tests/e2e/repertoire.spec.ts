@@ -853,8 +853,9 @@ test("touch dragging pieces uses finger position and does not allow board scroll
   expect(consoleMessages).toEqual([]);
 });
 
-test("touching a piece and then a target square moves the piece", async ({ page }) => {
+test("touching a piece and then a target square animates the move", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
+  await recordPieceAnimations(page);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await openRepertoire(page);
@@ -877,6 +878,7 @@ test("touching a piece and then a target square moves the piece", async ({ page 
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
   await expect(page.locator("[data-selected-piece-square]")).toHaveCount(0);
+  await expect.poll(() => pieceAnimationCount(page)).toBe(1);
   expect(consoleMessages).toEqual([]);
 });
 

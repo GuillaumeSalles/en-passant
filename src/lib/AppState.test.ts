@@ -676,6 +676,14 @@ test("move on main line", () => {
   expect(toPgn(getPgn(state, ctx)!)).toBe("1. e4 e5 *");
 });
 
+test("moves from a selected piece can opt into board animation", () => {
+  const state = fromPgn("*");
+
+  moveFromChessboard(state, ctx, "e2", "e4", "wP", true);
+
+  expect(state.animation?.movements).toEqual([{ piece: "P", from: "e2", to: "e4" }]);
+});
+
 test("move should create variation", () => {
   let state = fromPgn("1. e4 e5 *");
   forward(state, ctx);

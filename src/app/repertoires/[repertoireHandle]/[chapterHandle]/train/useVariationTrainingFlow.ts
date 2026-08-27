@@ -420,7 +420,12 @@ export function useVariationTrainingFlow(
     }
   }
 
-  const onPieceDrop = (sourceSquare: string, targetSquare: string, piece: string) => {
+  const onPieceDrop = (
+    sourceSquare: string,
+    targetSquare: string,
+    piece: string,
+    animate: boolean,
+  ) => {
     const activePhase = currentPhase;
     const pgn = chapterPgn();
     if (
@@ -443,7 +448,7 @@ export function useVariationTrainingFlow(
     const origin = activePhase.type === "awaiting-replay-move" ? "replay" : "line";
     if (!dispatch({ type: "MOVE_SUBMITTED", origin })) return;
     onUpdateTrainingStatus("in-progress");
-    onMoveFromChessboard(sourceSquare, targetSquare, piece);
+    onMoveFromChessboard(sourceSquare, targetSquare, piece, animate);
     const playedMoveId = selectSelectedMoveId(state, ctx());
 
     if (sourceSquare !== expectedMove.from || targetSquare !== expectedMove.to) {

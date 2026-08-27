@@ -26,6 +26,7 @@ export type LearningMoveInput = {
   from: string;
   to: string;
   piece: string;
+  animate: boolean;
 };
 
 export type LearningFlowEvent =

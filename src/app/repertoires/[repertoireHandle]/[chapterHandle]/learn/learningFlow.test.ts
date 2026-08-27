@@ -87,7 +87,10 @@ describe("learning flow", () => {
   test("captures the exact wrong move before scheduling its removal", () => {
     const wrong = reduceLearningFlow(
       { type: "awaiting-repeat" },
-      { type: "WRONG_MOVE", input: { from: "g1", to: "f3", piece: "N" } },
+      {
+        type: "WRONG_MOVE",
+        input: { from: "g1", to: "f3", piece: "N", animate: true },
+      },
     );
     expect(wrong.state).toEqual({ type: "recording-wrong", square: "f3" });
 

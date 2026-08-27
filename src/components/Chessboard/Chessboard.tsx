@@ -33,7 +33,12 @@ import type { MoveAnnotationData } from "./MoveAnnotation";
 type ChessboardProps = {
   boardOrientation: Orientation;
   position: string; // FEN string
-  onPieceDrop: (sourceSquare: string, targetSquare: string, piece: string) => void;
+  onPieceDrop: (
+    sourceSquare: string,
+    targetSquare: string,
+    piece: string,
+    animate: boolean,
+  ) => void;
   arrows: { [fromTo: string]: ArrowKind };
   squareHighlights: { [square: string]: SquareHighlightKind };
   onHighlightSquare: (square: string, highlight: HighlightKind) => void;
@@ -376,7 +381,12 @@ export function Chessboard(props: ChessboardProps) {
           setSelectedPiece({ sourceSquare: pending.sourceSquare, piece: pending.piece });
         } else if (targetSquare !== null) {
           setSelectedPiece(null);
-          props.onPieceDrop(pending.sourceSquare, targetSquare, fenPieceToPiece(pending.piece));
+          props.onPieceDrop(
+            pending.sourceSquare,
+            targetSquare,
+            fenPieceToPiece(pending.piece),
+            true,
+          );
         }
         return;
       }
@@ -384,7 +394,7 @@ export function Chessboard(props: ChessboardProps) {
       if (targetSquare === null) return;
       setSelectedPiece(null);
       if (targetSquare !== pending.sourceSquare) {
-        props.onPieceDrop(pending.sourceSquare, targetSquare, fenPieceToPiece(pending.piece));
+        props.onPieceDrop(pending.sourceSquare, targetSquare, fenPieceToPiece(pending.piece), true);
       }
       return;
     }
@@ -399,7 +409,7 @@ export function Chessboard(props: ChessboardProps) {
     if (targetSquare == null) return;
 
     if (data.type === "piece") {
-      props.onPieceDrop(sourceSquare, targetSquare, fenPieceToPiece(data.piece));
+      props.onPieceDrop(sourceSquare, targetSquare, fenPieceToPiece(data.piece), false);
       return;
     }
 
