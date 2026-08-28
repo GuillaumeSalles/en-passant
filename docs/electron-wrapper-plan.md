@@ -1,263 +1,193 @@
-# Electron wrapper plan
+# Electron desktop app
 
-Status: proposed
+Status: bundled desktop foundation implemented in this PR
 
 ## Outcome
 
-Ship En Passant as an installable desktop application without forking the Solid application or
-weakening its browser security boundary. The first release should wrap the production web app in a
-small, locked-down Electron shell. macOS is the suggested first signed target, followed by Windows;
-Linux can follow when there is a distribution and update strategy.
+En Passant's desktop shell and core application assets are installed with Electron. The app starts
+and remains useful without internet access, including on first launch.
 
-The desktop app is considered ready when it can:
+Internet access is only required for server-owned features:
 
-- open `https://enpassant.io/app` in a single application window;
-- build and train a repertoire, run Stockfish, import games, and export PGNs with web parity;
-- sign in with email OTP and Google, sign out, and enforce the existing authenticated IndexedDB
-  deletion rules;
-- restart without losing local IndexedDB, local storage, cookies, or the last useful window state;
-- reopen after the web app shell has been cached while the machine is offline;
-- keep arbitrary web content outside the Electron renderer and expose no Node or generic IPC API;
-- produce signed, notarized installers from CI and receive desktop runtime security updates.
+| Available offline                   | Requires internet                    |
+| ----------------------------------- | ------------------------------------ |
+| Create and edit repertoires         | Email OTP and Google sign-in         |
+| Train and review lines              | Sync authenticated data              |
+| Run the packaged Stockfish engine   | Import games from remote providers   |
+| Import and export local PGNs        | Download desktop application updates |
+| Use local IndexedDB and preferences | Load remote account data             |
 
-## Recommended architecture
+The web app remains independently deployable to Cloudflare Pages. Both targets use the same Solid
+renderer build and HTTP contracts.
 
-### Release 1: hosted renderer
+## Implemented architecture
 
-The Electron main process loads `https://enpassant.io/app` in production and the local Vite URL in
-development. The existing Cloudflare Pages deployment remains the renderer release channel and the
-existing backend remains the only server boundary.
+### Packaged renderer
 
-The shell owns only desktop lifecycle concerns:
+`npm run desktop:build` produces two outputs:
 
-- window creation and restoration;
-- navigation and new-window policy;
-- permissions policy;
-- application menus and keyboard conventions;
-- packaging, signing, publishing, and updates.
+- `dist/`: the existing Vite renderer, including route chunks, Stockfish JavaScript and wasm,
+  openings data, sounds, icons, and locally bundled Geist fonts;
+- `dist-electron/main.cjs`: the bundled Electron main process.
 
-There should be no preload script and no IPC bridge in the first release. The renderer does not need
-filesystem or shell access for current product behavior. The browser PGN download remains the export
-path until a native save dialog is a proven requirement.
+Electron Forge packages both directories into `app.asar`. Production loads
+`app://enpassant/app`; it never loads the hosted frontend as its normal renderer. Development uses
+the Vite server so UI changes retain the existing feedback loop.
 
-Use a persistent Electron session so the production origin keeps the same cookies, IndexedDB,
-local-storage, and service-worker behavior users already have in a browser. Do not partition web
-storage by app version.
+[`electron/protocol.ts`](../electron/protocol.ts) implements a standard, secure custom protocol. It:
 
-### Why this fits the current application
+- serves only files contained by the packaged `dist/` directory;
+- returns `index.html` for extensionless Solid client routes;
+- returns `404` for missing assets instead of hiding build errors behind the SPA fallback;
+- applies CSP, COOP, COEP, CORP, referrer policy, and `nosniff` headers;
+- assigns explicit content types for scripts, styles, wasm, fonts, audio, JSON, and icons;
+- forwards only the `/api` subtree to the fixed `https://enpassant.io` backend origin;
+- returns a defined `502` API response while offline without affecting local application routes.
 
-The application is intentionally origin-dependent today:
+The renderer service worker is disabled on `app:` because the installed files are already the
+offline application shell. It remains enabled for production web builds.
 
-- API and Better Auth requests use relative `/api/...` URLs in
-  [`src/lib/authClient.ts`](../src/lib/authClient.ts),
-  [`src/storage/backendSync.ts`](../src/storage/backendSync.ts), and
-  [`src/lib/games.ts`](../src/lib/games.ts).
-- Google auth returns to the current URL in [`src/lib/authRedirect.ts`](../src/lib/authRedirect.ts).
-- authenticated-user ownership and deletion are tied to browser IndexedDB in
-  [`src/lib/authSessionPersistence.ts`](../src/lib/authSessionPersistence.ts).
-- the production service worker supplies the offline shell from
-  [`src/lib/serviceWorker.ts`](../src/lib/serviceWorker.ts) and
-  [`scripts/offline-service-worker.ts`](../scripts/offline-service-worker.ts).
-- Cloudflare supplies cross-origin isolation and other response headers through
-  [`public/_headers`](../public/_headers), while Stockfish is loaded as a web worker by
-  [`src/lib/engine.ts`](../src/lib/engine.ts).
-- application routes assume an HTTP-style origin and history fallback in
-  [`src/App.tsx`](../src/App.tsx) and [`public/_redirects`](../public/_redirects).
+### API and storage boundary
 
-A bundled renderer would therefore require a custom secure protocol, SPA fallbacks, API proxying,
-cookie and OAuth validation, equivalent response headers, worker/wasm validation, and a separate
-offline/update model before it delivers user-visible value. Loading the existing production origin
-keeps those contracts intact.
+Existing relative `fetch("/api/...")` calls continue to work. Requests to
+`app://enpassant/api/...` are handled in the main process and sent through the persistent Electron
+session's Chromium network stack to `https://enpassant.io/api/...`.
 
-### Deferred alternative: bundled renderer
+The proxy:
 
-Revisit a bundled renderer only if first-launch offline support, independent frontend rollouts, or a
-native-only feature justifies it. Do not use `file://`. The follow-up design must use a standard,
-secure custom protocol, constrain file resolution to the packaged renderer, and prove all of the
-following in an isolated spike:
+- cannot be directed to another host;
+- preserves the method, query, body, and application headers;
+- strips renderer-supplied cookies and transport/browser headers;
+- supplies the production origin and referrer expected by the existing backend contract;
+- uses the Electron session's cookie jar with credentials included;
+- strips `Set-Cookie` before returning the response to renderer JavaScript;
+- passes successful backend responses through as the trusted HTTP contracts defined by this repo.
 
-- `/api` forwarding preserves Better Auth cookies, CSRF/origin checks, `401` behavior, and request
-  streaming;
-- Google OAuth can leave and return to the app without allowing arbitrary navigation;
-- IndexedDB and local storage remain stable across upgrades;
-- deep client routes receive `index.html` without masking missing assets;
-- Stockfish's worker, wasm, audio, and cross-origin isolation all work from the custom origin;
-- the web service worker is disabled or given a clearly non-overlapping responsibility.
+IndexedDB, local storage, backend cookies, and service state use the persistent
+`persist:en-passant` session. The existing authenticated-owner metadata and `401` deletion behavior
+remain in the renderer and apply to the desktop database without a separate storage implementation.
 
-Electron recommends a custom protocol over `file://`, but this additional work is not necessary for
-the hosted first release.
+### Authentication
 
-## Delivery sequence
+Better Auth accepts only HTTP(S) base URLs. On desktop,
+[`src/lib/authClient.ts`](../src/lib/authClient.ts) gives Better Auth the production HTTPS auth URL,
+then maps those auth requests back through the scoped `app://enpassant/api/auth/...` proxy.
 
-Keep each phase as a separate, reviewable PR after this planning PR.
+Email OTP stays inside the bundled app. Google OAuth temporarily navigates the sandboxed,
+unprivileged window through the exact Google sign-in and `enpassant.io/api/auth/` callback origins.
+The callback uses the production `/app` URL so the backend can complete its existing cookie flow.
+The main process intercepts that final hosted-app navigation and maps it back to the equivalent
+`app://enpassant/app/...` route.
 
-### 1. Secure shell and local development
+The Google redirect chain must still receive a real-account release-candidate check before public
+distribution. If the provider adds another main-frame origin, add that exact origin with a
+regression test; do not broaden the allowlist.
 
-Add an `electron/` boundary with a small TypeScript main process and pure helpers that can be unit
-tested outside Electron.
+### Electron security boundary
 
-Planned files and changes:
+[`electron/main.ts`](../electron/main.ts) configures one application window with:
 
-- `electron/main.ts`: single-instance lifecycle, `BrowserWindow` creation, macOS activate behavior,
-  window bounds restoration, and production/development URL selection.
-- `electron/navigation.ts`: parsed-URL allowlists for in-app navigation, OAuth navigation, and links
-  that may open in the system browser.
-- `electron/permissions.ts`: deny every permission by default; add a capability only alongside a
-  product requirement and test.
-- `electron/windowState.ts`: validate persisted window bounds and keep a usable minimum size.
-- `electron/tsconfig.json`: isolate Electron/Node types from the web renderer type-check.
-- `forge.config.ts`: package the shell with ASAR enabled and explicit product metadata.
-- `package.json`: add `desktop:dev`, `desktop:package`, `desktop:make`, and focused desktop test
-  scripts without changing `dev`, `build`, or `deploy`.
+- Node integration disabled;
+- context isolation and Chromium sandboxing enabled;
+- web security enabled;
+- no preload script or IPC bridge;
+- webviews disabled and attachment attempts blocked;
+- all permission checks and requests denied;
+- DevTools available only in development;
+- renderer-created windows denied;
+- external URLs opened only for an exact HTTPS host allowlist;
+- arbitrary top-level navigation denied;
+- a single application instance.
 
-Use Electron Forge for packaging because it is the Electron project's recommended packaging path.
-Keep the existing Vite renderer build independent from Forge's experimental Vite plugin: development
-loads the existing Vite server, and the hosted production shell does not bundle a renderer.
+The package uses ASAR and flips Electron fuses to disable Run-as-Node, Node options, and CLI inspect;
+enable cookie encryption; and enforce embedded ASAR integrity plus load-only-from-ASAR.
 
-Set the `BrowserWindow` security posture explicitly even where it matches Electron defaults:
+There is deliberately no native bridge. If a later feature needs a file dialog, application menu
+operation, or update status, add one typed operation at a time, validate its sender and arguments in
+the main process, and never expose raw `ipcRenderer`, filesystem, shell, or network primitives.
 
-- `nodeIntegration: false`;
-- `contextIsolation: true`;
-- `sandbox: true`;
-- `webSecurity: true`;
-- no `<webview>` support;
-- no preload bridge;
-- a persistent session scoped to En Passant;
-- a restrictive permission request/check handler;
-- DevTools only in development.
+## Commands
 
-Navigation rules must use `URL` parsing and exact protocol/origin comparisons, never prefix checks.
-Allow normal routes only on `https://enpassant.io`. Deny renderer-created windows. Open the known
-GitHub, X, Chess.com, Lichess, and Chessable HTTPS links in the system browser only after validating
-their exact host and protocol. Deny every other external protocol, including `file:`, `javascript:`,
-and unknown custom schemes.
+| Command                    | Purpose                                                   |
+| -------------------------- | --------------------------------------------------------- |
+| `npm run desktop:dev`      | Start Vite and the Electron development window            |
+| `npm run desktop:build`    | Build the web renderer and Electron main process          |
+| `npm run desktop:test`     | Run Electron protocol and navigation unit tests           |
+| `npm run desktop:test:e2e` | Build and prove first-launch offline behavior in Electron |
+| `npm run desktop:package`  | Create an unpacked application for the current platform   |
+| `npm run desktop:make`     | Create configured distributables for the current platform |
 
-Google sign-in is the only expected cross-origin main-frame flow in the current UI. Capture its
-actual redirect chain in a test environment, then choose one of these implementations during the
-phase:
+Electron's TypeScript compilation is isolated in [`electron/tsconfig.json`](../electron/tsconfig.json)
+so Electron/Node globals do not leak into browser source. The regular type-check and lint commands
+include the desktop code.
 
-1. preferred: open authentication in the system browser and return through an HTTPS callback page
-   owned by `enpassant.io`, which hands a one-time authorization code to a registered
-   `enpassant://auth/callback` deep link; or
-2. interim: allow the exact configured Google authentication origins in the unprivileged main
-   window, while continuing to block all other navigation.
+## Regression coverage
 
-Do not ship Google sign-in until the callback, cancellation, and malicious redirect cases have been
-tested. Email OTP is the fallback auth path during development.
+Unit tests cover:
 
-### 2. Desktop regression coverage
+- exact navigation and external-link allowlists, including malicious lookalike hosts and unsafe
+  schemes;
+- production OAuth callback mapping back to the bundle;
+- packaged asset responses, security headers, SPA fallback, missing assets, and path containment;
+- API target, method, body, origin/referrer, cookie stripping, response headers, and offline errors;
+- Better Auth desktop request mapping and callback URLs;
+- desktop service-worker suppression.
 
-Keep the existing web checks unchanged. Add a smaller Electron-specific suite that launches the
-application through Playwright's Electron support and tests the desktop boundary rather than
-duplicating every browser test.
+[`tests/electron/bundled.spec.ts`](../tests/electron/bundled.spec.ts) launches Electron with DNS
+disabled and a fresh user-data directory. It proves that:
 
-Automated coverage:
+- the app initializes its demo repertoire on first launch without reaching the internet;
+- the board and moves tree render from `app://enpassant`;
+- Stockfish is available from the installed bundle;
+- the renderer remains cross-origin isolated;
+- local fonts are installed and active;
+- no service worker controls the desktop page;
+- offline API calls fail without taking down the local app;
+- local storage survives a full Electron restart.
 
-- main-process helper unit tests for URL allowlists, unsafe schemes, production/dev URL selection,
-  and invalid saved window bounds;
-- a smoke test that opens `/app`, waits for 64 squares and the moves tree, and reports renderer
-  console errors;
-- external-link tests proving approved HTTPS hosts use the system-browser adapter and all other URLs
-  are denied;
-- a persistence test that creates anonymous data, restarts the Electron context, and reads it back;
-- an authenticated storage test that restarts, receives a mocked `401`, and confirms the database is
-  deleted before reload;
-- a Stockfish smoke test that starts and completes an evaluation;
-- a PGN export test that observes a completed download;
-- a warm-cache offline restart test matching the guarantees in
-  [`tests/e2e/offline.spec.ts`](../tests/e2e/offline.spec.ts).
+The existing web test suite remains the source of truth for detailed chess, PGN, state, storage, UI,
+and browser-offline behavior.
 
-Manual release-candidate checks:
+## Packaging and distribution
 
-- Google and email OTP sign-in, account switching, sign-out, and expired sessions;
-- anonymous and signed-in sync behavior across restart;
-- keyboard shortcuts, context menus, drag interactions, audio, clipboard behavior, and PGN download;
-- first launch online, warm launch offline, and recovery when connectivity returns;
-- window restoration across multiple displays and after a display is disconnected;
-- install, upgrade, and uninstall on every supported OS/architecture.
+[`forge.config.cjs`](../forge.config.cjs) currently packages macOS and Windows ZIP artifacts and a
+Windows Squirrel installer. The application identifier is `io.enpassant.desktop`.
 
-Add a desktop smoke job to pull requests. Keep signing and full installer tests in protected release
-workflows so secrets are not exposed to untrusted PR code.
+The implementation is packageable, but the generated artifacts are development builds. Before a
+public release:
 
-### 3. Packaging and platform readiness
+1. create proper source artwork plus `.icns` and `.ico` assets;
+2. configure Apple Developer ID signing and notarization;
+3. configure a Windows signing certificate or managed signing service;
+4. add native macOS and Windows GitHub Actions jobs for package and smoke tests;
+5. manually verify email OTP, Google OAuth, account switching, sign-out, session expiry, and
+   authenticated IndexedDB deletion against production;
+6. manually verify PGN downloads, Stockfish, sounds, keyboard commands, and multi-display window
+   behavior from signed installers;
+7. verify GPL source availability and ship the repository license, third-party notices, and
+   Stockfish copying notice with every release;
+8. publish draft GitHub Releases with checksums and release notes.
 
-Package one artifact per supported OS and architecture on that operating system. Suggested rollout:
+Use SemVer in `package.json` and tag desktop releases as `desktop-vX.Y.Z`. The desktop package and
+hosted web application can release independently.
 
-1. macOS arm64 and x64, signed and notarized;
-2. Windows x64, signed installer;
-3. Linux only after choosing package formats and an update channel.
-
-Before the first external build:
-
-- create proper `.icns`, `.ico`, and source artwork rather than scaling the favicon at package time;
-- choose and reserve the application identifier, suggested `io.enpassant.desktop`;
-- verify that macOS Keychain prompts and storage remain stable across upgrades;
-- configure ASAR packaging and Forge's fuses plugin;
-- disable Run-as-Node, Node options, and CLI inspect fuses;
-- enable cookie encryption;
-- enable embedded ASAR integrity validation and load-only-from-ASAR where supported;
-- generate a software bill of materials and retain third-party notices, including Stockfish GPL
-  materials and the repository's GPL license.
-
-The desktop package version is independent from the hosted renderer deployment. Use SemVer in
-`package.json`, tag desktop releases as `desktop-vX.Y.Z`, and display both the desktop version and web
-build revision in diagnostics.
-
-### 4. Signed release and updates
-
-Add a manually triggered/tag-gated GitHub Actions release workflow with native macOS and Windows
-runners. It should run the relevant checks, build installers, sign/notarize, attach checksums and
-release notes, and publish a draft GitHub Release for approval.
-
-Required secrets and ownership decisions:
-
-- Apple Developer ID certificate, team identifier, and notarization credentials;
-- Windows code-signing certificate or managed signing service;
-- who can approve a production desktop release;
-- whether crash reporting is in scope and, if so, its privacy policy and retention.
-
-Enable automatic updates only after signed upgrade and rollback testing passes. Use Electron's
-supported updater path for macOS and Windows and show a user-controlled restart prompt. Linux has no
-built-in Electron auto-updater, so use package-manager updates or document manual updates instead.
-Never update the Electron runtime by replacing files from renderer code.
-
-Add a recurring dependency PR for Electron and Forge. The release owner should take Electron stable
-security updates promptly and run the desktop smoke suite before publishing them.
-
-### 5. Native capabilities only when justified
-
-If a later feature needs native access, introduce a preload bridge one operation at a time. Define a
-typed request/result contract, validate the sender frame and every argument in the main process, and
-expose a named operation rather than raw `ipcRenderer`, filesystem, shell, or network primitives.
-
-Likely candidates are a native PGN save/open dialog, application-menu commands, and OS update status.
-None blocks the first wrapper release.
+Enable automatic updates only after signed install, upgrade, interrupted-update, and rollback tests
+pass. Electron's built-in updater supports macOS and Windows; Linux needs a package-manager or manual
+update strategy.
 
 ## Release gates
 
-The first public desktop release is blocked until all of these are true:
+The first public desktop release is blocked until:
 
-- all existing `npm run check` behavior remains green;
-- desktop unit and smoke tests pass on each release platform;
-- the renderer has no Node access and no generic IPC surface;
-- navigation, new windows, permissions, and external URL handling are deny-by-default;
-- email OTP and Google auth satisfy the authenticated storage deletion rules;
-- Stockfish, PGN export, sync, and warm-cache offline startup have desktop coverage;
-- artifacts are signed, macOS is notarized, and install/upgrade/uninstall have been exercised;
-- the updater accepts only signed artifacts and has a tested failure/rollback procedure;
-- GPL source and third-party notices ship with the application and release artifacts.
-
-## Decisions to confirm before implementation
-
-- Is macOS-first acceptable, and which architectures must the first release support?
-- Should the first release require first-launch offline support? If yes, run the bundled-renderer
-  spike before building the shell.
-- Can the backend contract support a one-time desktop authorization code returned through an
-  `enpassant.io` callback and registered `enpassant://auth/callback` deep link, or is the interim
-  in-window OAuth flow required?
-- Which signing accounts and certificates already exist?
-- Should releases be downloadable only from GitHub at first, or also submitted to app stores?
-- Is automatic update required for the first public release or acceptable in the next release?
+- `npm run check`, `npm run desktop:test`, `npm run desktop:test:e2e`, and platform packaging pass;
+- real email OTP and Google OAuth flows pass on every release platform;
+- session expiry, account switching, explicit sign-out, and authenticated `401` responses delete the
+  correct desktop IndexedDB before reload;
+- anonymous data remains intact when there is no authenticated-user marker;
+- artifacts have product icons, are signed, and macOS artifacts are notarized;
+- install, upgrade, and uninstall are exercised on supported OS versions and architectures;
+- update artifacts are accepted only after signature verification;
+- GPL and third-party compliance materials are present.
 
 ## References
 
@@ -268,4 +198,3 @@ The first public desktop release is blocked until all of these are true:
 - [Electron Forge packaging overview](https://www.electronjs.org/docs/latest/tutorial/forge-overview)
 - [Electron distribution overview](https://www.electronjs.org/docs/latest/tutorial/distribution-overview)
 - [Electron application updates](https://www.electronjs.org/docs/latest/tutorial/updates)
-- [Electron Forge build lifecycle](https://www.electronforge.io/core-concepts/build-lifecycle)

@@ -3,6 +3,18 @@
 This project is licensed under GPL-3.0-or-later except where third-party
 materials below state otherwise.
 
+## Geist and Geist Mono Fonts
+
+- Source: https://github.com/vercel/geist-font
+- Packages: `@fontsource-variable/geist@5.3.0` and
+  `@fontsource-variable/geist-mono@5.3.0`
+- Copyright: 2024 The Geist Project Authors
+- License: SIL Open Font License 1.1
+- Local license: `public/geist-OFL-1.1.txt`
+
+The desktop and web builds bundle the variable Geist and Geist Mono font
+files from the Fontsource packages listed above.
+
 ## Cburnett SVG Chess Pieces
 
 - Source: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces

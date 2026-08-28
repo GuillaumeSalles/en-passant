@@ -5,6 +5,8 @@
 @layer base {
   :root,
   .dark {
+    --font-geist-sans: "Geist Variable", sans-serif;
+    --font-geist-mono: "Geist Mono Variable", monospace;
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 4.9% 12%;

@@ -24,7 +24,9 @@ function shellCacheVersion(bundle: Record<string, OutputAsset | OutputChunk>): s
 }
 
 function isShellOutput(output: OutputAsset | OutputChunk): boolean {
-  return /\.(?:css|html|js)$/.test(output.fileName) && output.fileName !== SERVICE_WORKER_FILE_NAME;
+  return (
+    /\.(?:css|html|js|woff2)$/.test(output.fileName) && output.fileName !== SERVICE_WORKER_FILE_NAME
+  );
 }
 
 export function createOfflineServiceWorkerSource(

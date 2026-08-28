@@ -11,7 +11,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    exclude: ["**/node_modules/**", "**/.claude/worktrees/**", "tests/e2e/**"],
+    exclude: ["**/node_modules/**", "**/.claude/worktrees/**", "tests/e2e/**", "tests/electron/**"],
     server: {
       deps: {
         inline: ["@solidjs/testing-library"],
