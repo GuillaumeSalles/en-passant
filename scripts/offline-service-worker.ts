@@ -1,17 +1,31 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import type { OutputAsset, OutputChunk } from "rollup";
 import type { Plugin } from "vite";
 
 const SERVICE_WORKER_FILE_NAME = "service-worker.js";
 const SHELL_CACHE_PREFIX = "en-passant-shell-";
 const RUNTIME_CACHE_NAME = "en-passant-runtime-v1";
-const ADDITIONAL_SHELL_URLS = ["/index.html", "/openings-4b862275.json"];
+const ADDITIONAL_SHELL_URLS = [
+  "/app.webmanifest",
+  "/favicon.svg",
+  "/icons/apple-touch-icon.png",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+  "/index.html",
+  "/openings-4b862275.json",
+];
 
 function outputContents(output: OutputAsset | OutputChunk): string | Uint8Array {
   return output.type === "chunk" ? output.code : output.source;
 }
 
-function shellCacheVersion(bundle: Record<string, OutputAsset | OutputChunk>): string {
+function shellCacheVersion(
+  bundle: Record<string, OutputAsset | OutputChunk>,
+  publicDir: string,
+): string {
   const hash = createHash("sha256");
   for (const output of Object.values(bundle).sort((left, right) =>
     left.fileName.localeCompare(right.fileName),
@@ -19,12 +33,18 @@ function shellCacheVersion(bundle: Record<string, OutputAsset | OutputChunk>): s
     hash.update(output.fileName);
     hash.update(outputContents(output));
   }
-  for (const url of ADDITIONAL_SHELL_URLS) hash.update(url);
+  for (const url of ADDITIONAL_SHELL_URLS) {
+    hash.update(url);
+    const publicAssetPath = path.join(publicDir, url.replace(/^\//, ""));
+    if (existsSync(publicAssetPath)) hash.update(readFileSync(publicAssetPath));
+  }
   return hash.digest("hex").slice(0, 12);
 }
 
 function isShellOutput(output: OutputAsset | OutputChunk): boolean {
-  return /\.(?:css|html|js)$/.test(output.fileName) && output.fileName !== SERVICE_WORKER_FILE_NAME;
+  return (
+    /\.(?:css|html|js|woff2)$/.test(output.fileName) && output.fileName !== SERVICE_WORKER_FILE_NAME
+  );
 }
 
 export function createOfflineServiceWorkerSource(
@@ -39,6 +59,10 @@ const SHELL_PATHS = new Set(SHELL_URLS.map((url) => new URL(url, self.location.o
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_URLS)));
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -116,9 +140,14 @@ self.addEventListener("fetch", (event) => {
 }
 
 export function offlineServiceWorker(): Plugin {
+  let publicDir = path.resolve("public");
+
   return {
     name: "offline-service-worker",
     apply: "build",
+    configResolved(config) {
+      publicDir = config.publicDir;
+    },
     generateBundle(_options, bundle) {
       const shellUrls = [
         ...Object.values(bundle)
@@ -126,7 +155,10 @@ export function offlineServiceWorker(): Plugin {
           .map((output) => `/${output.fileName}`),
         ...ADDITIONAL_SHELL_URLS,
       ].sort();
-      const source = createOfflineServiceWorkerSource(shellCacheVersion(bundle), shellUrls);
+      const source = createOfflineServiceWorkerSource(
+        shellCacheVersion(bundle, publicDir),
+        shellUrls,
+      );
       this.emitFile({ type: "asset", fileName: SERVICE_WORKER_FILE_NAME, source });
     },
   };

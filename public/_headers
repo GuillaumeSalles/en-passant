@@ -6,5 +6,9 @@
 /openings-4b862275.json
   Cache-Control: public, max-age=31536000, immutable
 
+/app.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=0, must-revalidate
+
 /service-worker.js
   Cache-Control: no-cache

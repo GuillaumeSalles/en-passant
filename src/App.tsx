@@ -25,6 +25,8 @@ import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { startAuthSessionRenewal } from "@/lib/authSession";
 import { useMutation } from "@/lib/useMutation";
 import { clearTrainingQueueReview } from "@/mutations/trainingSession";
+import { PwaInstallButton, PwaProvider } from "@/components/PwaControls";
+import { startRepertoireSyncOnReconnect } from "@/storage/backendSync";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
@@ -83,6 +85,7 @@ function GlobalActions(props: {
       <Show when={props.showAbout}>
         <AboutDialog buttonClass={props.buttonClass} />
       </Show>
+      <PwaInstallButton class={props.buttonClass} />
       <AuthButton class={props.buttonClass} menuSide={props.menuSide} />
     </div>
   );
@@ -169,6 +172,7 @@ function AppShell(props: { children?: JSX.Element }) {
   const onClearTrainingQueueReview = useMutation(clearTrainingQueueReview);
 
   onSettled(() => startAuthSessionRenewal());
+  onSettled(() => startRepertoireSyncOnReconnect());
 
   const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
 
@@ -353,7 +357,11 @@ function Root(props: { children?: JSX.Element }) {
 }
 
 export default function App() {
-  return <AppRouter>{Root}</AppRouter>;
+  return (
+    <PwaProvider>
+      <AppRouter>{Root}</AppRouter>
+    </PwaProvider>
+  );
 }
 
 const AppRouter = createRouter({

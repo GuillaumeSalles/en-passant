@@ -253,6 +253,15 @@ export function Repeat2(props: IconProps): JSX.Element {
   );
 }
 
+export function RefreshCw(props: IconProps): JSX.Element {
+  return (
+    <IconBase {...props} name="refresh-cw">
+      <path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5" />
+      <path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" />
+    </IconBase>
+  );
+}
+
 export function Settings(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} name="settings">
@@ -304,6 +313,20 @@ export function Upload(props: IconProps): JSX.Element {
       <path d="M12 3v12" />
       <path d="m17 8-5-5-5 5" />
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    </IconBase>
+  );
+}
+
+export function WifiOff(props: IconProps): JSX.Element {
+  return (
+    <IconBase {...props} name="wifi-off">
+      <path d="m2 2 20 20" />
+      <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+      <path d="M5 12.5a10 10 0 0 1 3-1.9" />
+      <path d="M15.1 10.7a10 10 0 0 1 3.9 1.8" />
+      <path d="M2 8.8a15 15 0 0 1 3.4-1.9" />
+      <path d="M10.7 5.2A15 15 0 0 1 22 8.8" />
+      <path d="M12 20h.01" />
     </IconBase>
   );
 }
