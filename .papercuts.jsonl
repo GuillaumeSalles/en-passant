@@ -16,3 +16,4 @@
 {"kind":"resolve","id":"pc_c5f43dd6f030","ts":"2026-08-23T18:27:42.503Z","agent":"agent"}
 {"kind":"resolve","id":"pc_2be4c1b97f8a","ts":"2026-08-23T18:27:55.439Z","agent":"agent"}
 {"kind":"resolve","id":"pc_36cbed496912","ts":"2026-08-23T18:28:12.086Z","agent":"agent"}
+{"kind":"cut","id":"pc_ae89d5ac6706","ts":"2026-08-28T02:06:25.193Z","agent":"agent","text":"gh pr edit fails on this repository because it queries deprecated Projects classic projectCards; using the pull-request REST API avoids the unrelated GraphQL failure","tags":["tooling"],"severity":"minor","cwd":"/Users/guillaume/chess/en-passant"}
