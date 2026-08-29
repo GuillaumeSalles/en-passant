@@ -1,4 +1,5 @@
 const PENDING_SOCIAL_SIGN_IN_KEY = "en_passant_pending_social_sign_in";
+const PRODUCTION_APP_ORIGIN = "https://enpassant.io";
 
 export type AuthEvent = "signin" | "signup";
 
@@ -7,8 +8,12 @@ export function authEventFromUrl(): AuthEvent | null {
   return event === "signin" || event === "signup" ? event : null;
 }
 
-export function authCallbackUrl(event: AuthEvent): string {
-  const url = new URL(window.location.href);
+export function authCallbackUrl(event: AuthEvent, currentUrl = window.location.href): string {
+  const current = new URL(currentUrl);
+  const url =
+    current.protocol === "app:"
+      ? new URL(`${current.pathname}${current.search}${current.hash}`, PRODUCTION_APP_ORIGIN)
+      : current;
   url.searchParams.set("auth_event", event);
   return url.toString();
 }
