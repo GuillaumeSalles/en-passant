@@ -18,6 +18,7 @@ import {
 } from "@/lib/AppState";
 import {
   chapterTrainingLineReviewPath,
+  parseTrainingStartMove,
   repertoirePath,
   trainingLinePath,
   trainingPath,
@@ -70,7 +71,31 @@ export function VariationTraining(props: {
     },
   );
 
-  const flow = useVariationTrainingFlow(props);
+  const requestedStartMove = () =>
+    parseTrainingStartMove(new URLSearchParams(location.search).get("startMove")) ?? 1;
+  const flow = useVariationTrainingFlow(props, { startMove: requestedStartMove });
+  createEffect(
+    () => ({
+      activeLinePlyCount: flow.activeLine()?.plyCount,
+      search: location.search,
+    }),
+    ({ activeLinePlyCount, search }) => {
+      const searchParams = new URLSearchParams(search);
+      const values = searchParams.getAll("startMove");
+      if (values.length === 0) return;
+
+      const startMove = values.length === 1 ? parseTrainingStartMove(values[0]) : null;
+      const isOutOfRange =
+        startMove !== null && activeLinePlyCount !== undefined && startMove > activeLinePlyCount;
+      if (startMove !== null && !isOutOfRange) return;
+
+      searchParams.delete("startMove");
+      const nextSearch = searchParams.toString();
+      navigate(`${location.pathname}${nextSearch === "" ? "" : `?${nextSearch}`}${location.hash}`, {
+        replace: true,
+      });
+    },
+  );
   useGlobalShortcuts({ allowEditing: flow.isLineComplete });
   const completedLineHighlights = useSelector(selectHighlights);
   const completedLineAnnotations = useSelector(selectNagAnnotations);

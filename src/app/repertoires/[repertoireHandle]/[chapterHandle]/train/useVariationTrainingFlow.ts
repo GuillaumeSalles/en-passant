@@ -22,7 +22,6 @@ import {
   selectSelectedMoveId,
   selectTraining,
   selectTrainingSessionStats,
-  selectTrainingVariationIsEmpty,
   trainingLineUciPathFromId,
   type EvalMove,
 } from "@/lib/AppState";
@@ -97,6 +96,7 @@ export function useVariationTrainingFlow(
     repetitions?: number;
     boundaryDelayMs?: number | Accessor<number>;
     onLineComplete?: () => void;
+    startMove?: Accessor<number>;
   } = {},
 ) {
   const state = useState();
@@ -112,7 +112,6 @@ export function useVariationTrainingFlow(
   const selectedMoveId = useSelector(selectSelectedMoveId);
   const currentMove = useSelector(selectCurrentMove);
   const replayMoveIds = useSelector((state) => state.training.session?.replayMoveIds ?? null);
-  const trainingVariationIsEmpty = useSelector(selectTrainingVariationIsEmpty);
   const trainingSessionStats = useSelector(selectTrainingSessionStats);
   const [boardIntroComplete, setBoardIntroComplete] = createSignal(false);
   const [phase, setPhase] = createSignal<VariationTrainingPhase>(initialVariationTrainingPhase);
@@ -174,6 +173,32 @@ export function useVariationTrainingFlow(
     const line = activeLine();
     return pgn === null || line === undefined ? [] : getVariationMoveIds(pgn, line.terminalMoveId);
   });
+  const effectiveStartMove = createMemo(() => {
+    const requestedStartMove = options.startMove?.() ?? 1;
+    return requestedStartMove >= 1 && requestedStartMove <= variation().length
+      ? requestedStartMove
+      : 1;
+  });
+  const precedingMoves = createMemo(() => {
+    const pgn = chapterPgn();
+    if (pgn === null) return [];
+    return variation()
+      .slice(0, effectiveStartMove() - 1)
+      .map((moveId) => pgn.moves[moveId])
+      .filter((move) => move !== undefined)
+      .map(moveToEvalMove);
+  });
+  const firstPendingMove = createMemo(() => {
+    const pgn = chapterPgn();
+    const moveId = variation()[effectiveStartMove() - 1];
+    return moveId === undefined ? undefined : pgn?.moves[moveId];
+  });
+  const startsWithUserMove = createMemo(() => {
+    const move = firstPendingMove();
+    if (move === undefined) return false;
+    const moveColor = move.halfMoveNumber % 2 === 0 ? "white" : "black";
+    return moveColor === orientation();
+  });
   const progress = createMemo(() => {
     const line = activeLine();
     return line === undefined || line.plyCount === 0
@@ -184,14 +209,9 @@ export function useVariationTrainingFlow(
     const pgn = chapterPgn();
     return pgn !== null && Object.keys(pgn.moves).length > 0;
   });
-  const firstVariationMove = createMemo(() => {
-    const pgn = chapterPgn();
-    const firstMoveId = variation()[0];
-    return firstMoveId === undefined ? undefined : pgn?.moves[firstMoveId];
-  });
   const replayMoveId = createMemo(() => replayMoveIds()?.[0]);
   const scopeKey = () =>
-    `${props.repertoireHandle}/${props.chapterHandle}/${props.lineId}/${orientation()}`;
+    `${props.repertoireHandle}/${props.chapterHandle}/${props.lineId}/${orientation()}/${effectiveStartMove()}`;
 
   let startedScope: {
     key: string;
@@ -274,9 +294,9 @@ export function useVariationTrainingFlow(
     setCompletedRepetitions(completed);
     const finished = completed >= repetitions();
     if (!finished) {
-      onPrepareTrainingReplayMove({ animateLastMove: false, precedingMoves: [] });
+      onPrepareTrainingReplayMove({ animateLastMove: false, precedingMoves: precedingMoves() });
     }
-    dispatch({ type: "LINE_BOUNDARY_ELAPSED", finished, orientation: orientation() });
+    dispatch({ type: "LINE_BOUNDARY_ELAPSED", finished, startsWithUserMove: startsWithUserMove() });
     if (finished) {
       onRevealCompletedTrainingLine(props.lineId);
       options.onLineComplete?.();
@@ -306,6 +326,8 @@ export function useVariationTrainingFlow(
       lineIds: lines().map((line) => line.id),
       enabled: isEnabled(),
       orientation: orientation(),
+      precedingMoves: precedingMoves(),
+      startsWithUserMove: startsWithUserMove(),
       variationIndex: activeLineIndex(),
       repertoireHandle: props.repertoireHandle,
       chapterHandle: props.chapterHandle,
@@ -316,7 +338,8 @@ export function useVariationTrainingFlow(
       line,
       lineIds,
       enabled,
-      orientation,
+      precedingMoves,
+      startsWithUserMove,
       variationIndex,
       repertoireHandle,
       chapterHandle,
@@ -326,7 +349,7 @@ export function useVariationTrainingFlow(
       if (startedScope !== null) onDiscardTrainingLine(startedScope);
       dispatch({ type: "RESET" });
       setCompletedRepetitions(0);
-      onStartTrainingLine({ lineIds, lineId: line.id, variationIndex });
+      onStartTrainingLine({ lineIds, lineId: line.id, precedingMoves, variationIndex });
       startedScope = {
         key,
         repertoireHandle,
@@ -334,7 +357,7 @@ export function useVariationTrainingFlow(
         lineId,
       };
       setInitializedScopeKey(key);
-      if (orientation === "white") dispatch({ type: "READY_FOR_LINE_MOVE" });
+      if (startsWithUserMove) dispatch({ type: "READY_FOR_LINE_MOVE" });
     },
   );
 
@@ -342,28 +365,33 @@ export function useVariationTrainingFlow(
     () => ({
       boardIntroComplete: boardIntroComplete(),
       enabled: isEnabled(),
-      firstMove: firstVariationMove(),
-      orientation: orientation(),
+      firstPendingMove: firstPendingMove(),
       phase: phase(),
-      trainingVariationIsEmpty: trainingVariationIsEmpty(),
+      startsWithUserMove: startsWithUserMove(),
     }),
-    ({ boardIntroComplete, enabled, firstMove, orientation, phase, trainingVariationIsEmpty }) => {
+    ({ boardIntroComplete, enabled, firstPendingMove, phase, startsWithUserMove }) => {
       if (
         !enabled ||
         phase.type !== "initializing" ||
-        orientation !== "black" ||
         !boardIntroComplete ||
-        !trainingVariationIsEmpty ||
-        firstMove?.halfMoveNumber !== 0
+        startsWithUserMove ||
+        firstPendingMove === undefined
       ) {
         return;
       }
       untrack(() => {
-        onAutoMoveFromEvalMove(moveToEvalMove(firstMove));
+        onAutoMoveFromEvalMove(moveToEvalMove(firstPendingMove));
+        const animationId = selectAnimation(state, ctx())?.id ?? null;
+        const completedMoveId =
+          variation().at(-1) === firstPendingMove.id ? firstPendingMove.id : null;
         dispatch({
           type: "INTRO_MOVE_STARTED",
-          animationId: selectAnimation(state, ctx())?.id ?? null,
+          animationId,
+          completedMoveId,
         });
+        if (animationId === null && completedMoveId !== null) {
+          completeLineAttempt(completedMoveId);
+        }
       });
     },
   );
@@ -567,7 +595,13 @@ export function useVariationTrainingFlow(
   });
 
   function onAnimationSettled(animationId: number): void {
+    const completedIntroMoveId =
+      currentPhase.type === "animating-intro" ? currentPhase.completedMoveId : null;
     if (!dispatch({ type: "ANIMATION_SETTLED", animationId })) return;
+    if (completedIntroMoveId !== null) {
+      completeLineAttempt(completedIntroMoveId);
+      return;
+    }
     handleResponseSettled();
   }
 

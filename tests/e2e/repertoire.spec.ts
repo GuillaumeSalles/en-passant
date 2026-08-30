@@ -1184,6 +1184,80 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   expect(consoleMessages).toEqual([]);
 });
 
+test("removes invalid training start moves from the URL", async ({ page }) => {
+  await seedRepertoire(page, "1. e4 e5 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const learnHref = await page
+    .locator("[data-training-line]")
+    .first()
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  if (learnHref === null) throw new Error("Expected a learning URL");
+  const trainingHref = learnHref.replace(/\/learn$/, "/train");
+
+  await page.goto(`${trainingHref}?startMove=invalid&source=test`);
+  await expect.poll(() => new URL(page.url()).searchParams.has("startMove")).toBe(false);
+  expect(new URL(page.url()).searchParams.get("source")).toBe("test");
+
+  await page.goto(`${trainingHref}?startMove=3&source=test`);
+  await expect.poll(() => new URL(page.url()).searchParams.has("startMove")).toBe(false);
+  expect(new URL(page.url()).searchParams.get("source")).toBe("test");
+
+  await page.goto(`${trainingHref}?startMove=2&source=test`);
+  await expect(page.getByRole("link", { name: "King's Pawn Game" })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("startMove")).toBe("2");
+});
+
+test("starts training at the requested move in a line", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 Nc6 3. Bb5 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const learnHref = await page
+    .locator("[data-training-line]")
+    .first()
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  if (learnHref === null) throw new Error("Expected a learning URL");
+
+  await page.goto(`${learnHref.replace(/\/learn$/, "/train")}?startMove=3`);
+  await expectTrainingInputReady(page);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "N");
+
+  await dragPiece(page, "g1", "f3");
+  await expect(page.locator('[data-square="f3"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.locator('[data-square="c6"]')).toHaveAttribute("data-piece", "n");
+  await dragPiece(page, "f1", "b5");
+  await expect(page.getByText("Good job!")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+test("plays an opponent move when training starts on their turn", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  const learnHref = await page
+    .locator("[data-training-line]")
+    .first()
+    .getByRole("link", { name: "Learn" })
+    .getAttribute("href");
+  if (learnHref === null) throw new Error("Expected a learning URL");
+
+  await page.goto(`${learnHref.replace(/\/learn$/, "/train")}?startMove=2`);
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+  await expect(page.locator('[data-square="e5"]')).toHaveAttribute("data-piece", "p");
+  await expectTrainingInputReady(page);
+
+  await dragPiece(page, "g1", "f3");
+  await expect(page.getByText("Good job!")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
 test("opens a chapter at the terminal move of a line", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

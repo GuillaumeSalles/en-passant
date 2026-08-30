@@ -67,13 +67,35 @@ describe("variation training flow", () => {
   });
 
   test("ignores stale animation completions", () => {
-    const phase: VariationTrainingPhase = { type: "animating-intro", animationId: 3 };
+    const phase: VariationTrainingPhase = {
+      type: "animating-intro",
+      animationId: 3,
+      completedMoveId: null,
+    };
     expect(reduceVariationTrainingFlow(phase, { type: "ANIMATION_SETTLED", animationId: 2 })).toBe(
       phase,
     );
     expect(
       reduceVariationTrainingFlow(phase, { type: "ANIMATION_SETTLED", animationId: 3 }),
     ).toEqual({ type: "awaiting-line-move", notice: null });
+  });
+
+  test("returns to the configured side to move between repetitions", () => {
+    const boundary: VariationTrainingPhase = { type: "line-boundary" };
+    expect(
+      reduceVariationTrainingFlow(boundary, {
+        type: "LINE_BOUNDARY_ELAPSED",
+        finished: false,
+        startsWithUserMove: true,
+      }),
+    ).toEqual({ type: "awaiting-line-move", notice: null });
+    expect(
+      reduceVariationTrainingFlow(boundary, {
+        type: "LINE_BOUNDARY_ELAPSED",
+        finished: false,
+        startsWithUserMove: false,
+      }),
+    ).toEqual({ type: "initializing" });
   });
 
   test("rejects events that are invalid for the current state", () => {

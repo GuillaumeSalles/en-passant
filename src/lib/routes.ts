@@ -87,12 +87,24 @@ export function trainingPath(repertoireHandle: string, chapterHandle: string): s
   return `${repertoirePath(repertoireHandle, chapterHandle)}/train`;
 }
 
+type TrainingLinePathOptions = {
+  startMove?: number;
+};
+
 export function trainingLinePath(
   repertoireHandle: string,
   chapterHandle: string,
   lineId: string,
+  options: TrainingLinePathOptions = {},
 ): string {
-  return `${lineReaderPath(repertoireHandle, chapterHandle, lineId)}/train`;
+  const path = `${lineReaderPath(repertoireHandle, chapterHandle, lineId)}/train`;
+  return options.startMove === undefined ? path : `${path}?startMove=${options.startMove}`;
+}
+
+export function parseTrainingStartMove(value: string | null | undefined): number | null {
+  if (value === null || value === undefined || !/^[1-9]\d*$/.test(value)) return null;
+  const move = Number(value);
+  return Number.isSafeInteger(move) ? move : null;
 }
 
 export function lineReaderPath(

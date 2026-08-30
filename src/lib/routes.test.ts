@@ -5,7 +5,9 @@ import {
   learningLinePath,
   lineReaderPath,
   parseSelectedPositionKey,
+  parseTrainingStartMove,
   repertoireMovePath,
+  trainingLinePath,
   trainingLineReviewPath,
   trainingQueueReviewPath,
 } from "./routes";
@@ -18,6 +20,23 @@ test("builds a read-only line path from handles", () => {
 
 test("builds a learning line path", () => {
   expect(learningLinePath("white", "main", "v1-line")).toBe("/app/white/main/v1-line/learn");
+});
+
+test("builds a training line path from a specific move", () => {
+  expect(trainingLinePath("white", "main", "v1-line", { startMove: 12 })).toBe(
+    "/app/white/main/v1-line/train?startMove=12",
+  );
+});
+
+test("parses training start moves from query strings", () => {
+  expect(parseTrainingStartMove("12")).toBe(12);
+  expect(parseTrainingStartMove(null)).toBeNull();
+  expect(parseTrainingStartMove(undefined)).toBeNull();
+  expect(parseTrainingStartMove("0")).toBeNull();
+  expect(parseTrainingStartMove("01")).toBeNull();
+  expect(parseTrainingStartMove("1.5")).toBeNull();
+  expect(parseTrainingStartMove("move-12")).toBeNull();
+  expect(parseTrainingStartMove("9007199254740992")).toBeNull();
 });
 
 test("builds paths for reviewing all due lines", () => {

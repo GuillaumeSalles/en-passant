@@ -147,7 +147,12 @@ export function ensureTrainingSession(
 export function startTrainingLine(
   state: StoreState<AppState>,
   ctx: Context,
-  details: { lineIds: string[]; lineId: string; variationIndex: number },
+  details: {
+    lineIds: string[];
+    lineId: string;
+    variationIndex: number;
+    precedingMoves?: EvalMove[];
+  },
 ): void {
   ensureTrainingSession(state, ctx, details.lineIds);
   const session = state.training.session;
@@ -170,6 +175,9 @@ export function startTrainingLine(
   state.set("selectedMoveId", null);
   state.set("preselectedVariation", null);
   state.set("animation", null);
+  for (const move of details.precedingMoves ?? []) {
+    moveFromEvalMove(state, ctx, move, false);
+  }
 }
 
 export function discardTrainingLine(

@@ -12,7 +12,7 @@ type PendingResponse = {
 
 export type VariationTrainingPhase =
   | { type: "initializing" }
-  | { type: "animating-intro"; animationId: number }
+  | { type: "animating-intro"; animationId: number; completedMoveId: number | null }
   | { type: "awaiting-line-move"; notice: TrainingMoveFeedback | null }
   | { type: "awaiting-replay-move" }
   | { type: "checking-move"; origin: TrainingMoveOrigin }
@@ -37,7 +37,7 @@ export type VariationTrainingPhase =
 export type VariationTrainingEvent =
   | { type: "RESET" }
   | { type: "READY_FOR_LINE_MOVE" }
-  | { type: "INTRO_MOVE_STARTED"; animationId: number | null }
+  | { type: "INTRO_MOVE_STARTED"; animationId: number | null; completedMoveId: number | null }
   | { type: "MOVE_SUBMITTED"; origin: TrainingMoveOrigin }
   | {
       type: "MOVE_REJECTED";
@@ -56,7 +56,7 @@ export type VariationTrainingEvent =
   | { type: "REPLAY_STARTED"; animationId: number | null }
   | { type: "ANIMATION_SETTLED"; animationId: number }
   | { type: "LINE_BOUNDARY_STARTED" }
-  | { type: "LINE_BOUNDARY_ELAPSED"; finished: boolean; orientation: Orientation };
+  | { type: "LINE_BOUNDARY_ELAPSED"; finished: boolean; startsWithUserMove: boolean };
 
 export const initialVariationTrainingPhase: VariationTrainingPhase = { type: "initializing" };
 
@@ -74,7 +74,11 @@ export function reduceVariationTrainingFlow(
       if (event.type === "INTRO_MOVE_STARTED") {
         return event.animationId === null
           ? { type: "awaiting-line-move", notice: null }
-          : { type: "animating-intro", animationId: event.animationId };
+          : {
+              type: "animating-intro",
+              animationId: event.animationId,
+              completedMoveId: event.completedMoveId,
+            };
       }
       return phase;
     case "animating-intro":
@@ -155,7 +159,7 @@ export function reduceVariationTrainingFlow(
     case "line-boundary":
       if (event.type !== "LINE_BOUNDARY_ELAPSED") return phase;
       if (event.finished) return { type: "line-complete" };
-      return event.orientation === "white"
+      return event.startsWithUserMove
         ? { type: "awaiting-line-move", notice: null }
         : { type: "initializing" };
     case "line-complete":
