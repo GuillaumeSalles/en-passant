@@ -15,7 +15,7 @@
     "build": "vite build",
     "desktop:build:main": "vite build --config vite.electron.config.ts",
     "desktop:build": "npm run build && npm run desktop:build:main",
-    "desktop:dev": "npm run desktop:build:main && concurrently --kill-others --success first \"vite --host 127.0.0.1 --port 5173 --strictPort\" \"wait-on http://localhost:5173 && cross-env ELECTRON_RENDERER_URL=http://localhost:5173 electron .\"",
+    "desktop:dev": "npm run desktop:build:main && concurrently --kill-others --success first \"vite --host 127.0.0.1 --port 5173 --strictPort\" \"wait-on http://localhost:5173 && cross-env ELECTRON_RENDERER_URL=http://localhost:5173 electron . --en-passant-local-dev\"",
     "desktop:package": "npm run desktop:build && electron-forge package",
     "desktop:make": "npm run desktop:build && electron-forge make",
     "desktop:test": "vitest --run electron",
