@@ -1,13 +1,13 @@
-export const APP_HOST = "enpassant";
+import desktopAuth from "../desktop-auth.config.json";
+
+export const APP_HOST = desktopAuth.appHost;
 export const APP_ORIGIN = `app://${APP_HOST}`;
 export const APP_URL = `${APP_ORIGIN}/app`;
-export const API_ORIGIN = "https://enpassant.io";
-export const PRODUCTION_APP_ORIGIN = "https://enpassant.io";
+export const API_ORIGIN = desktopAuth.productionAppOrigin;
 export const SESSION_PARTITION = "persist:en-passant";
-export const ELECTRON_AUTH_SCHEME = "io.enpassant.desktop";
-export const ELECTRON_AUTH_CLIENT_ID = "electron";
-export const ELECTRON_AUTH_CALLBACK_PATH = "/auth/callback";
-const ELECTRON_AUTH_SIGN_IN_PATH = "/app/auth/desktop?desktop_auth=google";
+export const ELECTRON_AUTH_SCHEME = desktopAuth.scheme;
+export const ELECTRON_AUTH_CLIENT_ID = desktopAuth.clientId;
+export const ELECTRON_AUTH_CALLBACK_PATH = desktopAuth.callbackPath;
 
 export type DesktopAuthRuntime = {
   apiOrigin: string;
@@ -20,7 +20,7 @@ export function resolveDesktopAuthRuntime(options: {
   if (options.developmentRendererUrl === undefined) {
     return {
       apiOrigin: API_ORIGIN,
-      signInURL: `${PRODUCTION_APP_ORIGIN}${ELECTRON_AUTH_SIGN_IN_PATH}`,
+      signInURL: `${API_ORIGIN}${desktopAuth.brokerPath}`,
     };
   }
 
@@ -34,6 +34,6 @@ export function resolveDesktopAuthRuntime(options: {
 
   return {
     apiOrigin: rendererUrl.origin,
-    signInURL: new URL(ELECTRON_AUTH_SIGN_IN_PATH, rendererUrl.origin).toString(),
+    signInURL: new URL(desktopAuth.brokerPath, rendererUrl.origin).toString(),
   };
 }

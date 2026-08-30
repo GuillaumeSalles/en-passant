@@ -1,5 +1,6 @@
 const { FusesPlugin } = require("@electron-forge/plugin-fuses");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
+const desktopAuth = require("./desktop-auth.config.json");
 
 const packageFiles = [
   "/dist",
@@ -19,7 +20,7 @@ function ignoreUnpackagedFiles(filePath) {
 
 module.exports = {
   packagerConfig: {
-    appBundleId: "io.enpassant.desktop",
+    appBundleId: desktopAuth.scheme,
     asar: true,
     extraResource: [
       "LICENSE",
@@ -32,7 +33,7 @@ module.exports = {
     protocols: [
       {
         name: "En Passant authentication",
-        schemes: ["io.enpassant.desktop"],
+        schemes: [desktopAuth.scheme],
       },
     ],
   },

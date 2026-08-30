@@ -1,15 +1,16 @@
 import { createAuthClient } from "better-auth/client";
 import { emailOTPClient } from "better-auth/client/plugins";
 import { electronProxyClient } from "@better-auth/electron/proxy";
+import desktopAuth from "../../desktop-auth.config.json";
 
-const DESKTOP_AUTH_BASE_URL = "https://enpassant.io/api/auth";
-const DESKTOP_ORIGIN = "app://enpassant";
+const DESKTOP_AUTH_BASE_URL = `${desktopAuth.productionAppOrigin}/api/auth`;
+const DESKTOP_ORIGIN = `app://${desktopAuth.appHost}`;
 
 type FetchInput = string | URL | Request;
 
 export function desktopAuthRequestUrl(value: string): string {
   const url = new URL(value);
-  if (url.origin !== "https://enpassant.io" || !url.pathname.startsWith("/api/auth/")) {
+  if (url.origin !== desktopAuth.productionAppOrigin || !url.pathname.startsWith("/api/auth/")) {
     throw new Error("Unexpected desktop auth URL");
   }
   return `${DESKTOP_ORIGIN}${url.pathname}${url.search}${url.hash}`;
@@ -37,9 +38,9 @@ export const authClient = createAuthClient({
   plugins: [
     emailOTPClient(),
     electronProxyClient({
-      clientID: "electron",
-      protocol: "io.enpassant.desktop",
-      callbackPath: "/auth/callback",
+      clientID: desktopAuth.clientId,
+      protocol: desktopAuth.scheme,
+      callbackPath: desktopAuth.callbackPath,
     }),
   ],
   ...desktopOptions,

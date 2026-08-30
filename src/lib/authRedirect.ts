@@ -1,5 +1,6 @@
+import desktopAuth from "../../desktop-auth.config.json";
+
 const PENDING_SOCIAL_SIGN_IN_KEY = "en_passant_pending_social_sign_in";
-const PRODUCTION_APP_ORIGIN = "https://enpassant.io";
 
 export type AuthEvent = "signin" | "signup";
 
@@ -12,7 +13,10 @@ export function authCallbackUrl(event: AuthEvent, currentUrl = window.location.h
   const current = new URL(currentUrl);
   const url =
     current.protocol === "app:"
-      ? new URL(`${current.pathname}${current.search}${current.hash}`, PRODUCTION_APP_ORIGIN)
+      ? new URL(
+          `${current.pathname}${current.search}${current.hash}`,
+          desktopAuth.productionAppOrigin,
+        )
       : current;
   url.searchParams.set("auth_event", event);
   return url.toString();
