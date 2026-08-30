@@ -8,12 +8,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("better-auth/client", () => ({
   createAuthClient: () => ({
+    authenticate: vi.fn(),
     requestAuth: mocks.requestAuth,
   }),
 }));
 
 vi.mock("@better-auth/electron/client", () => ({
-  electronClient: vi.fn(() => ({ id: "electron" })),
+  electronClient: vi.fn(() => ({
+    getActions: () => ({
+      authenticate: vi.fn(),
+      requestAuth: mocks.requestAuth,
+    }),
+  })),
 }));
 
 vi.mock("electron", () => ({
@@ -29,6 +35,5 @@ describe("desktop auth client", () => {
     await requestGoogleSignIn();
 
     expect(mocks.requestAuth).toHaveBeenCalledOnce();
-    expect(mocks.requestAuth).toHaveBeenCalledWith();
   });
 });

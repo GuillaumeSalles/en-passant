@@ -44,7 +44,7 @@ export function parseDesktopAuthDeepLink(value: string): ParsedDesktopAuthDeepLi
 
 function electronSameSite(
   sameSite: "strict" | "lax" | "none" | undefined,
-): Electron.CookiesSetDetails["sameSite"] {
+): NonNullable<Electron.CookiesSetDetails["sameSite"]> {
   if (sameSite === "none") return "no_restriction";
   return sameSite ?? "lax";
 }
