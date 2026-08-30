@@ -26,6 +26,7 @@ import { startAuthSessionRenewal } from "@/lib/authSession";
 import { useMutation } from "@/lib/useMutation";
 import { clearTrainingQueueReview } from "@/mutations/trainingSession";
 import { DesktopAuthBroker } from "@/app/DesktopAuthBroker";
+import { DesktopAuthCompletion } from "@/app/DesktopAuthCompletion";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
@@ -246,6 +247,7 @@ function AppShell(props: { children?: JSX.Element }) {
           </>
         </Show>
         {props.children}
+        <DesktopAuthCompletion />
         <SignupNudge />
         <div id="drag-overlay" class="pointer-events-none absolute inset-0 z-10" />
       </div>

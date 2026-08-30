@@ -36,6 +36,7 @@ import {
   consumeRedirectAccountKind,
   finishAuthenticatedAccountFlow,
 } from "@/lib/authBootstrap";
+import { DESKTOP_AUTH_ERROR_EVENT } from "@/lib/desktopAuth";
 
 type EmailAuthStep = "email" | "code";
 
@@ -118,38 +119,20 @@ export function AuthButton(
   });
 
   onSettled(() => {
-    const desktop = window.enPassantDesktop;
-    if (desktop === undefined) return;
-    const unsubscribeComplete = desktop.onGoogleSignInComplete((authEvent) => {
-      void refreshAuthSession()
-        .then(async (user) => {
-          if (user === null) throw new Error("Google sign in did not create a session.");
-          await finishAuthenticatedAccountFlow(authEvent === "signup" ? "new" : "existing");
-        })
-        .catch(() => {
-          clearPendingSocialSignIn();
-          setError("Google sign in failed.");
-          setIsAuthDialogOpen(true);
-        });
-    });
-    const unsubscribeError = desktop.onGoogleSignInError((message) => {
-      clearPendingSocialSignIn();
-      setError(message);
-      setIsAuthDialogOpen(true);
-    });
-    return () => {
-      unsubscribeComplete();
-      unsubscribeError();
-    };
-  });
-
-  onSettled(() => {
     function openAuthDialog() {
       setIsAuthDialogOpen(true);
     }
+    function openAuthDialogWithError(event: Event) {
+      if (event instanceof CustomEvent && typeof event.detail === "string") {
+        setError(event.detail);
+      }
+      openAuthDialog();
+    }
     document.addEventListener("en-passant:open-auth-dialog", openAuthDialog);
+    document.addEventListener(DESKTOP_AUTH_ERROR_EVENT, openAuthDialogWithError);
     return () => {
       document.removeEventListener("en-passant:open-auth-dialog", openAuthDialog);
+      document.removeEventListener(DESKTOP_AUTH_ERROR_EVENT, openAuthDialogWithError);
     };
   });
 

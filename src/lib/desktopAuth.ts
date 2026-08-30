@@ -7,6 +7,8 @@ const ELECTRON_AUTH_CALLBACK_PATH = "/auth/callback";
 const ELECTRON_AUTH_COOKIE = "better-auth.electron";
 const ELECTRON_AUTH_FRAGMENT_KEY = "desktop_token";
 
+export const DESKTOP_AUTH_ERROR_EVENT = "en-passant:desktop-auth-error";
+
 export type DesktopAuthContext = {
   client_id: string;
   state: string;
