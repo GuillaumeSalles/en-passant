@@ -1,6 +1,5 @@
 import { createAuthClient } from "better-auth/client";
 import { emailOTPClient } from "better-auth/client/plugins";
-import { electronProxyClient } from "@better-auth/electron/proxy";
 import desktopAuth from "../../desktop-auth.config.json";
 
 const DESKTOP_AUTH_BASE_URL = `${desktopAuth.productionAppOrigin}/api/auth`;
@@ -35,13 +34,6 @@ const desktopOptions =
 
 export const authClient = createAuthClient({
   basePath: "/api/auth",
-  plugins: [
-    emailOTPClient(),
-    electronProxyClient({
-      clientID: desktopAuth.clientId,
-      protocol: desktopAuth.scheme,
-      callbackPath: desktopAuth.callbackPath,
-    }),
-  ],
+  plugins: [emailOTPClient()],
   ...desktopOptions,
 });

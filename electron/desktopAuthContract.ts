@@ -1,80 +1,44 @@
-import { parseSetCookieHeader } from "better-auth/cookies";
-import { API_ORIGIN, ELECTRON_AUTH_CALLBACK_PATH, ELECTRON_AUTH_SCHEME } from "./constants";
+import { ELECTRON_AUTH_CLIENT_ID } from "./constants";
 
-export type DesktopAuthEvent = "signin" | "signup";
+export type DesktopAuthAccountKind = "new" | "existing";
 
-const BETTER_AUTH_SESSION_COOKIE_NAMES = new Set([
-  "better-auth.session_token",
-  "__Secure-better-auth.session_token",
-  "better-auth.session_data",
-  "__Secure-better-auth.session_data",
-]);
-
-type CookieSession = {
-  cookies: {
-    set: (details: Electron.CookiesSetDetails) => Promise<void>;
-  };
+export type DesktopAuthorizationToken = {
+  identifier: string;
+  state: string;
 };
 
-export type ParsedDesktopAuthDeepLink = {
-  authEvent: DesktopAuthEvent;
-  token: string;
-};
-
-export function parseDesktopAuthDeepLink(value: string): ParsedDesktopAuthDeepLink | null {
-  let url: URL;
+export function parseDesktopAuthorizationToken(token: string): DesktopAuthorizationToken | null {
+  let parsed: unknown;
   try {
-    url = new URL(value);
+    parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
   } catch {
     return null;
   }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const value = parsed as Record<string, unknown>;
   if (
-    url.protocol !== `${ELECTRON_AUTH_SCHEME}:` ||
-    url.hostname !== "" ||
-    url.pathname !== ELECTRON_AUTH_CALLBACK_PATH
+    typeof value["identifier"] !== "string" ||
+    value["identifier"] === "" ||
+    typeof value["state"] !== "string" ||
+    value["state"] === ""
   ) {
     return null;
   }
-  const authEvent = url.searchParams.get("auth_event");
-  if (authEvent !== "signin" && authEvent !== "signup") return null;
-  if (!url.hash.startsWith("#token=")) return null;
-  const token = url.hash.slice("#token=".length);
-  return token === "" ? null : { authEvent, token };
+  return { identifier: value["identifier"], state: value["state"] };
 }
 
-function electronSameSite(
-  sameSite: "strict" | "lax" | "none" | undefined,
-): NonNullable<Electron.CookiesSetDetails["sameSite"]> {
-  if (sameSite === "none") return "no_restriction";
-  return sameSite ?? "lax";
-}
-
-export async function mirrorAuthCookies(
-  desktopSession: CookieSession,
-  setCookieHeader: string,
-  cookieUrl = API_ORIGIN,
-  now = Date.now(),
-): Promise<void> {
-  const cookies = parseSetCookieHeader(setCookieHeader);
-  const defaultSecure = new URL(cookieUrl).protocol === "https:";
-  for (const [name, attributes] of cookies) {
-    if (!BETTER_AUTH_SESSION_COOKIE_NAMES.has(name)) continue;
-    const maxAge = attributes["max-age"];
-    const expirationDate =
-      typeof maxAge === "number"
-        ? now / 1000 + maxAge
-        : attributes.expires?.getTime() === undefined
-          ? undefined
-          : attributes.expires.getTime() / 1000;
-    await desktopSession.cookies.set({
-      url: cookieUrl,
-      name,
-      value: attributes.value,
-      path: attributes.path ?? "/",
-      secure: attributes.secure ?? defaultSecure,
-      httpOnly: attributes.httponly ?? true,
-      sameSite: electronSameSite(attributes.samesite),
-      ...(expirationDate === undefined ? {} : { expirationDate }),
-    });
-  }
+export function desktopAuthBrokerUrl(options: {
+  signInURL: string;
+  state: string;
+  codeChallenge: string;
+  callbackPort: number;
+  callbackNonce: string;
+}): string {
+  const url = new URL(options.signInURL);
+  url.searchParams.set("client_id", ELECTRON_AUTH_CLIENT_ID);
+  url.searchParams.set("state", options.state);
+  url.searchParams.set("code_challenge", options.codeChallenge);
+  url.searchParams.set("loopback_port", String(options.callbackPort));
+  url.searchParams.set("callback_nonce", options.callbackNonce);
+  return url.toString();
 }

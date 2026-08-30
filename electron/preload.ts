@@ -5,15 +5,15 @@ const REQUEST_GOOGLE_AUTH_CHANNEL = "en-passant:request-google-auth";
 const GOOGLE_AUTH_COMPLETE_CHANNEL = "en-passant:google-auth-complete";
 const GOOGLE_AUTH_ERROR_CHANNEL = "en-passant:google-auth-error";
 
-type AuthEvent = "signin" | "signup";
+type DesktopAuthAccountKind = "new" | "existing";
 
 contextBridge.exposeInMainWorld("enPassantDesktop", {
   requestGoogleSignIn: async (): Promise<void> => {
     await ipcRenderer.invoke(REQUEST_GOOGLE_AUTH_CHANNEL);
   },
-  onGoogleSignInComplete(callback: (event: AuthEvent) => void): () => void {
-    const listener = (_event: Electron.IpcRendererEvent, authEvent: unknown) => {
-      if (authEvent === "signin" || authEvent === "signup") callback(authEvent);
+  onGoogleSignInComplete(callback: (accountKind: DesktopAuthAccountKind) => void): () => void {
+    const listener = (_event: Electron.IpcRendererEvent, accountKind: unknown) => {
+      if (accountKind === "new" || accountKind === "existing") callback(accountKind);
     };
     ipcRenderer.on(GOOGLE_AUTH_COMPLETE_CHANNEL, listener);
     return () => ipcRenderer.removeListener(GOOGLE_AUTH_COMPLETE_CHANNEL, listener);

@@ -872,19 +872,24 @@ test("brokers desktop Google sign in through the system-browser route", async ({
   });
 
   await page.goto(
-    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge",
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state-123456&code_challenge=desktop-challenge-12345678901234567890&loopback_port=48321&callback_nonce=callback-nonce-123456",
   );
+  await expect(page.getByText("The En Passant desktop app is requesting access")).toBeVisible();
+  expect(requestUrl).toBeNull();
+  await page.getByRole("button", { name: "Continue with Google" }).click();
   await expect.poll(() => requestUrl).not.toBeNull();
 
   const brokerOrigin = new URL(page.url()).origin;
   const startUrl = new URL(requestUrl ?? "https://invalid.example");
   expect(startUrl.searchParams.get("client_id")).toBe("electron");
-  expect(startUrl.searchParams.get("state")).toBe("desktop-state");
-  expect(startUrl.searchParams.get("code_challenge")).toBe("desktop-challenge");
+  expect(startUrl.searchParams.get("state")).toBe("desktop-state-123456");
+  expect(startUrl.searchParams.get("code_challenge")).toBe(
+    "desktop-challenge-12345678901234567890",
+  );
   expect(requestBody).toMatchObject({
     provider: "google",
-    callbackURL: `${brokerOrigin}/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin`,
-    newUserCallbackURL: `${brokerOrigin}/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signup`,
+    callbackURL: `${brokerOrigin}/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state-123456&code_challenge=desktop-challenge-12345678901234567890&loopback_port=48321&callback_nonce=callback-nonce-123456&auth_event=signin`,
+    newUserCallbackURL: `${brokerOrigin}/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state-123456&code_challenge=desktop-challenge-12345678901234567890&loopback_port=48321&callback_nonce=callback-nonce-123456&auth_event=signup`,
     disableRedirect: true,
   });
 });
@@ -895,6 +900,17 @@ test("offers an explicit desktop handoff after Google returns", async ({ page })
     syncRequests++;
   });
   auth.signIn();
+  await page.route("**/api/auth/desktop-assertion", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      token: "desktop-authorization-code",
+      accountKind: "existing",
+    });
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ assertion: "signed-assertion" }),
+    });
+  });
   await page.context().addCookies([
     {
       name: "better-auth.electron",
@@ -903,13 +919,13 @@ test("offers an explicit desktop handoff after Google returns", async ({ page })
     },
   ]);
   await page.goto(
-    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin",
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state-123456&code_challenge=desktop-challenge-12345678901234567890&loopback_port=48321&callback_nonce=callback-nonce-123456&auth_event=signin",
   );
 
   await expect(page.getByRole("heading", { name: "Continue in En Passant" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open En Passant" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Return to En Passant" })).toHaveAttribute(
     "href",
-    "io.enpassant.desktop:/auth/callback?auth_event=signin#token=desktop-authorization-code",
+    "http://127.0.0.1:48321/auth/callback/callback-nonce-123456?token=desktop-authorization-code&assertion=signed-assertion",
   );
   await page.waitForTimeout(250);
   expect(syncRequests).toBe(0);
@@ -921,7 +937,7 @@ test("offers an explicit desktop handoff after Google returns", async ({ page })
 test("rejects a desktop callback without an authorization code immediately", async ({ page }) => {
   await mockSignedOutAuth(page);
   await page.goto(
-    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin",
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state-123456&code_challenge=desktop-challenge-12345678901234567890&loopback_port=48321&callback_nonce=callback-nonce-123456&auth_event=signin",
   );
 
   await expect(

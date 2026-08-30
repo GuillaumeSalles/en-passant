@@ -20,7 +20,7 @@ vi.mock("@/lib/authSession", () => ({
 import { DesktopAuthCompletion } from "./DesktopAuthCompletion";
 
 describe("DesktopAuthCompletion", () => {
-  let complete: ((event: "signin" | "signup") => void) | undefined;
+  let complete: ((accountKind: "new" | "existing") => void) | undefined;
   let fail: ((message: string) => void) | undefined;
 
   beforeEach(() => {
@@ -52,7 +52,7 @@ describe("DesktopAuthCompletion", () => {
     const view = render(() => <DesktopAuthCompletion />);
     await waitFor(() => expect(complete).toBeDefined());
 
-    complete?.("signup");
+    complete?.("new");
 
     await waitFor(() => {
       expect(mocks.refreshAuthSession).toHaveBeenCalledOnce();

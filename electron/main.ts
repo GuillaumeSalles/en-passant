@@ -1,8 +1,7 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain, protocol, session, shell } from "electron";
-import { APP_URL, ELECTRON_AUTH_SCHEME, SESSION_PARTITION } from "./constants";
-import { authenticateDesktopDeepLink, requestGoogleSignIn } from "./desktopAuth";
-import { parseDesktopAuthDeepLink } from "./desktopAuthContract";
+import { APP_URL, SESSION_PARTITION } from "./constants";
+import { startGoogleSignIn, type DesktopAuthFlow } from "./desktopAuth";
 import {
   GOOGLE_AUTH_COMPLETE_CHANNEL,
   GOOGLE_AUTH_ERROR_CHANNEL,
@@ -21,13 +20,6 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
       stream: true,
       codeCache: true,
-    },
-  },
-  {
-    scheme: ELECTRON_AUTH_SCHEME,
-    privileges: {
-      standard: false,
-      secure: true,
     },
   },
 ]);
@@ -80,28 +72,13 @@ function createMainWindow(): BrowserWindow {
   return window;
 }
 
-function registerDesktopAuthProtocol(): void {
-  const registered = process.defaultApp
-    ? typeof process.argv[1] === "string" &&
-      app.setAsDefaultProtocolClient(ELECTRON_AUTH_SCHEME, process.execPath, [
-        path.resolve(process.argv[1]),
-      ])
-    : app.setAsDefaultProtocolClient(ELECTRON_AUTH_SCHEME);
-  if (!registered) console.error(`Failed to register ${ELECTRON_AUTH_SCHEME} deep links`);
-}
-
-function desktopAuthUrlFromArguments(values: readonly string[]): string | null {
-  return values.find((value) => parseDesktopAuthDeepLink(value) !== null) ?? null;
-}
-
-registerDesktopAuthProtocol();
-
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   let mainWindow: BrowserWindow | null = null;
-  let pendingDesktopAuthUrl: string | null = desktopAuthUrlFromArguments(process.argv);
+  let desktopAuthFlow: DesktopAuthFlow | null = null;
+  let desktopAuthPending = false;
 
   function ensureMainWindow(): BrowserWindow {
     if (mainWindow !== null && !mainWindow.isDestroyed()) return mainWindow;
@@ -124,44 +101,10 @@ if (!hasSingleInstanceLock) {
     return window;
   }
 
-  async function completeDesktopAuth(url: string): Promise<void> {
-    try {
-      const authEvent = await authenticateDesktopDeepLink(
-        url,
-        session.fromPartition(SESSION_PARTITION),
-      );
-      if (authEvent === null) return;
-      const window = notifyRenderer(GOOGLE_AUTH_COMPLETE_CHANNEL, authEvent);
-      if (window.isMinimized()) window.restore();
-      window.focus();
-    } catch (error: unknown) {
-      console.error("Failed to complete Google sign in", error);
-      notifyRenderer(GOOGLE_AUTH_ERROR_CHANNEL, "Google sign in failed. Please try again.");
-    }
-  }
-
-  function acceptDesktopAuthUrl(url: string): void {
-    if (parseDesktopAuthDeepLink(url) === null) return;
-    if (!app.isReady()) {
-      pendingDesktopAuthUrl = url;
-      return;
-    }
-    void completeDesktopAuth(url);
-  }
-
-  app.on("open-url", (event, url) => {
-    event.preventDefault();
-    acceptDesktopAuthUrl(url);
-  });
-  app.on("second-instance", (_event, commandLine, _workingDirectory, additionalData) => {
+  app.on("second-instance", () => {
     const window = ensureMainWindow();
     if (window.isMinimized()) window.restore();
     window.focus();
-    const authUrl =
-      typeof additionalData === "string"
-        ? additionalData
-        : desktopAuthUrlFromArguments(commandLine);
-    if (authUrl !== null) acceptDesktopAuthUrl(authUrl);
   });
 
   ipcMain.handle(REQUEST_GOOGLE_AUTH_CHANNEL, async (event) => {
@@ -169,8 +112,32 @@ if (!hasSingleInstanceLock) {
     if (senderUrl === undefined || !isRendererUrl(senderUrl, rendererUrl)) {
       throw new Error("Google sign in request came from an untrusted renderer");
     }
-    await requestGoogleSignIn();
+    if (desktopAuthPending) return;
+    desktopAuthPending = true;
+    try {
+      const flow = await startGoogleSignIn(session.fromPartition(SESSION_PARTITION));
+      desktopAuthFlow = flow;
+      void flow.completion
+        .then((accountKind) => {
+          const window = notifyRenderer(GOOGLE_AUTH_COMPLETE_CHANNEL, accountKind);
+          if (window.isMinimized()) window.restore();
+          window.focus();
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to complete Google sign in", error);
+          notifyRenderer(GOOGLE_AUTH_ERROR_CHANNEL, "Google sign in failed. Please try again.");
+        })
+        .finally(() => {
+          if (desktopAuthFlow === flow) desktopAuthFlow = null;
+          desktopAuthPending = false;
+        });
+    } catch (error: unknown) {
+      desktopAuthPending = false;
+      throw error;
+    }
   });
+
+  app.on("before-quit", () => desktopAuthFlow?.cancel());
 
   app
     .whenReady()
@@ -187,11 +154,6 @@ if (!hasSingleInstanceLock) {
         }),
       );
       ensureMainWindow();
-      if (pendingDesktopAuthUrl !== null) {
-        const authUrl = pendingDesktopAuthUrl;
-        pendingDesktopAuthUrl = null;
-        void completeDesktopAuth(authUrl);
-      }
       app.on("activate", () => {
         if (BrowserWindow.getAllWindows().length === 0) ensureMainWindow();
       });

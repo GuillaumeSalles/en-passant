@@ -1,45 +1,54 @@
 import { describe, expect, test } from "vitest";
-import { desktopAuthContextFromUrl, desktopAuthDeepLink } from "./desktopAuth";
+import {
+  desktopAuthContextFromUrl,
+  desktopAuthLoopbackUrl,
+  desktopAuthPluginContext,
+  desktopAuthorizationCode,
+} from "./desktopAuth";
+
+const requestQuery =
+  "desktop_auth=google&client_id=electron&state=state-value-123456&code_challenge=challenge-value-12345678901234567890&loopback_port=48321&callback_nonce=callback-nonce-123456";
 
 describe("desktop auth browser broker", () => {
-  test("reads an exact production Electron PKCE request", () => {
-    expect(
-      desktopAuthContextFromUrl(
-        "https://enpassant.io/app?desktop_auth=google&client_id=electron&state=state-1&code_challenge=challenge-1",
-      ),
-    ).toEqual({
+  test("reads an exact production Electron PKCE and loopback request", () => {
+    const context = desktopAuthContextFromUrl(`https://enpassant.io/app?${requestQuery}`);
+    expect(context).toEqual({
       client_id: "electron",
-      state: "state-1",
-      code_challenge: "challenge-1",
+      state: "state-value-123456",
+      code_challenge: "challenge-value-12345678901234567890",
+      loopback_port: "48321",
+      callback_nonce: "callback-nonce-123456",
     });
     expect(
-      desktopAuthContextFromUrl(
-        "http://localhost:5174/app/auth/desktop?desktop_auth=google&client_id=electron&state=state-1&code_challenge=challenge-1",
-      ),
+      desktopAuthContextFromUrl(`http://localhost:5174/app/auth/desktop?${requestQuery}`),
     ).not.toBeNull();
+    expect(desktopAuthPluginContext(context!)).toEqual({
+      client_id: "electron",
+      state: "state-value-123456",
+      code_challenge: "challenge-value-12345678901234567890",
+    });
   });
 
   test("rejects forged and incomplete broker requests", () => {
+    expect(desktopAuthContextFromUrl(`https://attacker.example/app?${requestQuery}`)).toBeNull();
+    expect(desktopAuthContextFromUrl(`app://enpassant/app?${requestQuery}`)).toBeNull();
     expect(
-      desktopAuthContextFromUrl(
-        "https://attacker.example/app?desktop_auth=google&client_id=electron&state=a&code_challenge=b",
-      ),
+      desktopAuthContextFromUrl(`https://enpassant.io/app?${requestQuery.replace("48321", "0")}`),
     ).toBeNull();
     expect(
       desktopAuthContextFromUrl(
-        "app://enpassant/app?desktop_auth=google&client_id=electron&state=a&code_challenge=b",
-      ),
-    ).toBeNull();
-    expect(
-      desktopAuthContextFromUrl(
-        "https://enpassant.io/app?desktop_auth=google&client_id=electron&state=a",
+        `https://enpassant.io/app?${requestQuery.replace("callback-nonce-123456", "short")}`,
       ),
     ).toBeNull();
   });
 
-  test("returns the account kind through the app deep link", () => {
-    expect(desktopAuthDeepLink("signup", "token/value")).toBe(
-      "io.enpassant.desktop:/auth/callback?auth_event=signup#token=token%2Fvalue",
+  test("builds an exact loopback callback and reads the client-specific cookie", () => {
+    const context = desktopAuthContextFromUrl(`https://enpassant.io/app?${requestQuery}`)!;
+    expect(desktopAuthLoopbackUrl(context, "token/value", "signed assertion")).toBe(
+      "http://127.0.0.1:48321/auth/callback/callback-nonce-123456?token=token%2Fvalue&assertion=signed+assertion",
     );
+    expect(
+      desktopAuthorizationCode("other=value; better-auth.electron=token%2Fvalue; another=1"),
+    ).toBe("token/value");
   });
 });

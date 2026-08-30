@@ -5,9 +5,8 @@ export const APP_ORIGIN = `app://${APP_HOST}`;
 export const APP_URL = `${APP_ORIGIN}/app`;
 export const API_ORIGIN = desktopAuth.productionAppOrigin;
 export const SESSION_PARTITION = "persist:en-passant";
-export const ELECTRON_AUTH_SCHEME = desktopAuth.scheme;
 export const ELECTRON_AUTH_CLIENT_ID = desktopAuth.clientId;
-export const ELECTRON_AUTH_CALLBACK_PATH = desktopAuth.callbackPath;
+export const ELECTRON_AUTH_CALLBACK_PATH = desktopAuth.loopbackCallbackPath;
 
 export type DesktopAuthRuntime = {
   apiOrigin: string;

@@ -3,37 +3,31 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requestAuth: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock("better-auth/client", () => ({
-  createAuthClient: () => ({
-    authenticate: vi.fn(),
-    requestAuth: mocks.requestAuth,
-  }),
-}));
-
-vi.mock("@better-auth/electron/client", () => ({
-  electronClient: vi.fn(() => ({
-    getActions: () => ({
-      authenticate: vi.fn(),
-      requestAuth: mocks.requestAuth,
-    }),
-  })),
+  openExternal: vi.fn<(url: string, options: { activate: boolean }) => Promise<void>>(() =>
+    Promise.resolve(),
+  ),
 }));
 
 vi.mock("electron", () => ({
-  app: { isPackaged: false },
+  shell: { openExternal: mocks.openExternal },
 }));
 
-import { requestGoogleSignIn } from "./desktopAuth";
+import { startGoogleSignIn } from "./desktopAuth";
 
 describe("desktop auth client", () => {
-  beforeEach(() => mocks.requestAuth.mockClear());
+  beforeEach(() => mocks.openExternal.mockClear());
 
-  test("starts Google authentication through the Electron main-process client", async () => {
-    await requestGoogleSignIn();
+  test("starts a one-time loopback callback before opening the browser", async () => {
+    const flow = await startGoogleSignIn({ fetch: vi.fn() } as never);
+    expect(mocks.openExternal).toHaveBeenCalledOnce();
+    const [value] = mocks.openExternal.mock.calls[0] ?? [];
+    const url = new URL(value ?? "https://invalid.example");
+    expect(url.searchParams.get("loopback_port")).toMatch(/^\d+$/);
+    expect(url.searchParams.get("callback_nonce")).toMatch(/^[A-Za-z0-9_-]{16,}$/);
+    expect(url.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{16,}$/);
+    expect(url.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{32,}$/);
 
-    expect(mocks.requestAuth).toHaveBeenCalledOnce();
+    flow.cancel();
+    await expect(flow.completion).rejects.toThrow("cancelled");
   });
 });

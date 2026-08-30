@@ -14,11 +14,11 @@ export function DesktopAuthCompletion() {
     const desktop = window.enPassantDesktop;
     if (desktop === undefined) return;
 
-    const unsubscribeComplete = desktop.onGoogleSignInComplete((authEvent) => {
+    const unsubscribeComplete = desktop.onGoogleSignInComplete((accountKind) => {
       void refreshAuthSession()
         .then(async (user) => {
           if (user === null) throw new Error("Google sign in did not create a session.");
-          await finishAuthenticatedAccountFlow(authEvent === "signup" ? "new" : "existing");
+          await finishAuthenticatedAccountFlow(accountKind);
         })
         .catch(() => reportDesktopAuthError("Google sign in failed."));
     });

@@ -3,10 +3,10 @@
 This project is licensed under GPL-3.0-or-later except where third-party
 materials below state otherwise.
 
-## Better Auth and Better Auth Electron
+## Better Auth
 
 - Source: https://github.com/better-auth/better-auth
-- Packages: `better-auth@1.7.2` and `@better-auth/electron@1.7.2`
+- Package: `better-auth@1.7.2`
 - Copyright: 2024-present Bereket Engida
 - License: MIT
 

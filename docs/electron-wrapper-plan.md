@@ -75,16 +75,18 @@ then maps those auth requests back through the scoped `app://enpassant/api/auth/
 
 Email OTP stays inside the bundled app. Google OAuth uses Better Auth's Electron PKCE transfer
 flow and never loads Google in the application window. The narrow preload bridge asks the main
-process to open a production `/app/auth/desktop?desktop_auth=google` broker URL in the system
-browser. The hosted app preserves the Electron client id, state, and code challenge on the social
-sign-in request.
+process to bind an ephemeral `127.0.0.1` callback listener and open a production
+`/app/auth/desktop?desktop_auth=google` broker URL in the system browser. The broker shows an
+explicit confirmation before starting Google OAuth and preserves the Electron client id, PKCE
+state and code challenge, loopback port, and random callback path nonce.
 
-After Google returns, the backend issues a short-lived, single-use authorization code. The hosted
-app redirects that code and the existing/new-account classification to the registered
-`io.enpassant.desktop:/auth/callback` deep link. The main process validates the exact scheme, path,
-and account classification, exchanges the code with the in-memory PKCE verifier, and copies only
-the resulting Better Auth session cookies into the persistent Electron session. The renderer never
-receives the authorization code or session token.
+After Google returns, the backend issues a short-lived, single-use authorization code. It also
+signs the existing/new-account classification against that exact code and authenticated user. The
+hosted app returns both values to the random loopback callback. The main process checks the PKCE
+state, exchanges the code with its in-memory verifier, and verifies the signed classification
+through the newly authenticated session. Both requests use the persistent Electron session's
+Chromium cookie jar, so renderer JavaScript never receives the session token and no `Set-Cookie`
+parsing or cookie copying is required.
 
 The complete flow must still receive a real-account release-candidate check on every supported
 platform before public distribution.
@@ -140,7 +142,7 @@ Unit tests cover:
 - exact navigation and external-link allowlists, including malicious lookalike hosts and unsafe
   schemes;
 - rejection of embedded Google and hosted callback navigation;
-- exact deep-link parsing, account classification, and Better Auth session-cookie transfer;
+- exact PKCE token parsing, loopback broker parameters, and account classification;
 - packaged asset responses, security headers, SPA fallback, missing assets, and path containment;
 - API target, method, body, origin/referrer, cookie stripping, response headers, and offline errors;
 - Better Auth desktop request mapping and browser-broker URLs;
@@ -156,6 +158,7 @@ disabled and a fresh user-data directory. It proves that:
 - local fonts are installed and active;
 - no service worker controls the desktop page;
 - offline API calls fail without taking down the local app;
+- the complete local loopback handoff verifies PKCE and retains the session cookie in Chromium;
 - local storage survives a full Electron restart.
 
 The existing web test suite remains the source of truth for detailed chess, PGN, state, storage, UI,

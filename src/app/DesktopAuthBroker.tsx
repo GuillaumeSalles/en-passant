@@ -6,45 +6,58 @@ import { authCallbackUrl, authEventFromUrl } from "@/lib/authRedirect";
 import {
   clearDesktopAuthorizationCookie,
   desktopAuthContextFromUrl,
-  desktopAuthDeepLink,
+  desktopAuthLoopbackUrl,
+  desktopAuthPluginContext,
+  desktopAuthorizationCode,
+  requestDesktopAuthAssertion,
   type DesktopAuthContext,
 } from "@/lib/desktopAuth";
 
-async function startGoogleSignIn(context: DesktopAuthContext): Promise<string | null> {
+async function startGoogleSignIn(context: DesktopAuthContext): Promise<void> {
   clearDesktopAuthorizationCookie();
   const { data, error } = await authClient.signIn.social({
     provider: "google",
     callbackURL: authCallbackUrl("signin"),
     newUserCallbackURL: authCallbackUrl("signup"),
     disableRedirect: true,
-    fetchOptions: { query: context },
+    fetchOptions: { query: desktopAuthPluginContext(context) },
   });
-  if (error !== null) return error.message ?? "Google sign in failed.";
-  if (data?.url === undefined) return "Google sign in did not return a redirect.";
+  if (error !== null) throw new Error(error.message ?? "Google sign in failed.");
+  if (data?.url === undefined) throw new Error("Google sign in did not return a redirect.");
   window.location.assign(data.url);
-  return null;
 }
 
 export function DesktopAuthBroker() {
+  const [context, setContext] = createSignal<DesktopAuthContext | null>(null);
   const [desktopUrl, setDesktopUrl] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const [isStarting, setIsStarting] = createSignal(false);
+  const [isCompleting, setIsCompleting] = createSignal(false);
+
+  function beginSignIn(): void {
+    const currentContext = context();
+    if (currentContext === null || isStarting()) return;
+    setIsStarting(true);
+    void startGoogleSignIn(currentContext).catch((cause: unknown) => {
+      setIsStarting(false);
+      setError(cause instanceof Error ? cause.message : "Google sign in failed.");
+    });
+  }
 
   onSettled(() => {
-    const context = desktopAuthContextFromUrl();
-    if (context === null) {
+    const currentContext = desktopAuthContextFromUrl();
+    if (currentContext === null) {
       setError("This desktop sign-in link is invalid or has expired.");
       return;
     }
 
     const authEvent = authEventFromUrl();
     if (authEvent === null) {
-      void startGoogleSignIn(context).then((message) => {
-        if (message !== null) setError(message);
-      });
+      setContext(currentContext);
       return;
     }
 
-    const token = authClient.electron.getAuthorizationCode();
+    const token = desktopAuthorizationCode();
     if (token === null) {
       setError(
         "The desktop authorization code was not received. Start sign in again from En Passant.",
@@ -52,8 +65,13 @@ export function DesktopAuthBroker() {
       return;
     }
 
-    clearDesktopAuthorizationCookie();
-    setDesktopUrl(desktopAuthDeepLink(authEvent, token));
+    setIsCompleting(true);
+    void requestDesktopAuthAssertion(token, authEvent)
+      .then((assertion) => {
+        clearDesktopAuthorizationCookie();
+        setDesktopUrl(desktopAuthLoopbackUrl(currentContext, token, assertion));
+      })
+      .catch(() => setError("Desktop authorization could not be completed. Please try again."));
   });
 
   return (
@@ -66,14 +84,29 @@ export function DesktopAuthBroker() {
             fallback={
               <Show
                 when={desktopUrl()}
-                fallback={<p class="text-sm text-muted-foreground">Finishing Google sign in…</p>}
+                fallback={
+                  <Show
+                    when={!isCompleting()}
+                    fallback={
+                      <p class="text-sm text-muted-foreground">Finishing Google sign in…</p>
+                    }
+                  >
+                    <p class="text-sm text-muted-foreground">
+                      The En Passant desktop app is requesting access to your account. Continue only
+                      if you opened this page from the desktop app.
+                    </p>
+                    <Button type="button" disabled={isStarting()} onClick={beginSignIn}>
+                      {isStarting() ? "Opening Google…" : "Continue with Google"}
+                    </Button>
+                  </Show>
+                }
               >
                 {(url) => (
                   <>
                     <p class="text-sm text-muted-foreground">
                       Google sign in is complete. Return to the desktop app to finish.
                     </p>
-                    <Button href={url()}>Open En Passant</Button>
+                    <Button href={url()}>Return to En Passant</Button>
                   </>
                 )}
               </Show>
