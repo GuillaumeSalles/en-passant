@@ -930,3 +930,16 @@ test("reads the desktop handoff from the callback fragment", async ({ page }) =>
   );
   expect(new URL(page.url()).hash).toBe("");
 });
+
+test("rejects a desktop callback without an authorization code immediately", async ({ page }) => {
+  await mockSignedOutAuth(page);
+  await page.goto(
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin",
+  );
+
+  await expect(
+    page.getByText(
+      "The desktop authorization code was not received. Start sign in again from En Passant.",
+    ),
+  ).toBeVisible();
+});

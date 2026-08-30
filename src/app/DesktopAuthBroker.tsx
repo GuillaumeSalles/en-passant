@@ -2,7 +2,7 @@ import { createSignal, onSettled, Show } from "solid-js";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/authClient";
-import { authCallbackUrl, authEventFromUrl, type AuthEvent } from "@/lib/authRedirect";
+import { authCallbackUrl, authEventFromUrl } from "@/lib/authRedirect";
 import {
   clearDesktopAuthorizationCookie,
   desktopAuthContextFromUrl,
@@ -45,34 +45,22 @@ export function DesktopAuthBroker() {
       return;
     }
 
-    function captureAuthorizationCode(event: AuthEvent): boolean {
-      const tokenFromUrl = desktopAuthorizationCodeFromUrl();
-      const token = tokenFromUrl ?? authClient.electron.getAuthorizationCode();
-      if (token === null) return false;
-      clearDesktopAuthorizationCookie();
-      if (tokenFromUrl !== null) {
-        const currentUrl = new URL(window.location.href);
-        currentUrl.hash = "";
-        window.history.replaceState(window.history.state, "", currentUrl.toString());
-      }
-      setDesktopUrl(desktopAuthDeepLink(event, token));
-      return true;
-    }
-
-    if (captureAuthorizationCode(authEvent)) return;
-    const intervalId = window.setInterval(() => {
-      if (captureAuthorizationCode(authEvent)) window.clearInterval(intervalId);
-    }, 100);
-    const timeoutId = window.setTimeout(() => {
-      window.clearInterval(intervalId);
+    const tokenFromUrl = desktopAuthorizationCodeFromUrl();
+    const token = tokenFromUrl ?? authClient.electron.getAuthorizationCode();
+    if (token === null) {
       setError(
         "The desktop authorization code was not received. Start sign in again from En Passant.",
       );
-    }, 10_000);
-    return () => {
-      window.clearInterval(intervalId);
-      window.clearTimeout(timeoutId);
-    };
+      return;
+    }
+
+    clearDesktopAuthorizationCookie();
+    if (tokenFromUrl !== null) {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.hash = "";
+      window.history.replaceState(window.history.state, "", currentUrl.toString());
+    }
+    setDesktopUrl(desktopAuthDeepLink(authEvent, token));
   });
 
   return (
