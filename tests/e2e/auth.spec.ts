@@ -890,19 +890,32 @@ test("brokers desktop Google sign in through the system-browser route", async ({
 });
 
 test("offers an explicit desktop handoff after Google returns", async ({ page }) => {
-  await mockSignedOutAuth(page);
+  let syncRequests = 0;
+  const auth = await mockSignedInUser(page, () => {
+    syncRequests++;
+  });
+  auth.signIn();
+  await page.context().addCookies([
+    {
+      name: "better-auth.electron",
+      value: "desktop-authorization-code",
+      url: "http://localhost:5174",
+    },
+  ]);
   await page.goto(
     "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin",
   );
-  await page.evaluate(() => {
-    document.cookie = "better-auth.electron=desktop-authorization-code; path=/";
-  });
 
   await expect(page.getByRole("heading", { name: "Continue in En Passant" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open En Passant" })).toHaveAttribute(
     "href",
     "io.enpassant.desktop:/auth/callback?auth_event=signin#token=desktop-authorization-code",
   );
+  await page.waitForTimeout(250);
+  expect(syncRequests).toBe(0);
+  await expect
+    .poll(() => page.evaluate(async () => (await indexedDB.databases()).map(({ name }) => name)))
+    .not.toContain("en-passant");
 });
 
 test("reads the desktop handoff from the callback fragment", async ({ page }) => {

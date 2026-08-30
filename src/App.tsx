@@ -29,6 +29,7 @@ import { DesktopAuthBroker } from "@/app/DesktopAuthBroker";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
+const DESKTOP_AUTH_BROKER_PATH = `${APP_ROOT}/auth/desktop`;
 
 const Design = lazy(() => import("@/app/Design"));
 const Debug = lazy(() => import("@/app/Debug"));
@@ -341,14 +342,22 @@ function Root(props: { children?: JSX.Element }) {
   }
 
   return (
-    <Show when={isAppRoute()} fallback={<Loading on={location.pathname}>{props.children}</Loading>}>
-      <AppStateProvider>
-        <AppShell>
-          <Loading fallback={<BaseLayout />} on={location.pathname}>
-            {props.children}
-          </Loading>
-        </AppShell>
-      </AppStateProvider>
+    <Show
+      when={location.pathname !== DESKTOP_AUTH_BROKER_PATH}
+      fallback={<Loading on={location.pathname}>{props.children}</Loading>}
+    >
+      <Show
+        when={isAppRoute()}
+        fallback={<Loading on={location.pathname}>{props.children}</Loading>}
+      >
+        <AppStateProvider>
+          <AppShell>
+            <Loading fallback={<BaseLayout />} on={location.pathname}>
+              {props.children}
+            </Loading>
+          </AppShell>
+        </AppStateProvider>
+      </Show>
     </Show>
   );
 }
@@ -362,7 +371,7 @@ const AppRouter = createRouter({
     { path: "/design", component: Design },
     { path: "/debug", component: Debug },
     { path: APP_ROOT, component: AppRootRoute },
-    { path: `${APP_ROOT}/auth/desktop`, component: DesktopAuthBroker },
+    { path: DESKTOP_AUTH_BROKER_PATH, component: DesktopAuthBroker },
     { path: `${APP_ROOT}/games`, component: Games },
     { path: `${APP_ROOT}/training`, component: Training },
     { path: `${APP_ROOT}/games/:gameId`, component: GameViewer },

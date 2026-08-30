@@ -36,7 +36,6 @@ import {
   consumeRedirectAccountKind,
   finishAuthenticatedAccountFlow,
 } from "@/lib/authBootstrap";
-import { desktopAuthContextFromUrl } from "@/lib/desktopAuth";
 
 type EmailAuthStep = "email" | "code";
 
@@ -106,7 +105,6 @@ export function AuthButton(
   const [isAuthDialogOpen, setIsAuthDialogOpen] = createSignal(false);
 
   onSettled(() => {
-    if (desktopAuthContextFromUrl() !== null) return undefined;
     const accountKind = consumeRedirectAccountKind();
     refreshAuthSession()
       .then(async (user) => {
@@ -117,7 +115,6 @@ export function AuthButton(
         }
       })
       .catch(() => clearAuthSession());
-    return undefined;
   });
 
   onSettled(() => {
