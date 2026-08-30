@@ -25,6 +25,7 @@ import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { startAuthSessionRenewal } from "@/lib/authSession";
 import { useMutation } from "@/lib/useMutation";
 import { clearTrainingQueueReview } from "@/mutations/trainingSession";
+import { DesktopAuthBroker } from "@/app/DesktopAuthBroker";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
@@ -361,6 +362,7 @@ const AppRouter = createRouter({
     { path: "/design", component: Design },
     { path: "/debug", component: Debug },
     { path: APP_ROOT, component: AppRootRoute },
+    { path: `${APP_ROOT}/auth/desktop`, component: DesktopAuthBroker },
     { path: `${APP_ROOT}/games`, component: Games },
     { path: `${APP_ROOT}/training`, component: Training },
     { path: `${APP_ROOT}/games/:gameId`, component: GameViewer },

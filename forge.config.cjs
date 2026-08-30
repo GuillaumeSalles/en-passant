@@ -29,6 +29,12 @@ module.exports = {
     ],
     ignore: ignoreUnpackagedFiles,
     name: "En Passant",
+    protocols: [
+      {
+        name: "En Passant authentication",
+        schemes: ["io.enpassant.desktop"],
+      },
+    ],
   },
   makers: [
     {

@@ -1,11 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test } from "vitest";
-import {
-  isAllowedExternalUrl,
-  isAllowedMainFrameNavigation,
-  productionAppToDesktopUrl,
-} from "./navigation";
+import { isAllowedExternalUrl, isAllowedMainFrameNavigation, isRendererUrl } from "./navigation";
 
 describe("desktop navigation policy", () => {
   test("allows only exact external HTTPS hosts", () => {
@@ -24,31 +20,27 @@ describe("desktop navigation policy", () => {
     expect(isAllowedMainFrameNavigation("app://other/app", "app://enpassant/app")).toBe(false);
   });
 
-  test("allows only the expected OAuth navigation", () => {
+  test("keeps OAuth out of the embedded renderer", () => {
     expect(
       isAllowedMainFrameNavigation(
         "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
         "app://enpassant/app",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isAllowedMainFrameNavigation(
         "https://enpassant.io/api/auth/callback/google?code=test",
         "app://enpassant/app",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(isAllowedMainFrameNavigation("https://attacker.example/", "app://enpassant/app")).toBe(
       false,
     );
   });
 
-  test("maps the hosted callback back to the bundled route", () => {
-    expect(
-      productionAppToDesktopUrl(
-        "https://enpassant.io/app/training?review=due&auth_event=signin#current",
-      ),
-    ).toBe("app://enpassant/app/training?review=due&auth_event=signin#current");
-    expect(productionAppToDesktopUrl("https://enpassant.io/api/auth/get-session")).toBeNull();
-    expect(productionAppToDesktopUrl("https://enpassant.io.evil.example/app")).toBeNull();
+  test("validates IPC senders against the renderer origin", () => {
+    expect(isRendererUrl("app://enpassant/app/training", "app://enpassant/app")).toBe(true);
+    expect(isRendererUrl("app://other/app", "app://enpassant/app")).toBe(false);
+    expect(isRendererUrl("https://accounts.google.com", "app://enpassant/app")).toBe(false);
   });
 });

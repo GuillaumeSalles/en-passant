@@ -1,10 +1,131 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 
 const OFFLINE_ARG = "--host-resolver-rules=MAP * ~NOTFOUND";
 const PERSISTENCE_KEY = "en_passant_electron_persistence_test";
+const EXTERNAL_AUTH_URL_KEY = "EN_PASSANT_TEST_EXTERNAL_AUTH_URL";
+
+test("opens Google PKCE authentication in the external browser", async () => {
+  const userDataDir = await mkdtemp(path.join(os.tmpdir(), "en-passant-electron-auth-"));
+  const app = await electron.launch({
+    args: [".", OFFLINE_ARG, `--user-data-dir=${userDataDir}`],
+    cwd: process.cwd(),
+  });
+
+  try {
+    await app.evaluate(({ shell }, externalAuthUrlKey) => {
+      delete process.env[externalAuthUrlKey];
+      Object.defineProperty(shell, "openExternal", {
+        configurable: true,
+        value: async (url: string) => {
+          process.env[externalAuthUrlKey] = url;
+        },
+      });
+    }, EXTERNAL_AUTH_URL_KEY);
+    const page = await app.firstWindow();
+    await expect(page.locator("[data-square]")).toHaveCount(64);
+    await expect.poll(() => page.evaluate(() => window.enPassantDesktop !== undefined)).toBe(true);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("button", { name: "Continue with Google" }).click();
+
+    let externalAuthUrl = "";
+    await expect
+      .poll(async () => {
+        externalAuthUrl = await app.evaluate(
+          (_electron, externalAuthUrlKey) => process.env[externalAuthUrlKey] ?? "",
+          EXTERNAL_AUTH_URL_KEY,
+        );
+        return externalAuthUrl;
+      })
+      .not.toBe("");
+
+    const url = new URL(externalAuthUrl);
+    expect(url.origin).toBe("https://enpassant.io");
+    expect(url.pathname).toBe("/app/auth/desktop");
+    expect(url.searchParams.get("desktop_auth")).toBe("google");
+    expect(url.searchParams.get("client_id")).toBe("electron");
+    expect(url.searchParams.get("state")).not.toBe("");
+    expect(url.searchParams.get("code_challenge")).not.toBe("");
+    expect(page.url()).toContain("app://enpassant/app/");
+  } finally {
+    await app.close();
+    await rm(userDataDir, { recursive: true, force: true });
+  }
+});
+
+test("opens local Google PKCE authentication in the external browser", async () => {
+  const rendererServer = createServer((_request, response) => {
+    response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><title>Local Electron auth test</title>");
+  });
+  await new Promise<void>((resolve, reject) => {
+    rendererServer.once("error", reject);
+    rendererServer.listen(0, "localhost", resolve);
+  });
+  const address = rendererServer.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Could not allocate a local Electron renderer port");
+  }
+  const rendererOrigin = `http://localhost:${address.port}`;
+  const userDataDir = await mkdtemp(path.join(os.tmpdir(), "en-passant-electron-local-auth-"));
+  const app = await electron.launch({
+    args: [".", "--en-passant-local-dev", `--user-data-dir=${userDataDir}`],
+    cwd: process.cwd(),
+    env: { ...process.env, ELECTRON_RENDERER_URL: rendererOrigin },
+  });
+
+  try {
+    await app.evaluate(({ shell }, externalAuthUrlKey) => {
+      delete process.env[externalAuthUrlKey];
+      Object.defineProperty(shell, "openExternal", {
+        configurable: true,
+        value: async (url: string) => {
+          process.env[externalAuthUrlKey] = url;
+        },
+      });
+    }, EXTERNAL_AUTH_URL_KEY);
+    const page = await app.firstWindow();
+    await expect.poll(() => page.url()).toBe(`${rendererOrigin}/`);
+    const bridgeResult = await page.evaluate(async () => {
+      if (window.enPassantDesktop === undefined) return "Desktop bridge is missing";
+      try {
+        await window.enPassantDesktop.requestGoogleSignIn();
+        return "ok";
+      } catch (error: unknown) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    });
+    expect(bridgeResult).toBe("ok");
+
+    let externalAuthUrl = "";
+    await expect
+      .poll(async () => {
+        externalAuthUrl = await app.evaluate(
+          (_electron, externalAuthUrlKey) => process.env[externalAuthUrlKey] ?? "",
+          EXTERNAL_AUTH_URL_KEY,
+        );
+        return externalAuthUrl;
+      })
+      .not.toBe("");
+
+    const url = new URL(externalAuthUrl);
+    expect(url.origin).toBe(rendererOrigin);
+    expect(url.pathname).toBe("/app/auth/desktop");
+    expect(url.searchParams.get("desktop_auth")).toBe("google");
+    expect(url.searchParams.get("client_id")).toBe("electron");
+    expect(url.searchParams.get("state")).not.toBe("");
+    expect(url.searchParams.get("code_challenge")).not.toBe("");
+  } finally {
+    await app.close();
+    await new Promise<void>((resolve, reject) => {
+      rendererServer.close((error) => (error === undefined ? resolve() : reject(error)));
+    });
+    await rm(userDataDir, { recursive: true, force: true });
+  }
+});
 
 test("starts from the bundle offline and preserves browser storage", async () => {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), "en-passant-electron-"));

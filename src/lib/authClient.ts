@@ -1,5 +1,6 @@
 import { createAuthClient } from "better-auth/client";
 import { emailOTPClient } from "better-auth/client/plugins";
+import { electronProxyClient } from "@better-auth/electron/proxy";
 
 const DESKTOP_AUTH_BASE_URL = "https://enpassant.io/api/auth";
 const DESKTOP_ORIGIN = "app://enpassant";
@@ -33,6 +34,13 @@ const desktopOptions =
 
 export const authClient = createAuthClient({
   basePath: "/api/auth",
-  plugins: [emailOTPClient()],
+  plugins: [
+    emailOTPClient(),
+    electronProxyClient({
+      clientID: "electron",
+      protocol: "io.enpassant.desktop",
+      callbackPath: "/auth/callback",
+    }),
+  ],
   ...desktopOptions,
 });

@@ -823,3 +823,97 @@ test("starts Google sign in", async ({ page }) => {
     disableRedirect: true,
   });
 });
+
+test("starts local Electron Google sign in through the external-browser bridge", async ({
+  page,
+}) => {
+  let requestedEmbeddedGoogleStart = false;
+  await page.addInitScript(() => {
+    window.enPassantDesktop = {
+      async requestGoogleSignIn() {
+        window.sessionStorage.setItem("test_desktop_google_requested", "1");
+      },
+      onGoogleSignInComplete: () => () => undefined,
+      onGoogleSignInError: () => () => undefined,
+    };
+  });
+  await mockSignedOutAuth(page);
+  await page.route("**/api/auth/sign-in/social", async (route) => {
+    requestedEmbeddedGoogleStart = true;
+    await route.fulfill({
+      status: 500,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "Embedded OAuth should not start." }),
+    });
+  });
+
+  await openAuthPage(page);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Continue with Google" }).click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.sessionStorage.getItem("test_desktop_google_requested")))
+    .toBe("1");
+  expect(requestedEmbeddedGoogleStart).toBe(false);
+});
+
+test("brokers desktop Google sign in through the system-browser route", async ({ page }) => {
+  let requestUrl: string | null = null;
+  let requestBody: unknown = null;
+  await mockSignedOutAuth(page);
+  await page.route("**/api/auth/sign-in/social?**", async (route) => {
+    requestUrl = route.request().url();
+    requestBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ redirect: false }),
+    });
+  });
+
+  await page.goto(
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge",
+  );
+  await expect.poll(() => requestUrl).not.toBeNull();
+
+  const brokerOrigin = new URL(page.url()).origin;
+  const startUrl = new URL(requestUrl ?? "https://invalid.example");
+  expect(startUrl.searchParams.get("client_id")).toBe("electron");
+  expect(startUrl.searchParams.get("state")).toBe("desktop-state");
+  expect(startUrl.searchParams.get("code_challenge")).toBe("desktop-challenge");
+  expect(requestBody).toMatchObject({
+    provider: "google",
+    callbackURL: `${brokerOrigin}/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin`,
+    newUserCallbackURL: `${brokerOrigin}/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signup`,
+    disableRedirect: true,
+  });
+});
+
+test("offers an explicit desktop handoff after Google returns", async ({ page }) => {
+  await mockSignedOutAuth(page);
+  await page.goto(
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin",
+  );
+  await page.evaluate(() => {
+    document.cookie = "better-auth.electron=desktop-authorization-code; path=/";
+  });
+
+  await expect(page.getByRole("heading", { name: "Continue in En Passant" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open En Passant" })).toHaveAttribute(
+    "href",
+    "io.enpassant.desktop:/auth/callback?auth_event=signin#token=desktop-authorization-code",
+  );
+});
+
+test("reads the desktop handoff from the callback fragment", async ({ page }) => {
+  await mockSignedOutAuth(page);
+  await page.goto(
+    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin#desktop_token=fragment-authorization-code",
+  );
+
+  await expect(page.getByRole("link", { name: "Open En Passant" })).toHaveAttribute(
+    "href",
+    "io.enpassant.desktop:/auth/callback?auth_event=signin#token=fragment-authorization-code",
+  );
+  expect(new URL(page.url()).hash).toBe("");
+});

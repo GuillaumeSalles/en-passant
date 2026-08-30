@@ -5,17 +5,22 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     outDir: "dist-electron",
+    ssr: true,
     rollupOptions: {
       external: ["electron"],
+      input: {
+        main: "electron/main.ts",
+        preload: "electron/preload.ts",
+      },
       output: {
-        entryFileNames: "main.cjs",
+        entryFileNames: "[name].cjs",
         format: "cjs",
       },
     },
-    ssr: "electron/main.ts",
     target: "node22",
   },
   ssr: {
+    noExternal: true,
     target: "node",
   },
 });

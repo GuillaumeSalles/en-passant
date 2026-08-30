@@ -73,15 +73,26 @@ Better Auth accepts only HTTP(S) base URLs. On desktop,
 [`src/lib/authClient.ts`](../src/lib/authClient.ts) gives Better Auth the production HTTPS auth URL,
 then maps those auth requests back through the scoped `app://enpassant/api/auth/...` proxy.
 
-Email OTP stays inside the bundled app. Google OAuth temporarily navigates the sandboxed,
-unprivileged window through the exact Google sign-in and `enpassant.io/api/auth/` callback origins.
-The callback uses the production `/app` URL so the backend can complete its existing cookie flow.
-The main process intercepts that final hosted-app navigation and maps it back to the equivalent
-`app://enpassant/app/...` route.
+Email OTP stays inside the bundled app. Google OAuth uses Better Auth's Electron PKCE transfer
+flow and never loads Google in the application window. The narrow preload bridge asks the main
+process to open a production `/app/auth/desktop?desktop_auth=google` broker URL in the system
+browser. The hosted app preserves the Electron client id, state, and code challenge on the social
+sign-in request.
 
-The Google redirect chain must still receive a real-account release-candidate check before public
-distribution. If the provider adds another main-frame origin, add that exact origin with a
-regression test; do not broaden the allowlist.
+After Google returns, the backend issues a short-lived, single-use authorization code. The hosted
+app redirects that code and the existing/new-account classification to the registered
+`io.enpassant.desktop:/auth/callback` deep link. The main process validates the exact scheme, path,
+and account classification, exchanges the code with the in-memory PKCE verifier, and copies only
+the resulting Better Auth session cookies into the persistent Electron session. The renderer never
+receives the authorization code or session token.
+
+The complete flow must still receive a real-account release-candidate check on every supported
+platform before public distribution.
+
+Development uses the same system-browser PKCE flow against the local Vite origin. Vite proxies the
+browser broker and token exchange to the local backend, and the resulting session cookie is scoped
+to `localhost` so the Electron development renderer can read the authenticated session. Packaged
+builds use `https://enpassant.io` for the broker, token exchange, and session cookie.
 
 ### Electron security boundary
 
@@ -90,21 +101,22 @@ regression test; do not broaden the allowlist.
 - Node integration disabled;
 - context isolation and Chromium sandboxing enabled;
 - web security enabled;
-- no preload script or IPC bridge;
+- a sandboxed preload exposing only Google sign-in initiation and typed completion/error events;
 - webviews disabled and attachment attempts blocked;
 - all permission checks and requests denied;
 - DevTools available only in development;
 - renderer-created windows denied;
 - external URLs opened only for an exact HTTPS host allowlist;
-- arbitrary top-level navigation denied;
+- arbitrary top-level navigation denied, including Google and hosted auth pages;
 - a single application instance.
 
 The package uses ASAR and flips Electron fuses to disable Run-as-Node, Node options, and CLI inspect;
 enable cookie encryption; and enforce embedded ASAR integrity plus load-only-from-ASAR.
 
-There is deliberately no native bridge. If a later feature needs a file dialog, application menu
-operation, or update status, add one typed operation at a time, validate its sender and arguments in
-the main process, and never expose raw `ipcRenderer`, filesystem, shell, or network primitives.
+The auth bridge validates its sender against the exact renderer origin. If a later feature needs a
+file dialog, application menu operation, or update status, add one typed operation at a time,
+validate its sender and arguments in the main process, and never expose raw `ipcRenderer`,
+filesystem, shell, or network primitives.
 
 ## Commands
 
@@ -127,10 +139,11 @@ Unit tests cover:
 
 - exact navigation and external-link allowlists, including malicious lookalike hosts and unsafe
   schemes;
-- production OAuth callback mapping back to the bundle;
+- rejection of embedded Google and hosted callback navigation;
+- exact deep-link parsing, account classification, and Better Auth session-cookie transfer;
 - packaged asset responses, security headers, SPA fallback, missing assets, and path containment;
 - API target, method, body, origin/referrer, cookie stripping, response headers, and offline errors;
-- Better Auth desktop request mapping and callback URLs;
+- Better Auth desktop request mapping and browser-broker URLs;
 - desktop service-worker suppression.
 
 [`tests/electron/bundled.spec.ts`](../tests/electron/bundled.spec.ts) launches Electron with DNS

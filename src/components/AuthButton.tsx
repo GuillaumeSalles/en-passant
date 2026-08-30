@@ -36,6 +36,7 @@ import {
   consumeRedirectAccountKind,
   finishAuthenticatedAccountFlow,
 } from "@/lib/authBootstrap";
+import { desktopAuthContextFromUrl } from "@/lib/desktopAuth";
 
 type EmailAuthStep = "email" | "code";
 
@@ -105,6 +106,7 @@ export function AuthButton(
   const [isAuthDialogOpen, setIsAuthDialogOpen] = createSignal(false);
 
   onSettled(() => {
+    if (desktopAuthContextFromUrl() !== null) return undefined;
     const accountKind = consumeRedirectAccountKind();
     refreshAuthSession()
       .then(async (user) => {
@@ -115,6 +117,33 @@ export function AuthButton(
         }
       })
       .catch(() => clearAuthSession());
+    return undefined;
+  });
+
+  onSettled(() => {
+    const desktop = window.enPassantDesktop;
+    if (desktop === undefined) return;
+    const unsubscribeComplete = desktop.onGoogleSignInComplete((authEvent) => {
+      void refreshAuthSession()
+        .then(async (user) => {
+          if (user === null) throw new Error("Google sign in did not create a session.");
+          await finishAuthenticatedAccountFlow(authEvent === "signup" ? "new" : "existing");
+        })
+        .catch(() => {
+          clearPendingSocialSignIn();
+          setError("Google sign in failed.");
+          setIsAuthDialogOpen(true);
+        });
+    });
+    const unsubscribeError = desktop.onGoogleSignInError((message) => {
+      clearPendingSocialSignIn();
+      setError(message);
+      setIsAuthDialogOpen(true);
+    });
+    return () => {
+      unsubscribeComplete();
+      unsubscribeError();
+    };
   });
 
   onSettled(() => {
@@ -130,6 +159,16 @@ export function AuthButton(
   async function loginWithGoogle() {
     setError(null);
     markPendingSocialSignIn();
+    const desktop = window.enPassantDesktop;
+    if (desktop !== undefined) {
+      try {
+        await desktop.requestGoogleSignIn();
+      } catch {
+        clearPendingSocialSignIn();
+        setError("Could not open Google sign in.");
+      }
+      return;
+    }
     const { data, error } = await authClient.signIn.social({
       provider: "google",
       callbackURL: authCallbackUrl("signin"),
@@ -211,7 +250,7 @@ export function AuthButton(
               <DialogDescription>Use Google or your email.</DialogDescription>
             </DialogHeader>
 
-            <Button variant="outline" onClick={loginWithGoogle}>
+            <Button variant="outline" onClick={() => void loginWithGoogle()}>
               Continue with Google
             </Button>
 
