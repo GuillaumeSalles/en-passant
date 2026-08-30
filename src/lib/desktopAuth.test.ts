@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  desktopAuthContextFromUrl,
-  desktopAuthDeepLink,
-  desktopAuthorizationCodeFromUrl,
-} from "./desktopAuth";
+import { desktopAuthContextFromUrl, desktopAuthDeepLink } from "./desktopAuth";
 
 describe("desktop auth browser broker", () => {
   test("reads an exact production Electron PKCE request", () => {
@@ -45,18 +41,5 @@ describe("desktop auth browser broker", () => {
     expect(desktopAuthDeepLink("signup", "token/value")).toBe(
       "io.enpassant.desktop:/auth/callback?auth_event=signup#token=token%2Fvalue",
     );
-  });
-
-  test("reads the authorization code from the broker fragment", () => {
-    expect(
-      desktopAuthorizationCodeFromUrl(
-        "http://localhost:5173/app/auth/desktop?auth_event=signin#desktop_token=authorization-code",
-      ),
-    ).toBe("authorization-code");
-    expect(
-      desktopAuthorizationCodeFromUrl(
-        "http://localhost:5173/app/auth/desktop?auth_event=signin#other=value",
-      ),
-    ).toBeNull();
   });
 });

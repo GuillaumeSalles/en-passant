@@ -918,19 +918,6 @@ test("offers an explicit desktop handoff after Google returns", async ({ page })
     .not.toContain("en-passant");
 });
 
-test("reads the desktop handoff from the callback fragment", async ({ page }) => {
-  await mockSignedOutAuth(page);
-  await page.goto(
-    "/app/auth/desktop?desktop_auth=google&client_id=electron&state=desktop-state&code_challenge=desktop-challenge&auth_event=signin#desktop_token=fragment-authorization-code",
-  );
-
-  await expect(page.getByRole("link", { name: "Open En Passant" })).toHaveAttribute(
-    "href",
-    "io.enpassant.desktop:/auth/callback?auth_event=signin#token=fragment-authorization-code",
-  );
-  expect(new URL(page.url()).hash).toBe("");
-});
-
 test("rejects a desktop callback without an authorization code immediately", async ({ page }) => {
   await mockSignedOutAuth(page);
   await page.goto(

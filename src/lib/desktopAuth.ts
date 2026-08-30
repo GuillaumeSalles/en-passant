@@ -5,7 +5,6 @@ const ELECTRON_AUTH_SCHEME = "io.enpassant.desktop";
 const ELECTRON_AUTH_CLIENT_ID = "electron";
 const ELECTRON_AUTH_CALLBACK_PATH = "/auth/callback";
 const ELECTRON_AUTH_COOKIE = "better-auth.electron";
-const ELECTRON_AUTH_FRAGMENT_KEY = "desktop_token";
 
 export const DESKTOP_AUTH_ERROR_EVENT = "en-passant:desktop-auth-error";
 
@@ -44,12 +43,6 @@ export function desktopAuthContextFromUrl(value = window.location.href): Desktop
 export function desktopAuthDeepLink(event: AuthEvent, token: string): string {
   const query = new URLSearchParams({ auth_event: event });
   return `${ELECTRON_AUTH_SCHEME}:${ELECTRON_AUTH_CALLBACK_PATH}?${query.toString()}#token=${encodeURIComponent(token)}`;
-}
-
-export function desktopAuthorizationCodeFromUrl(value = window.location.href): string | null {
-  const url = new URL(value);
-  const token = new URLSearchParams(url.hash.slice(1)).get(ELECTRON_AUTH_FRAGMENT_KEY);
-  return token === null || token === "" ? null : token;
 }
 
 export function clearDesktopAuthorizationCookie(): void {

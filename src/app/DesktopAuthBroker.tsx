@@ -7,7 +7,6 @@ import {
   clearDesktopAuthorizationCookie,
   desktopAuthContextFromUrl,
   desktopAuthDeepLink,
-  desktopAuthorizationCodeFromUrl,
   type DesktopAuthContext,
 } from "@/lib/desktopAuth";
 
@@ -45,8 +44,7 @@ export function DesktopAuthBroker() {
       return;
     }
 
-    const tokenFromUrl = desktopAuthorizationCodeFromUrl();
-    const token = tokenFromUrl ?? authClient.electron.getAuthorizationCode();
+    const token = authClient.electron.getAuthorizationCode();
     if (token === null) {
       setError(
         "The desktop authorization code was not received. Start sign in again from En Passant.",
@@ -55,11 +53,6 @@ export function DesktopAuthBroker() {
     }
 
     clearDesktopAuthorizationCookie();
-    if (tokenFromUrl !== null) {
-      const currentUrl = new URL(window.location.href);
-      currentUrl.hash = "";
-      window.history.replaceState(window.history.state, "", currentUrl.toString());
-    }
     setDesktopUrl(desktopAuthDeepLink(authEvent, token));
   });
 
