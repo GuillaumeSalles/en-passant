@@ -51,6 +51,7 @@ import { useRouteContext } from "@/lib/useRouteContext";
 import { useSelector } from "@/lib/useSelector";
 import {
   acceptsTrainingMove,
+  canDragTrainingPiece,
   initialVariationTrainingPhase,
   reduceVariationTrainingFlow,
   trainingInstruction,
@@ -581,7 +582,7 @@ export function useVariationTrainingFlow(
     }
     return undefined;
   };
-  const canDrag = createMemo(() => acceptsTrainingMove(phase()) && nextMoveIds().length === 0);
+  const canDrag = createMemo(() => canDragTrainingPiece(phase()) && nextMoveIds().length === 0);
   const instruction = createMemo(() =>
     trainingInstruction(phase(), orientation(), nextMoveIds().length > 0),
   );

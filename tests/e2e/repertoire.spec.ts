@@ -612,6 +612,15 @@ async function dragPiece(page: Page, from: string, to: string) {
   await dragBetweenSquares(page, from, to);
 }
 
+async function startDraggingPiece(page: Page, from: string, to: string) {
+  const source = await squareCenter(page, from);
+  const target = await squareCenter(page, to);
+
+  await page.mouse.move(source.x, source.y);
+  await page.mouse.down();
+  await page.mouse.move(target.x, target.y, { steps: 8 });
+}
+
 async function dragPieceWithCapturedTouch(page: Page, from: string, to: string) {
   const source = await squareCenter(page, from);
   const target = await squareCenter(page, to);
@@ -1459,9 +1468,7 @@ test("locks training input while grading a move and waiting for the response", a
   expect(consoleMessages).toEqual([]);
 });
 
-test("keeps training input locked until the actual response animation settles", async ({
-  page,
-}) => {
+test("lets a training move drag begin during the opponent animation", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 
   await recordPlayedSounds(page);
@@ -1473,11 +1480,15 @@ test("keeps training input locked until the actual response animation settles", 
 
   await dragPiece(page, "e2", "e4");
   await expect(page.locator('[data-training-flow-state="animating-response"]')).toBeVisible();
-  await dragPiece(page, "g1", "f3");
-  await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "N");
-  await expect(page.locator('[data-square="f3"]')).not.toHaveAttribute("data-piece");
+  await expect(page.locator('[data-square="g1"]')).toHaveCSS("cursor", "grab");
+  await startDraggingPiece(page, "g1", "f3");
+  await expect(page.locator('[data-training-flow-state="animating-response"]')).toBeVisible();
+  await expect(page.locator('svg[style*="position: fixed"]')).toHaveCount(1);
 
   await expect(page.getByText("White to play.")).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator('[data-square="f3"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.getByText("Good job!")).toBeVisible();
   expect(consoleMessages).toEqual([]);
 });
 
@@ -1591,6 +1602,30 @@ test("highlights demonstrated and opponent moves while learning", async ({ page 
     "last-move",
   );
   await expect(page.locator('[data-highlight-kind="last-move"]')).toHaveCount(2);
+  expect(consoleMessages).toEqual([]);
+});
+
+test("lets a learning move drag begin during the opponent animation", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 e5 2. Nf3 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  await page.locator("[data-training-line]").first().getByRole("link", { name: "Learn" }).click();
+
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await page.addStyleTag({
+    content: "[data-moving-piece] { animation-duration: 1200ms !important; }",
+  });
+  await dragPiece(page, "e2", "e4");
+  await expect(page.locator('[data-learning-flow-state="animating"]')).toBeVisible();
+  await expect(page.getByText("Black responds.")).toBeVisible();
+
+  await startDraggingPiece(page, "g1", "f3");
+  await expect(page.locator('svg[style*="position: fixed"]')).toHaveCount(1);
+  await page.mouse.up();
+  await expect(page.locator('[data-square="g1"]')).toHaveAttribute("data-piece", "N");
+  await expect(page.locator('[data-square="f3"]')).not.toHaveAttribute("data-piece");
   expect(consoleMessages).toEqual([]);
 });
 

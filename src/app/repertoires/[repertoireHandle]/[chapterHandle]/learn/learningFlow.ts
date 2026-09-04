@@ -189,6 +189,12 @@ export function acceptsLearningMove(state: LearningFlowState): boolean {
   return state.type === "awaiting-repeat";
 }
 
+export function canDragLearningPiece(state: LearningFlowState): boolean {
+  if (acceptsLearningMove(state)) return true;
+  if (state.type === "animating") return state.role === "opponent";
+  return state.type === "pacing" && state.kind === "after-opponent";
+}
+
 export function learningInstruction(state: LearningFlowState, orientation: Orientation): string {
   switch (state.type) {
     case "starting-animation":

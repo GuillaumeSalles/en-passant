@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   acceptsLearningMove,
+  canDragLearningPiece,
   initialLearningFlowState,
   learningInstruction,
   reduceLearningFlow,
@@ -72,6 +73,27 @@ describe("learning flow", () => {
       { type: "complete" },
     ];
     expect(locked.every((state) => !acceptsLearningMove(state))).toBe(true);
+  });
+
+  test("allows a piece to be picked up during an opponent animation", () => {
+    const opponentAnimation: LearningFlowState = {
+      type: "animating",
+      role: "opponent",
+      sourceMoveId: 2,
+      renderedMoveId: 2,
+      animationId: 9,
+    };
+    const previewAnimation: LearningFlowState = {
+      ...opponentAnimation,
+      role: "preview",
+    };
+
+    expect(canDragLearningPiece(opponentAnimation)).toBe(true);
+    expect(canDragLearningPiece({ type: "pacing", kind: "after-opponent", moveId: null })).toBe(
+      true,
+    );
+    expect(canDragLearningPiece(previewAnimation)).toBe(false);
+    expect(acceptsLearningMove(opponentAnimation)).toBe(false);
   });
 
   test("derives instructions from machine state", () => {

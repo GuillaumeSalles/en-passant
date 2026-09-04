@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   acceptsTrainingMove,
+  canDragTrainingPiece,
   initialVariationTrainingPhase,
   reduceVariationTrainingFlow,
   trainingInstruction,
@@ -36,6 +37,28 @@ describe("variation training flow", () => {
     { type: "awaiting-replay-move" },
   ])("accepts move input during $type", (phase) => {
     expect(acceptsTrainingMove(phase)).toBe(true);
+  });
+
+  test("allows the next piece to be picked up while an opponent move animates", () => {
+    const response: VariationTrainingPhase = {
+      type: "animating-response",
+      animationId: 7,
+      completedMoveId: 1,
+      finishesVariation: false,
+      playedMoveId: 1,
+      responseMoveId: 2,
+    };
+    const finalResponse: VariationTrainingPhase = { ...response, finishesVariation: true };
+    const intro: VariationTrainingPhase = {
+      type: "animating-intro",
+      animationId: 8,
+      completedMoveId: null,
+    };
+
+    expect(canDragTrainingPiece(response)).toBe(true);
+    expect(canDragTrainingPiece(intro)).toBe(true);
+    expect(canDragTrainingPiece(finalResponse)).toBe(false);
+    expect(acceptsTrainingMove(response)).toBe(false);
   });
 
   test("derives instructions from the interaction phase", () => {

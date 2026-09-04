@@ -171,6 +171,15 @@ export function acceptsTrainingMove(phase: VariationTrainingPhase): boolean {
   return phase.type === "awaiting-line-move" || phase.type === "awaiting-replay-move";
 }
 
+export function canDragTrainingPiece(phase: VariationTrainingPhase): boolean {
+  if (acceptsTrainingMove(phase)) return true;
+  if (phase.type === "animating-intro") return phase.completedMoveId === null;
+  if (phase.type === "animating-response" || phase.type === "response-settled") {
+    return !phase.finishesVariation;
+  }
+  return false;
+}
+
 export function trainingInstruction(
   phase: VariationTrainingPhase,
   orientation: Orientation,

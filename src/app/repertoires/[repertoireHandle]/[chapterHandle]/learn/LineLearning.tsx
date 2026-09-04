@@ -47,6 +47,7 @@ import { TrainingLines } from "../train/TrainingLines";
 import { useVariationTrainingFlow } from "../train/useVariationTrainingFlow";
 import {
   acceptsLearningMove,
+  canDragLearningPiece,
   initialLearningFlowState,
   learningInstruction,
   reduceLearningFlow,
@@ -354,7 +355,7 @@ export function LineLearning(props: {
               canDrag={
                 flow().type === "reinforcement"
                   ? reinforcement.canDrag()
-                  : acceptsLearningMove(flow())
+                  : canDragLearningPiece(flow())
               }
               readOnly={false}
               animateIntro
