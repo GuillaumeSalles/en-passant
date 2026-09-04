@@ -205,6 +205,41 @@ test("shows the signed-in user's move statistics for the selected position", asy
       }),
     });
   });
+  await page.route("**/api/opening-explorer/masters?*", async (route) => {
+    const positionKey = new URL(route.request().url()).searchParams.get("positionKey");
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        source: "lichess-masters",
+        positionKey,
+        since: null,
+        until: null,
+        games: 6,
+        moves: [
+          {
+            uci: "e7e5",
+            san: "e5",
+            games: 6,
+            whiteWins: 2,
+            draws: 3,
+            blackWins: 1,
+            whiteWinRate: 1 / 3,
+            drawRate: 0.5,
+            blackWinRate: 1 / 6,
+          },
+        ],
+        topGames: [
+          {
+            id: "master-1",
+            white: { name: "Magnus Carlsen", rating: 2882 },
+            black: { name: "Fabiano Caruana", rating: 2820 },
+            result: "1/2-1/2",
+            moveUci: "e7e5",
+          },
+        ],
+      }),
+    });
+  });
 
   await openRepertoire(page);
 
@@ -227,7 +262,9 @@ test("shows the signed-in user's move statistics for the selected position", asy
   if (handleBox !== null) {
     await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
     await page.mouse.down();
-    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 40, { steps: 4 });
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 40, {
+      steps: 4,
+    });
     await page.mouse.up();
   }
   const statsHeightAfterDrag = (await stats.boundingBox())?.height;
@@ -252,6 +289,12 @@ test("shows the signed-in user's move statistics for the selected position", asy
   await stats.locator('[data-position-move="e2e4"]').click();
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
+  await page.getByRole("tab", { name: "Masters" }).click();
+  const masters = page.getByRole("region", { name: "Masters" });
+  await expect(masters.getByRole("button", { name: "Play e5" })).toBeVisible();
+  await expect(masters.getByLabel("Top master games")).toContainText(
+    "Magnus Carlsen (2882) – Fabiano Caruana (2820)",
+  );
 });
 
 async function seedRepertoire(
@@ -711,7 +754,9 @@ test("repertoire page renders without console warnings", async ({ page }) => {
   const breadcrumb = page.getByLabel("Breadcrumb");
   await expect(breadcrumb.getByRole("link", { name: "Untitled Repertoire" })).toBeVisible();
   await expect(breadcrumb.getByRole("link", { name: "Chapter 1" })).toBeVisible();
-  const chapterActions = page.getByRole("button", { name: "Actions for Chapter 1" });
+  const chapterActions = page.getByRole("button", {
+    name: "Actions for Chapter 1",
+  });
   await expect(chapterActions).toHaveCSS("opacity", "0");
   await page
     .locator("li")
@@ -930,7 +975,9 @@ test("creates a chapter from the repertoire overview before training", async ({ 
   await page.getByLabel("Breadcrumb").getByRole("link", { name: "Untitled Repertoire" }).click();
   await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire$/);
 
-  const createChapterButton = page.getByRole("button", { name: "Create chapter" });
+  const createChapterButton = page.getByRole("button", {
+    name: "Create chapter",
+  });
   await expect(createChapterButton).toBeVisible();
   await expect(page.getByRole("link", { name: "Train", exact: true })).toBeVisible();
 
@@ -972,7 +1019,10 @@ test("opens repertoires with the repertoire side at the bottom", async ({ page }
   const whiteE8 = await squareCenter(page, "e8");
   expect(whiteE1.y).toBeGreaterThan(whiteE8.y);
 
-  await seedRepertoire(page, defaultPgn, [], { ...repertoire, orientation: "black" });
+  await seedRepertoire(page, defaultPgn, [], {
+    ...repertoire,
+    orientation: "black",
+  });
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
   await expectRepertoireReady(page);
   const blackE1 = await squareCenter(page, "e1");
@@ -987,7 +1037,10 @@ test("black repertoire training starts after the automatic white move", async ({
 
   await recordPlayedSounds(page);
   await recordBoardAnimationSequence(page);
-  await seedRepertoire(page, "1. e4 e5 *", [], { ...repertoire, orientation: "black" });
+  await seedRepertoire(page, "1. e4 e5 *", [], {
+    ...repertoire,
+    orientation: "black",
+  });
   await openFirstTrainingLine(page);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
@@ -1083,7 +1136,10 @@ test("black repertoire learning waits for the board intro before the first white
 
   await recordPlayedSounds(page);
   await recordBoardAnimationSequence(page);
-  await seedRepertoire(page, "1. e4 e5 *", [], { ...repertoire, orientation: "black" });
+  await seedRepertoire(page, "1. e4 e5 *", [], {
+    ...repertoire,
+    orientation: "black",
+  });
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
   await expect(page.getByRole("heading", { name: "Lines" })).toBeVisible();
   await page.locator("[data-training-line]").first().getByRole("link", { name: "Learn" }).click();
@@ -1754,7 +1810,9 @@ test("creates a repertoire from the create repertoire menu", async ({ page }) =>
 
   await openRepertoire(page);
 
-  const createRepertoireButton = page.getByRole("button", { name: "Create repertoire" });
+  const createRepertoireButton = page.getByRole("button", {
+    name: "Create repertoire",
+  });
   await createRepertoireButton.click();
   await expect(page.getByText("Create white repertoire")).toBeVisible();
   const createRepertoireBox = await createRepertoireButton.boundingBox();

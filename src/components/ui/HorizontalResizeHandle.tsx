@@ -1,7 +1,10 @@
 import { createSignal, onCleanup } from "solid-js";
 import styles from "./HorizontalResizeHandle.module.css";
 
-export function HorizontalResizeHandle(props: { onResize: (delta: number) => void }) {
+export function HorizontalResizeHandle(props: {
+  onResize: (delta: number) => void;
+  label?: string;
+}) {
   const [isDragging, setIsDragging] = createSignal(false);
   let lastClientY = 0;
   let previousCursor = "";
@@ -20,7 +23,7 @@ export function HorizontalResizeHandle(props: { onResize: (delta: number) => voi
   return (
     <div
       role="separator"
-      aria-label="Resize moves and your games panels"
+      aria-label={props.label ?? "Resize moves and your games panels"}
       aria-orientation="horizontal"
       aria-valuetext="Use Up and Down arrow keys or drag to resize"
       tabindex="0"

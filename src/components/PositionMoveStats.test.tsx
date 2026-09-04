@@ -102,7 +102,7 @@ test("shows move results and hides the total row when there is only one next mov
   await waitFor(() => expect(section.getAttribute("data-resized")).toBe("true"));
   expect(section.style.getPropertyValue("--position-move-stats-height")).toBe("276px");
   expect(screen.getByRole("heading", { name: "Your games" })).not.toBeNull();
-  expect(screen.getByRole("button", { name: "Play e4" })).not.toBeNull();
+  expect(await screen.findByRole("button", { name: "Play e4" })).not.toBeNull();
   expect(screen.getByRole("cell", { name: "100% of games, 6 games" })).not.toBeNull();
   const resultBar = screen.getByRole("img", {
     name: "e4 results: 3 white wins (50%), 2 draws (33.3%), 1 black win (16.7%)",
@@ -186,6 +186,79 @@ test("shows the total row when there are multiple next moves", async () => {
       name: "Total results: 1 white win (50%), 0 draws (0%), 1 black win (50%)",
     }),
   ).not.toBeNull();
+});
+
+test("loads master moves and top rated games only after selecting Masters", async () => {
+  const onMove = vi.fn();
+  const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.startsWith("/api/opening-explorer/masters?")) {
+      return Response.json({
+        source: "lichess-masters",
+        positionKey: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
+        since: null,
+        until: null,
+        games: 10,
+        moves: [
+          {
+            uci: "e2e4",
+            san: "e4",
+            games: 10,
+            whiteWins: 4,
+            draws: 4,
+            blackWins: 2,
+            whiteWinRate: 0.4,
+            drawRate: 0.4,
+            blackWinRate: 0.2,
+          },
+        ],
+        topGames: [
+          {
+            id: "master-1",
+            white: { name: "Magnus Carlsen", rating: 2882 },
+            black: { name: "Fabiano Caruana", rating: 2820 },
+            result: "1/2-1/2",
+            moveUci: "e2e4",
+          },
+        ],
+      });
+    }
+    return Response.json({
+      positionKey: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",
+      playedBy: "user",
+      games: 0,
+      moves: [],
+      recentGames: [],
+    });
+  });
+  vi.stubGlobal("fetch", fetcher);
+
+  render(() => (
+    <TestRouter>
+      <PositionMoveStats fen={STARTING_FEN} color="white" onMove={onMove} />
+    </TestRouter>
+  ));
+
+  await waitFor(() => expect(screen.getByText("You have no imported games in this position.")));
+  expect(fetcher.mock.calls).toHaveLength(1);
+  fireEvent.click(screen.getByRole("tab", { name: "Masters" }));
+
+  expect(await screen.findByRole("region", { name: "Masters" })).not.toBeNull();
+  expect(await screen.findByRole("button", { name: "Play e4" })).not.toBeNull();
+  expect(screen.getByLabelText("Top master games").textContent).toContain(
+    "Magnus Carlsen (2882) – Fabiano Caruana (2820)",
+  );
+  expect(screen.getByLabelText("Top master games").textContent).toContain("1/2-1/2");
+
+  fireEvent.change(screen.getByLabelText("Masters from year"), {
+    target: { value: "2000" },
+  });
+  await waitFor(() => {
+    expect(fetcher.mock.calls.some(([input]) => String(input).includes("since=2000"))).toBe(true);
+  });
+
+  fireEvent.click(await screen.findByRole("button", { name: "Play e4" }));
+  expect(onMove).toHaveBeenCalledWith(expect.objectContaining({ uci: "e2e4", san: "e4" }));
 });
 
 test("hides result text when a segment is below fifteen percent", async () => {
