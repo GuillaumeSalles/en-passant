@@ -579,6 +579,10 @@ async function recordBoardAnimationSequence(page: Page) {
 }
 
 async function expectFirstMoveAfterBoardIntro(page: Page) {
+  // Position attributes update before the browser dispatches animationstart.
+  await expect
+    .poll(() => page.evaluate(() => window.__boardAnimationSequence.includes("move-start")))
+    .toBe(true);
   const sequence = await page.evaluate(() => window.__boardAnimationSequence);
   const firstMoveStart = sequence.indexOf("move-start");
   const lastBoardSquareEnd = sequence.lastIndexOf("board-square-end");
@@ -879,6 +883,73 @@ test("dismisses the signup nudge before opening the auth dialog", async ({ page 
   await expect(signupNudge).toBeHidden();
   await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
+});
+
+for (const orientation of ["white", "black"] as const) {
+  test(`dragging shows centered legal move dots with ${orientation} orientation`, async ({
+    page,
+  }) => {
+    const consoleMessages = collectUnexpectedConsole(page);
+    await seedRepertoire(page, defaultPgn, [], { ...repertoire, orientation });
+    await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
+    await expectRepertoireReady(page);
+
+    const dots = page.locator("[data-legal-move-square]");
+    await expect(dots).toHaveCount(0);
+    await startDraggingPiece(page, "e2", "e3");
+    await expect(dots).toHaveCount(2);
+    for (const square of ["e3", "e4"]) {
+      const dot = page.locator(`[data-legal-move-square="${square}"]`);
+      await expect(dot).toBeVisible();
+      await expect(dot).toHaveCSS("pointer-events", "none");
+      const center = await squareCenter(page, square);
+      const box = await dot.boundingBox();
+      if (box === null) throw new Error(`Expected a legal move dot on ${square}`);
+      expect(box.x + box.width / 2).toBeCloseTo(center.x, 0);
+      expect(box.y + box.height / 2).toBeCloseTo(center.y, 0);
+    }
+    const target = await squareCenter(page, "e4");
+    await page.mouse.move(target.x, target.y);
+    await page.mouse.up();
+    await expect(dots).toHaveCount(0);
+    await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
+
+    await startDraggingPiece(page, "e7", "e6");
+    await expect(dots).toHaveCount(2);
+    await expect(page.locator('[data-legal-move-square="e5"]')).toBeVisible();
+    await expect(page.locator('[data-legal-move-square="e6"]')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+    await expect(dots).toHaveCount(0);
+    expect(consoleMessages).toEqual([]);
+  });
+}
+
+test("legal move dots clear on cancellation and stay hidden for arrows and the opponent", async ({
+  page,
+}) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  await openRepertoire(page);
+  const dots = page.locator("[data-legal-move-square]");
+  for (const event of ["pointercancel", "blur"]) {
+    await startDraggingPiece(page, "g1", "f3");
+    await expect(dots).toHaveCount(2);
+    await page.evaluate((type) => window.dispatchEvent(new Event(type)), event);
+    await expect(dots).toHaveCount(0);
+    await page.mouse.up();
+  }
+  await startDraggingPiece(page, "e7", "e6");
+  await expect(dots).toHaveCount(0);
+  await page.mouse.up();
+
+  const source = await squareCenter(page, "e2");
+  const target = await squareCenter(page, "e4");
+  await page.mouse.move(source.x, source.y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(target.x, target.y);
+  await expect(dots).toHaveCount(0);
+  await page.mouse.up({ button: "right" });
+  expect(consoleMessages).toEqual([]);
 });
 
 test("touch dragging pieces uses finger position and does not allow board scrolling", async ({
@@ -1205,6 +1276,8 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
   const cleanStat = page.locator('[data-training-stat="clean"]');
   const mistakesStat = page.locator('[data-training-stat="mistakes"]');
   const accuracyStat = page.locator('[data-training-stat="accuracy"]');
+  // Freezing the clock during the intro prevents the training input from opening.
+  await expectTrainingInputReady(page);
   await pausePacingClock(page);
 
   await dragPiece(page, "g1", "f3");

@@ -19,6 +19,7 @@ import styles from "./Chessboard.module.css";
 import { DraggedHoverSquare } from "./DraggedHoverSquare";
 import { DraggedPiece } from "./DraggedPiece";
 import { SelectedPieceSquare } from "./SelectedPieceSquare";
+import { LegalMoveDots } from "./LegalMoveDots";
 import { Coordinates } from "./Coordinates";
 import { HighlightSquare } from "./HighlightSquare";
 import { Square } from "./Square";
@@ -683,6 +684,11 @@ export function Chessboard(props: ChessboardProps) {
               <MovingPiece movement={movement} boardOrientation={props.boardOrientation} />
             )}
           </For>
+          <LegalMoveDots
+            sourceSquare={draggedPieceSourceSquare()}
+            position={props.position}
+            boardOrientation={props.boardOrientation}
+          />
           <Arrows
             arrows={props.arrows}
             boardOrientation={props.boardOrientation}

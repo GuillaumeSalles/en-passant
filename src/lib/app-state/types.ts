@@ -1,4 +1,4 @@
-import type { StoreState } from "@/lib/createStore";
+import type { StoreState } from "@/lib/storeTypes";
 import type { AppliedMoveAnimation, FenPiece as ChessFenPiece } from "@/lib/chess";
 
 export type Context =

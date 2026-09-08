@@ -226,6 +226,17 @@ export function applyMove(
   });
 }
 
+export function legalMoveDestinations(position: ChessPosition, from: string): string[] {
+  const fromIndex = squareToIndex(from);
+  return [
+    ...new Set(
+      legalMoves(position)
+        .filter((move) => move.from === fromIndex)
+        .map((move) => indexToSquare(move.to)),
+    ),
+  ];
+}
+
 export function isMoveLegal(
   position: ChessPosition,
   move: { from: string; to: string; promotion?: string | null },

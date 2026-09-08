@@ -3,7 +3,9 @@ import path from "node:path";
 import ts from "typescript";
 
 const root = process.cwd();
-const checkedRoots = ["src", "tests", "scripts"].map((dir) => path.join(root, dir));
+const checkedRoots = ["src", "tests", "scripts", "apps/native/src", "apps/native/tests"].map(
+  (dir) => path.join(root, dir),
+);
 const sourceRoot = path.join(root, "src");
 const coreLibFiles = new Set(
   [

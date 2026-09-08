@@ -48,3 +48,11 @@ next-env.d.ts
 
 # cloudflare local state
 .wrangler
+
+# Expo native workspace
+apps/native/node_modules/
+apps/native/.expo/
+apps/native/dist/
+apps/native/ios/
+apps/native/android/
+apps/native/test-results/

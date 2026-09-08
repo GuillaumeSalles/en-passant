@@ -5,6 +5,9 @@
   "description": "Build and train your chess repertoire.",
   "license": "GPL-3.0-or-later",
   "author": "Guillaume Salles",
+  "workspaces": [
+    "apps/native"
+  ],
   "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite",
@@ -26,13 +29,23 @@
     "test:e2e": "node scripts/run-e2e.mjs",
     "test:e2e:offline": "npm run build && node scripts/run-e2e.mjs --offline",
     "type-check": "tsc --noEmit && tsc --project electron/tsconfig.json --noEmit",
-    "lint": "oxlint src tests scripts electron --deny-warnings -A no-unassigned-vars",
+    "lint": "oxlint src tests scripts electron apps/native/src apps/native/tests --deny-warnings -A no-unassigned-vars",
     "check:filenames": "node scripts/check-filenames.mjs",
     "check:guardrails": "node scripts/check-code-guardrails.mjs",
-    "check": "npm run format:check && npm run lint && npm run check:filenames && npm run check:guardrails && npm run type-check && npm test -- --run && npm run build && npm run test:e2e && node scripts/run-e2e.mjs --offline",
+    "check": "npm run format:check && npm run lint && npm run check:filenames && npm run check:guardrails && npm run type-check && npm test -- --run && npm run build && npm run test:e2e && node scripts/run-e2e.mjs --offline && npm run native:check",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "native:start": "npm run start --workspace @en-passant/native",
+    "native:ios": "node scripts/check-native-ios.mjs && npm run ios --workspace @en-passant/native",
+    "native:android": "npm run android --workspace @en-passant/native",
+    "native:type-check": "npm run type-check --workspace @en-passant/native",
+    "native:export": "npm run export --workspace @en-passant/native",
+    "native:test:e2e": "npm run native:export && node scripts/run-e2e.mjs --config playwright.native.config.ts",
+    "native:test": "vitest --run --config vitest.native.config.mts",
+    "native:artwork": "node scripts/generate-native-artwork.mjs",
+    "native:check": "npm run native:type-check && npm run native:test && node scripts/generate-native-artwork.mjs --check && npm run native:test:e2e",
+    "native:test:ios": "bash scripts/run-native-ios-e2e.sh"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

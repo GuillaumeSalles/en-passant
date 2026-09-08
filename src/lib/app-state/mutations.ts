@@ -6,7 +6,7 @@ import {
   type AppliedMove,
   type AppliedMoveAnimation,
 } from "@/lib/chess";
-import type { MutationEffect, MutationResult } from "@/lib/useMutation";
+import type { MutationEffect, MutationResult } from "@/lib/mutationEffects";
 import { PgnMerger } from "@/lib/mergePgns";
 import { applyNagToList } from "./nags";
 import { highlightsFromPgnMetadata, withPgnHighlightMetadata } from "./pgnHighlights";

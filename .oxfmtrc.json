@@ -1,5 +1,12 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["public/openings-*.json", "public/stockfish-*.js"],
+  "ignorePatterns": [
+    "public/openings-*.json",
+    "public/stockfish-*.js",
+    "apps/native/dist/**",
+    "apps/native/ios/**",
+    "apps/native/android/**",
+    "apps/native/.expo/**"
+  ],
   "sortTailwindcss": true
 }

@@ -1,5 +1,5 @@
 import { useStore } from "@/app/AppStateProvider";
-import type { AppState, Context, PgnMutation, TrainingLineReview } from "./AppState";
+import type { AppState, Context } from "./AppState";
 import { useRouteContext } from "./useRouteContext";
 import { Store, StoreState } from "@/lib/createStore";
 import { type Storage, storage } from "@/storage";
@@ -11,17 +11,8 @@ import { saveLatestPgnMutation, saveLatestPgnMutations } from "@/storage/pgnPers
 import { queueRepertoireSync } from "@/storage/backendSync";
 import { writeEngineEnabledPreference } from "@/lib/enginePreference";
 
-export type MoveSound = "Move" | "Capture";
-
-export type MutationEffect =
-  | { type: "play-sound"; sound: MoveSound }
-  | { type: "record-cached-move" }
-  | { type: "persist-pgn-mutation"; pgnId: string; pgn: string; mutation: PgnMutation }
-  | { type: "persist-pgn-mutations"; pgnId: string; pgn: string; mutations: PgnMutation[] }
-  | { type: "persist-training-line-schedule"; schedule: TrainingLineReview }
-  | { type: "persist-engine-enabled"; isEnabled: boolean };
-
-export type MutationResult = void | MutationEffect | MutationEffect[];
+import type { MoveSound, MutationResult } from "./mutationEffects";
+export type { MoveSound, MutationEffect, MutationResult } from "./mutationEffects";
 
 type Mutation = (state: StoreState<AppState>, ctx: Context, ...args: never[]) => MutationResult;
 

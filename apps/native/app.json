@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "En Passant",
+    "slug": "en-passant-native",
+    "scheme": "enpassant-native",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "io.enpassant.native",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "io.enpassant.native"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": ["expo-secure-store", "expo-sqlite", "expo-sharing", "expo-asset"]
+  }
+}

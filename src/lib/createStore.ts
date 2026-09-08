@@ -1,16 +1,8 @@
 import { createRoot, createSignal } from "solid-js";
 import type { Accessor } from "solid-js";
 
-export type StoreState<T> = T & {
-  set: <K extends Extract<keyof T, string>>(
-    key: K,
-    value: T[K] | ((currentValue: T[K]) => T[K]),
-  ) => void;
-};
-
-export type Store<T> = {
-  state: StoreState<T>;
-};
+import type { Store, StoreState } from "./storeTypes";
+export type { Store, StoreState } from "./storeTypes";
 
 type SignalEntry = {
   read: Accessor<number>;

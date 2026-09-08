@@ -1,5 +1,51 @@
 import { describe, expect, test } from "vitest";
-import { applyMove, applySan, createChessPosition, fen, isMoveLegal, STARTING_FEN } from "./chess";
+import {
+  applyMove,
+  applySan,
+  createChessPosition,
+  fen,
+  isMoveLegal,
+  legalMoveDestinations,
+  STARTING_FEN,
+} from "./chess";
+
+describe("legal move destinations", () => {
+  test("returns only the selected piece's legal destinations without changing the position", () => {
+    const position = createChessPosition();
+    expect(legalMoveDestinations(position, "e2").sort()).toEqual(["e3", "e4"]);
+    expect(legalMoveDestinations(position, "g1").sort()).toEqual(["f3", "h3"]);
+    expect(legalMoveDestinations(position, "e7")).toEqual([]);
+    expect(legalMoveDestinations(position, "e3")).toEqual([]);
+    expect(fen(position)).toBe(STARTING_FEN);
+  });
+
+  test("excludes moves that expose the king and includes legal captures", () => {
+    const position = createChessPosition("k3r3/8/8/8/8/8/4R3/4K3 w - - 0 1");
+    expect(legalMoveDestinations(position, "e2").sort()).toEqual([
+      "e3",
+      "e4",
+      "e5",
+      "e6",
+      "e7",
+      "e8",
+    ]);
+  });
+
+  test("includes castling and en passant and deduplicates promotions", () => {
+    expect(
+      legalMoveDestinations(
+        createChessPosition("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1"),
+        "e1",
+      ).sort(),
+    ).toEqual(["c1", "d1", "d2", "e2", "f1", "f2", "g1"]);
+    expect(
+      legalMoveDestinations(createChessPosition("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"), "e5").sort(),
+    ).toEqual(["d6", "e6"]);
+    expect(
+      legalMoveDestinations(createChessPosition("4k3/P7/8/8/8/8/8/4K3 w - - 0 1"), "a7"),
+    ).toEqual(["a8"]);
+  });
+});
 
 describe("chess rules", () => {
   test("starts from the standard position", () => {

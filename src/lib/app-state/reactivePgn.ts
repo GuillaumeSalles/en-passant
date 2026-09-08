@@ -1,10 +1,7 @@
-import { createSignal } from "solid-js";
+import { createVersionSignal, type VersionSignal } from "./versionSignal";
 import type { Move, NormalizedPgn } from "./types";
 
-type SignalEntry = {
-  get: () => number;
-  set: (value: number | ((currentValue: number) => number)) => number;
-};
+type SignalEntry = VersionSignal;
 
 type ReactivePgnControls = {
   setRootMoveIds: (rootMoveIds: number[]) => void;
@@ -21,11 +18,6 @@ type ReactiveNormalizedPgn = NormalizedPgn & {
 
 function hasOwnKey<T extends object>(object: T, key: PropertyKey): key is keyof T {
   return Object.prototype.hasOwnProperty.call(object, key);
-}
-
-function createVersionSignal(): SignalEntry {
-  const [get, set] = createSignal(0, { equals: false });
-  return { get, set };
 }
 
 function bumpVersion(signal: SignalEntry): void {
