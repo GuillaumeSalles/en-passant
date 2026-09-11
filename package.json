@@ -84,7 +84,7 @@
     "typescript": "^5",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.15",
+    "vitest": "^4.1.11",
     "wait-on": "^9.1.0",
     "wrangler": "^4.106.0"
   },
