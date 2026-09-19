@@ -1,10 +1,10 @@
 import { defineConfig } from "vitest/config";
 import solid from "@solidjs/vite-plugin";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [solid({ solid: { moduleName: "@solidjs/web" } }), tsconfigPaths()],
+  plugins: [solid({ solid: { moduleName: "@solidjs/web" } })],
   resolve: {
+    tsconfigPaths: true,
     alias: {
       "solid-js/web": "@solidjs/web",
     },

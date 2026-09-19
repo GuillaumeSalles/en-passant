@@ -350,6 +350,7 @@ async function expectRepertoireReady(page: Page) {
 test("keeps a stable evaluation preview open until the pointer leaves the lines", async ({
   page,
 }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
   await enableEngine(page);
   await openRepertoire(page);
 
@@ -428,6 +429,7 @@ test("keeps a stable evaluation preview open until the pointer leaves the lines"
 
   await page.locator('[aria-label="Move e4"]').hover();
   await expect(preview).toHaveAttribute("data-visible", "false");
+  expect(consoleMessages).toEqual([]);
 });
 
 async function expectDrawerLayout(page: Page) {
@@ -1323,6 +1325,7 @@ test("lists stable line URLs and continues through untrained lines", async ({ pa
 });
 
 test("removes invalid training start moves from the URL", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
   await seedRepertoire(page, "1. e4 e5 *");
   await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
   const learnHref = await page
@@ -1333,9 +1336,10 @@ test("removes invalid training start moves from the URL", async ({ page }) => {
   if (learnHref === null) throw new Error("Expected a learning URL");
   const trainingHref = learnHref.replace(/\/learn$/, "/train");
 
-  await page.goto(`${trainingHref}?startMove=invalid&source=test`);
+  await page.goto(`${trainingHref}?startMove=invalid&source=test#practice`);
   await expect.poll(() => new URL(page.url()).searchParams.has("startMove")).toBe(false);
   expect(new URL(page.url()).searchParams.get("source")).toBe("test");
+  expect(new URL(page.url()).hash).toBe("#practice");
 
   await page.goto(`${trainingHref}?startMove=3&source=test`);
   await expect.poll(() => new URL(page.url()).searchParams.has("startMove")).toBe(false);
@@ -1344,6 +1348,7 @@ test("removes invalid training start moves from the URL", async ({ page }) => {
   await page.goto(`${trainingHref}?startMove=2&source=test`);
   await expect(page.getByRole("link", { name: "King's Pawn Game" })).toBeVisible();
   expect(new URL(page.url()).searchParams.get("startMove")).toBe("2");
+  expect(consoleMessages).toEqual([]);
 });
 
 test("starts training at the requested move in a line", async ({ page }) => {

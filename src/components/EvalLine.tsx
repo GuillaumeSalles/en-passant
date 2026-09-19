@@ -44,7 +44,7 @@ function EvaluationLineContent(props: {
       <EvalBadge score={props.evaluation.score} />
       <For each={moveSlots()}>
         {(slot) => {
-          const previewKey = `${props.evaluation.index}:${slot.index}`;
+          const previewKey = createMemo(() => `${props.evaluation.index}:${slot.index}`);
 
           return (
             <Show when={props.evaluation.moves[slot.index]}>
@@ -55,7 +55,7 @@ function EvaluationLineContent(props: {
                   data-to={move().to}
                   class="cursor-pointer whitespace-nowrap hover:text-blue-500"
                   onPointerEnter={(event) =>
-                    positionPreview.onPointerEnter(previewKey, () => move().fen, event)
+                    positionPreview.onPointerEnter(previewKey(), () => move().fen, event)
                   }
                   onClick={() =>
                     props.onAddEvalMoves(props.evaluation.moves.slice(0, slot.index + 1))

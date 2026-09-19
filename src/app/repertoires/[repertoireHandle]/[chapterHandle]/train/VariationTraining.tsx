@@ -77,9 +77,11 @@ export function VariationTraining(props: {
   createEffect(
     () => ({
       activeLinePlyCount: flow.activeLine()?.plyCount,
+      pathname: location.pathname,
       search: location.search,
+      hash: location.hash,
     }),
-    ({ activeLinePlyCount, search }) => {
+    ({ activeLinePlyCount, pathname, search, hash }) => {
       const searchParams = new URLSearchParams(search);
       const values = searchParams.getAll("startMove");
       if (values.length === 0) return;
@@ -91,7 +93,7 @@ export function VariationTraining(props: {
 
       searchParams.delete("startMove");
       const nextSearch = searchParams.toString();
-      navigate(`${location.pathname}${nextSearch === "" ? "" : `?${nextSearch}`}${location.hash}`, {
+      navigate(`${pathname}${nextSearch === "" ? "" : `?${nextSearch}`}${hash}`, {
         replace: true,
       });
     },

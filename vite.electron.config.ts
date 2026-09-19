@@ -6,7 +6,7 @@ export default defineConfig({
     emptyOutDir: true,
     outDir: "dist-electron",
     ssr: true,
-    rollupOptions: {
+    rolldownOptions: {
       external: ["electron"],
       input: {
         main: "electron/main.ts",

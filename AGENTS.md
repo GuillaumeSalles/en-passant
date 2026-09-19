@@ -1,6 +1,6 @@
 # Agent Notes
 
-This is the GPL frontend for En Passant. It uses Solid v2 beta and deploys to
+This is the GPL frontend for En Passant. It uses Solid v2 RC and deploys to
 Cloudflare Pages project `enpassant`.
 
 ## Non-Negotiables
@@ -138,5 +138,5 @@ effects.
 
 ## Dependency Notes
 
-Installing Playwright required `--legacy-peer-deps` because the Solid router beta
-currently creates an npm peer-resolution conflict with the testing library.
+The repository enables `legacy-peer-deps` in `.npmrc` because Better Auth still
+declares a Solid 1 peer range while this frontend uses Solid 2.

@@ -1,17 +1,16 @@
 import { createHash } from "node:crypto";
-import type { OutputAsset, OutputChunk } from "rollup";
-import type { Plugin } from "vite";
+import type { Plugin, Rolldown } from "vite";
 
 const SERVICE_WORKER_FILE_NAME = "service-worker.js";
 const SHELL_CACHE_PREFIX = "en-passant-shell-";
 const RUNTIME_CACHE_NAME = "en-passant-runtime-v1";
 const ADDITIONAL_SHELL_URLS = ["/index.html", "/openings-4b862275.json"];
 
-function outputContents(output: OutputAsset | OutputChunk): string | Uint8Array {
+function outputContents(output: Rolldown.OutputAsset | Rolldown.OutputChunk): string | Uint8Array {
   return output.type === "chunk" ? output.code : output.source;
 }
 
-function shellCacheVersion(bundle: Record<string, OutputAsset | OutputChunk>): string {
+function shellCacheVersion(bundle: Rolldown.OutputBundle): string {
   const hash = createHash("sha256");
   for (const output of Object.values(bundle).sort((left, right) =>
     left.fileName.localeCompare(right.fileName),
@@ -23,7 +22,7 @@ function shellCacheVersion(bundle: Record<string, OutputAsset | OutputChunk>): s
   return hash.digest("hex").slice(0, 12);
 }
 
-function isShellOutput(output: OutputAsset | OutputChunk): boolean {
+function isShellOutput(output: Rolldown.OutputAsset | Rolldown.OutputChunk): boolean {
   return (
     /\.(?:css|html|js|woff2)$/.test(output.fileName) && output.fileName !== SERVICE_WORKER_FILE_NAME
   );
