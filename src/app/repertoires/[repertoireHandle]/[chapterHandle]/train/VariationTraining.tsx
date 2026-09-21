@@ -261,7 +261,7 @@ export function VariationTraining(props: {
                 >
                   <MovesTree readOnly canAnnotate={true} />
                 </Show>
-                <PgnExplorerToolbar />
+                <PgnExplorerToolbar showNavigation />
               </>
             }
           />

@@ -4,6 +4,7 @@ import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Button } from "@/components/ui/button";
 import { MovesTree } from "@/components/MovesTree";
+import { PgnExplorerToolbar } from "@/components/PgnExplorerToolbar";
 import { RepertoireBreadcrumb } from "@/components/RepertoireBreadcrumb";
 import { WorkspaceLayout } from "@/components/WorkspaceLayout";
 import { useSquareHighlights } from "@/components/useSquareHighlights";
@@ -442,6 +443,7 @@ export function LineLearning(props: {
               >
                 <MovesTree readOnly canAnnotate={true} />
               </Show>
+              <PgnExplorerToolbar showNavigation={false} />
             </>
           }
         />

@@ -1646,6 +1646,68 @@ test("a mistake during a failed-move retry stays on the isolated move", async ({
   expect(consoleMessages).toEqual([]);
 });
 
+test("shares the displayed position throughout learning", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  const startingFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const afterE4Fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+
+  async function expectSharedPosition(fen: string) {
+    await page.getByRole("button", { name: "Share position" }).click();
+    const destinations = [
+      [
+        "Open position in Chess.com",
+        `https://www.chess.com/analysis?fen=${encodeURIComponent(fen)}`,
+      ],
+      [
+        "Open position on Lichess",
+        `https://lichess.org/analysis/standard/${fen.replaceAll(" ", "_")}`,
+      ],
+      [
+        "Open position in Chessable",
+        `https://www.chessable.com/courses/fen/${encodeURIComponent(fen.replaceAll("/", "U"))}/`,
+      ],
+    ] as const;
+    for (const [name, href] of destinations) {
+      const link = page.getByRole("link", { name });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", href);
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAttribute("rel", "noreferrer");
+    }
+    await page.mouse.click(10, 10);
+    await expect(page.getByRole("link", { name: "Open position on Lichess" })).toHaveCount(0);
+  }
+
+  await recordPlayedSounds(page);
+  await seedRepertoire(page, "1. e4 *");
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1/train");
+  await page.locator("[data-training-line]").first().getByRole("link", { name: "Learn" }).click();
+
+  await expect(page.getByText("Watch this move.")).toBeVisible();
+  await pausePacingClock(page);
+  await expect(page.locator('[data-learning-flow-state="pacing"]')).toBeVisible();
+  await expectSharedPosition(afterE4Fen);
+  await expect(page.locator("[data-pgn-explorer-toolbar]").getByRole("button")).toHaveCount(1);
+
+  await advanceLearningPacing(page, 480);
+  await expect(page.getByText("Now repeat the move.")).toBeVisible();
+  await expectSharedPosition(startingFen);
+  await dragPiece(page, "e2", "e4");
+  await advanceLearningPacing(page, 400);
+
+  await expectTrainingInputReady(page);
+  await expectSharedPosition(startingFen);
+  await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "line-boundary", 1000);
+  await expectTrainingInputReady(page);
+  await dragPiece(page, "e2", "e4");
+  await advanceTrainingPacing(page, "line-boundary", 1000);
+
+  await expect(page.getByText("Line learned.")).toBeVisible();
+  await expectSharedPosition(afterE4Fen);
+  expect(consoleMessages).toEqual([]);
+});
+
 test("highlights demonstrated and opponent moves while learning", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
 

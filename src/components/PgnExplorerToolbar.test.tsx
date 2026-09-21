@@ -25,15 +25,16 @@ function Wrapper(props: { children: JSX.Element }) {
   );
 }
 
-test("opens the current position sharing destinations from the right edge", () => {
+test.each([true, false])("opens position sharing with showNavigation=%s", (showNavigation) => {
   render(() => (
     <Wrapper>
-      <PgnExplorerToolbar />
+      <PgnExplorerToolbar showNavigation={showNavigation} />
     </Wrapper>
   ));
 
   const shareButton = screen.getByRole("button", { name: "Share position" });
   expect(shareButton.closest(".ml-auto")).not.toBeNull();
+  expect(screen.getAllByRole("button")).toHaveLength(showNavigation ? 6 : 1);
 
   flush(() => fireEvent.click(shareButton));
 

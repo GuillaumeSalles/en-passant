@@ -32,8 +32,9 @@ import {
   lichessPositionUrl,
 } from "@/lib/positionShareUrls";
 import { useSelector } from "@/lib/useSelector";
+import { Show } from "solid-js";
 
-export function PgnExplorerToolbar() {
+export function PgnExplorerToolbar(props: { showNavigation: boolean }) {
   const onFlipBoard = useMutation(flipBoard);
   const onMoveToStart = useMutation(moveToStart);
   const onMoveBack = useMutation(back);
@@ -67,42 +68,44 @@ export function PgnExplorerToolbar() {
         data-pgn-explorer-toolbar
         class="flex w-full px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
       >
-        <div class="flex gap-2">
-          <TooltipIconButton
-            aria-label="Flip board"
-            icon={<Repeat2 />}
-            tooltip="Flip board (F)"
-            onClick={onFlipBoard}
-          />
-          <TooltipIconButton
-            aria-label="Move to start"
-            icon={<ArrowLeftToLine />}
-            tooltip="Move to start (↑)"
-            disabled={!canMoveToStart()}
-            onClick={onMoveToStart}
-          />
-          <TooltipIconButton
-            aria-label="Previous move"
-            icon={<ArrowLeft />}
-            tooltip="Previous move (←)"
-            onClick={() => onMoveBack()}
-            disabled={!canMoveBack()}
-          />
-          <TooltipIconButton
-            aria-label="Next move"
-            icon={<ArrowRight />}
-            tooltip="Next move (→)"
-            onClick={() => onMoveForward()}
-            disabled={!canMoveForward()}
-          />
-          <TooltipIconButton
-            aria-label="Move to last main line move"
-            icon={<ArrowRightToLine />}
-            tooltip="Move to last main line move (↓)"
-            onClick={onMoveToLastMainLineMove}
-            disabled={!canMoveToLastMainLineMove()}
-          />
-        </div>
+        <Show when={props.showNavigation}>
+          <div class="flex gap-2">
+            <TooltipIconButton
+              aria-label="Flip board"
+              icon={<Repeat2 />}
+              tooltip="Flip board (F)"
+              onClick={onFlipBoard}
+            />
+            <TooltipIconButton
+              aria-label="Move to start"
+              icon={<ArrowLeftToLine />}
+              tooltip="Move to start (↑)"
+              disabled={!canMoveToStart()}
+              onClick={onMoveToStart}
+            />
+            <TooltipIconButton
+              aria-label="Previous move"
+              icon={<ArrowLeft />}
+              tooltip="Previous move (←)"
+              onClick={() => onMoveBack()}
+              disabled={!canMoveBack()}
+            />
+            <TooltipIconButton
+              aria-label="Next move"
+              icon={<ArrowRight />}
+              tooltip="Next move (→)"
+              onClick={() => onMoveForward()}
+              disabled={!canMoveForward()}
+            />
+            <TooltipIconButton
+              aria-label="Move to last main line move"
+              icon={<ArrowRightToLine />}
+              tooltip="Move to last main line move (↓)"
+              onClick={onMoveToLastMainLineMove}
+              disabled={!canMoveToLastMainLineMove()}
+            />
+          </div>
+        </Show>
         <div class="ml-auto">
           <DropdownMenu>
             <DropdownMenuTrigger>
