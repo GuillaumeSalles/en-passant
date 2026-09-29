@@ -14,7 +14,7 @@ export function MergePgnDialog() {
       submitLabel="Merge"
       cancelLabel="Cancel"
       trigger={
-        <Button type="button" variant="outline">
+        <Button type="button" variant="outline" size="sm">
           Merge pgn
         </Button>
       }

@@ -234,7 +234,7 @@ export function Repertoire(props: {
               if (evalMove !== null) onMoveFromStats(evalMove);
             }}
           />
-          <PgnExplorerToolbar showNavigation />
+          <PgnExplorerToolbar showNavigation showMergePgn />
         </>
       }
     />

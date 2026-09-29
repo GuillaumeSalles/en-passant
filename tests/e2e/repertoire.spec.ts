@@ -793,13 +793,10 @@ test("merges a pasted PGN into the current chapter", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   await openRepertoire(page, "1. e4 e5 2. Nf3 *");
 
-  const mergeButton = page.getByRole("button", { name: "Merge pgn" });
-  const trainButton = page.getByRole("link", { name: "Train", exact: true });
+  const toolbar = page.locator("[data-pgn-explorer-toolbar]");
+  const mergeButton = toolbar.getByRole("button", { name: "Merge pgn" });
   await expect(mergeButton).toBeVisible();
-  const mergeBox = await mergeButton.boundingBox();
-  const trainBox = await trainButton.boundingBox();
-  if (mergeBox === null || trainBox === null) throw new Error("Expected chapter actions");
-  expect(mergeBox.x).toBeLessThan(trainBox.x);
+  await expect(page.getByRole("button", { name: "Merge pgn" })).toHaveCount(1);
 
   await mergeButton.click();
   const dialog = page.getByRole("dialog", { name: "Merge PGN" });
@@ -1047,6 +1044,19 @@ test("mobile shell uses dynamic viewport sizing for browser controls", async ({ 
   expect(viewportStyles.dynamicViewportSupported).toBe(true);
   expect(viewportStyles.shellHeight).toBe(viewportStyles.viewportHeight);
   expect(Number.parseFloat(viewportStyles.toolbarPaddingBottom)).toBeGreaterThanOrEqual(8);
+  const toolbar = page.locator("[data-pgn-explorer-toolbar]");
+  const mergeButton = toolbar.getByRole("button", { name: "Merge pgn" });
+  await expect(mergeButton).toBeVisible();
+  const toolbarBox = await toolbar.boundingBox();
+  const mergeBox = await mergeButton.boundingBox();
+  const shareBox = await toolbar.getByRole("button", { name: "Share position" }).boundingBox();
+  if (toolbarBox === null || mergeBox === null || shareBox === null) {
+    throw new Error("Expected explorer actions");
+  }
+  expect(mergeBox.y).toBe(shareBox.y);
+  expect(mergeBox.x + mergeBox.width).toBeLessThanOrEqual(shareBox.x);
+  expect(shareBox.x + shareBox.width).toBeLessThanOrEqual(toolbarBox.x + toolbarBox.width);
+  expect(toolbarBox.x + toolbarBox.width).toBeLessThanOrEqual(390);
   expect(consoleMessages).toEqual([]);
 });
 

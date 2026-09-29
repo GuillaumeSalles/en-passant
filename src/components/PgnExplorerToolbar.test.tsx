@@ -28,7 +28,7 @@ function Wrapper(props: { children: JSX.Element }) {
 test.each([true, false])("opens position sharing with showNavigation=%s", (showNavigation) => {
   render(() => (
     <Wrapper>
-      <PgnExplorerToolbar showNavigation={showNavigation} />
+      <PgnExplorerToolbar showNavigation={showNavigation} showMergePgn={false} />
     </Wrapper>
   ));
 

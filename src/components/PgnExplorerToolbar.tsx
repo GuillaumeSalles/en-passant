@@ -33,8 +33,9 @@ import {
 } from "@/lib/positionShareUrls";
 import { useSelector } from "@/lib/useSelector";
 import { Show } from "solid-js";
+import { MergePgnDialog } from "./MergePgnDialog";
 
-export function PgnExplorerToolbar(props: { showNavigation: boolean }) {
+export function PgnExplorerToolbar(props: { showNavigation: boolean; showMergePgn: boolean }) {
   const onFlipBoard = useMutation(flipBoard);
   const onMoveToStart = useMutation(moveToStart);
   const onMoveBack = useMutation(back);
@@ -66,7 +67,7 @@ export function PgnExplorerToolbar(props: { showNavigation: boolean }) {
       <HorizontalDashedDivider animationKey="pgn-explorer-toolbar-top" direction="right-to-left" />
       <div
         data-pgn-explorer-toolbar
-        class="flex w-full px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
+        class="flex w-full items-center gap-2 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
       >
         <Show when={props.showNavigation}>
           <div class="flex gap-2">
@@ -106,7 +107,10 @@ export function PgnExplorerToolbar(props: { showNavigation: boolean }) {
             />
           </div>
         </Show>
-        <div class="ml-auto">
+        <div class="ml-auto flex items-center gap-2">
+          <Show when={props.showMergePgn}>
+            <MergePgnDialog />
+          </Show>
           <DropdownMenu>
             <DropdownMenuTrigger>
               <TooltipIconButton

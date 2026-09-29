@@ -443,7 +443,7 @@ export function LineLearning(props: {
               >
                 <MovesTree readOnly canAnnotate={true} />
               </Show>
-              <PgnExplorerToolbar showNavigation={false} />
+              <PgnExplorerToolbar showNavigation={false} showMergePgn={false} />
             </>
           }
         />

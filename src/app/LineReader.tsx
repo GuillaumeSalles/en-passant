@@ -112,7 +112,7 @@ export function LineReader(props: LineReaderProps) {
         panelChildren={
           <>
             <MovesTree readOnly canAnnotate={false} />
-            <PgnExplorerToolbar showNavigation />
+            <PgnExplorerToolbar showNavigation showMergePgn={false} />
           </>
         }
       />
