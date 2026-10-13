@@ -69,7 +69,7 @@
     "@solidjs/testing-library": "1.0.0-beta.3",
     "@solidjs/vite-plugin": "3.0.0-next.44",
     "@types/node": "^20",
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
     "electron": "^44.0.0",
     "eslint": "^10.7.0",
