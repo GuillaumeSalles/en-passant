@@ -411,12 +411,17 @@ export async function storedRepertoireHandles(page: Page): Promise<string[]> {
 }
 
 export async function firstStoredPgn(page: Page): Promise<string> {
+  const values = await storedPgns(page);
+  const pgn = values[0] ?? null;
+  expect(pgn).not.toBeNull();
+  return pgn;
+}
+
+export async function storedPgns(page: Page): Promise<string[]> {
   const values = await readObjectStore(page, "pgns", (record) =>
     isRecord(record) && typeof record["pgn"] === "string" ? record["pgn"] : null,
   );
-  const pgn = values.find((value) => value !== null) ?? null;
-  expect(pgn).not.toBeNull();
-  return pgn;
+  return values.filter((value) => value !== null);
 }
 
 export async function storedTrainingLineUciPaths(page: Page): Promise<string[]> {

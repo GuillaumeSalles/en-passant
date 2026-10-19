@@ -12,6 +12,7 @@ import {
   mockSignedInUser,
   pausePacingClock,
   seedIndexedDb,
+  storedPgns,
   storedTrainingLineUciPaths,
   type ChapterRecord,
   type RepertoireRecord,
@@ -1211,6 +1212,7 @@ test("edits chapter annotations without reopening moves when training completes"
   await page.locator('[aria-label="Move e4"]').click({ button: "right" });
   await expect(page.getByText("Delete comment after", { exact: true })).toBeVisible();
   await expect(page.getByText("Delete move", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Extract to new chapter", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   await dragPiece(page, "e4", "e5");
@@ -1953,6 +1955,7 @@ test("continues learning with the next unlearned line", async ({ page }) => {
   await page.locator('[aria-label="Move e4"]').click({ button: "right" });
   await expect(page.getByText("Comment before", { exact: true })).toBeVisible();
   await expect(page.getByText("Delete move", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Extract to new chapter", { exact: true })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Next line" }).click();
   await expect(page).toHaveURL(secondLearnHref);
@@ -2675,6 +2678,80 @@ test("opens the context menu for a move variation", async ({ page }) => {
 
   await expect(page.getByText("Delete move")).toBeVisible();
   await expect(page.getByText("Promote variation")).toBeVisible();
+  expect(consoleMessages).toEqual([]);
+});
+
+for (const { move, original, extracted } of [
+  {
+    move: "c5",
+    original: "1. e4 e5 2. Bc4 *",
+    extracted: "1. e4 c5 $5 {Sicilian} 2. Nf3 d6 (2... Nc6) *",
+  },
+  {
+    move: "e5",
+    original: "1. e4 c5 $5 {Sicilian} 2. Nf3 d6 (2... Nc6) *",
+    extracted: "1. e4 e5 2. Bc4 *",
+  },
+]) {
+  test(`extracts ${move} and its continuations to a persistent chapter`, async ({ page }) => {
+    const consoleMessages = collectUnexpectedConsole(page);
+    await openRepertoire(page, "1. e4 e5 (1... c5 $5 {Sicilian} 2. Nf3 d6 (2... Nc6)) 2. Bc4 *");
+
+    const selectedMove = page.locator(`[data-san="${move}"]`);
+    await selectedMove.click({ button: "right" });
+    await expect(selectedMove).toHaveAttribute("data-selected", "true");
+    await page.getByText("Extract to new chapter", { exact: true }).click();
+
+    await expect(page).toHaveURL("/app/repertoires/untitled-repertoire/chapter-2");
+    await expectRepertoireReady(page);
+    await expect
+      .poll(async () => (await storedPgns(page)).sort())
+      .toEqual([original, extracted].sort());
+    await page.getByRole("button", { name: `Move ${move}`, exact: true }).click();
+    await expect(selectedMove).toHaveAttribute("data-selected", "true");
+    await expect(selectedMove).toHaveClass(/text-blue-500/);
+    await expect(page.locator(`[data-square="${move}"]`)).toHaveAttribute("data-piece", "p");
+
+    if (move === "c5") {
+      await expect(page.getByText("Sicilian", { exact: true })).toBeVisible();
+      await expect(selectedMove.locator('[data-nag="5"]')).toBeVisible();
+      await page.getByRole("button", { name: "Move Nf3", exact: true }).click();
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator('[data-san="Nc6"]')).toHaveAttribute("data-selected", "true");
+      await expect(page.locator('[data-square="c6"]')).toHaveAttribute("data-piece", "n");
+    }
+
+    await page.reload();
+    await expectRepertoireReady(page);
+    await expect(selectedMove).toBeVisible();
+    await page.getByRole("link", { name: "Chapter 1", exact: true }).click();
+    await expect(page).toHaveURL("/app/repertoires/untitled-repertoire/chapter-1");
+    await expect(selectedMove).toHaveCount(0);
+    await expect(page.locator('[data-san="e4"]')).toBeVisible();
+    expect(consoleMessages).toEqual([]);
+  });
+}
+
+test("hides move extraction when the repertoire is at its chapter limit", async ({ page }) => {
+  const consoleMessages = collectUnexpectedConsole(page);
+  await seedRepertoire(
+    page,
+    defaultPgn,
+    Array.from({ length: 19 }, (_, index) => ({
+      ...chapter,
+      id: `extra-chapter-${index}`,
+      handle: `chapter-${index + 2}`,
+      name: `Chapter ${index + 2}`,
+      pgnId: `extra-pgn-${index}`,
+    })),
+  );
+  await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
+  await expectRepertoireReady(page);
+  await page.locator('[data-san="e4"]').click({ button: "right" });
+
+  await expect(page.getByText("Delete move", { exact: true })).toBeVisible();
+  await expect(page.getByText("Extract to new chapter", { exact: true })).toHaveCount(0);
   expect(consoleMessages).toEqual([]);
 });
 

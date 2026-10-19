@@ -450,3 +450,29 @@ export function toPgn(normalizedPgn: NormalizedPgn): string {
     ) + " *"
   );
 }
+
+export function extractMovePgn(pgn: NormalizedPgn, moveId: number): string | null {
+  const selectedMove = pgn.moves[moveId];
+  if (selectedMove === undefined) return null;
+
+  const moves: Record<number, Move> = {};
+  const pendingMoveIds = [moveId];
+  while (pendingMoveIds.length > 0) {
+    const currentId = pendingMoveIds.pop();
+    if (currentId === undefined) break;
+    const move = pgn.moves[currentId];
+    if (move === undefined) return null;
+    moves[currentId] = move;
+    pendingMoveIds.push(...move.next);
+  }
+
+  let rootMove = selectedMove;
+  while (rootMove.prev !== null) {
+    const parent = pgn.moves[rootMove.prev];
+    if (parent === undefined) return null;
+    moves[parent.id] = { ...parent, next: [rootMove.id] };
+    rootMove = parent;
+  }
+
+  return toPgn({ rootMoveIds: [rootMove.id], moves, moveIdCounter: pgn.moveIdCounter });
+}

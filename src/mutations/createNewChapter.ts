@@ -6,9 +6,16 @@ import { queueRepertoireSync } from "@/storage/backendSync";
 import { MAX_CHAPTERS_PER_REPERTOIRE } from "@/lib/repertoireLimits";
 
 export async function createNewChapter(
+  context: MutationContext,
+  args: { repertoireId: string; pgn?: string },
+): Promise<void> {
+  await createChapterAndNavigate(context, args);
+}
+
+export async function createChapterAndNavigate(
   { store, router, storage: { createChapter } }: MutationContext,
   { repertoireId, pgn: initialPgn }: { repertoireId: string; pgn?: string },
-): Promise<void> {
+): Promise<Chapter | undefined> {
   const state = store.state;
 
   if (state.repertoires.status !== "success" || state.chapters.status !== "success") {
@@ -57,4 +64,5 @@ export async function createNewChapter(
 
   await createChapter(newChapter, toPgn(pgn));
   queueRepertoireSync();
+  return newChapter;
 }
