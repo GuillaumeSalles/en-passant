@@ -1,5 +1,5 @@
-import { normalizePgn, type Move } from "./AppState";
-import { createChessPosition, positionKey, STARTING_FEN } from "./chess";
+import { moveChildren, type MoveOccurrence } from "./moveIndex";
+import { normalizePgn } from "./app-state/pgnTree";
 import { parsePgnTags } from "./pgn-parser";
 import type {
   GameColor,
@@ -9,31 +9,27 @@ import type {
   PositionMoveStat,
   TrainingMistakeLink,
 } from "./gameContracts";
-import type { StoredChapter, StoredPgn, StoredRepertoire } from "../storage/contracts";
+import type { StoredChapter, StoredRepertoire } from "../storage/contracts";
 
 export type GameLibrary = {
   repertoires: StoredRepertoire[];
   chapters: StoredChapter[];
-  pgns: StoredPgn[];
+  repertoireMoves: Map<string, ReturnType<typeof moveChildren>>;
 };
-export function mainline(pgn: string): { move: Move; before: string; ply: number; uci: string }[] {
-  const normalized = normalizePgn(pgn);
-  const result: { move: Move; before: string; ply: number; uci: string }[] = [];
-  let id = normalized.rootMoveIds[0];
-  let before = parsePgnTags(pgn)["FEN"] ?? STARTING_FEN;
-  while (id !== undefined) {
-    const move = normalized.moves[id];
-    if (move === undefined) break;
-    result.push({
-      move,
-      before,
-      ply: result.length + 1,
-      uci: `${move.from}${move.to}${move.promotion ?? ""}`,
-    });
-    before = move.fen;
-    id = move.next[0];
+
+export function groupMovesBySource(moves: MoveOccurrence[]): Map<string, MoveOccurrence[]> {
+  const grouped = new Map<string, MoveOccurrence[]>();
+  for (const move of moves) {
+    const group = grouped.get(move.sourceId) ?? [];
+    group.push(move);
+    grouped.set(move.sourceId, group);
   }
-  return result;
+  for (const group of grouped.values()) group.sort((a, b) => a.ply - b.ply || a.moveId - b.moveId);
+  return grouped;
+}
+
+export function repertoireMoveTrees(moves: MoveOccurrence[]): GameLibrary["repertoireMoves"] {
+  return new Map([...groupMovesBySource(moves)].map(([id, group]) => [id, moveChildren(group)]));
 }
 // Split only at tag sections following movetext, so PGNs need not contain an Event tag.
 export function parseGameImport(
@@ -60,8 +56,10 @@ export function parseGameImport(
   return chunks
     .filter((c) => c.trim() !== "")
     .map((pgn) => {
-      const moves = mainline(pgn);
-      if (moves.length === 0) throw new Error("No legal moves found in the PGN.");
+      // Preserve the editor's import validation, including annotated variations.
+      // Only the persisted game index is restricted to the played main line.
+      if (normalizePgn(pgn).rootMoveIds.length === 0)
+        throw new Error("No legal moves found in the PGN.");
       const tags = parsePgnTags(pgn);
       const whiteName = tags["White"] ?? "White",
         blackName = tags["Black"] ?? "Black";
@@ -140,31 +138,33 @@ export function filterGames(
       filters.sort === "asc" ? a.createdAt - b.createdAt : b.createdAt - a.createdAt,
     );
 }
-export function analyzeGame(game: StoredGame, library: GameLibrary): StoredGame {
+export function analyzeGame(
+  game: StoredGame,
+  library: GameLibrary,
+  line: readonly MoveOccurrence[],
+): StoredGame {
   const result = { ...game, latestRepertoireMove: null, repertoireMistake: null } as StoredGame;
-  const line = mainline(game.pgn);
   for (const repertoire of library.repertoires.filter(
     (r) => r.deletedAt == null && r.orientation === game.userColor,
   )) {
     for (const chapter of library.chapters.filter(
       (c) => c.deletedAt == null && c.repertoireId === repertoire.id,
     )) {
-      const pgn = library.pgns.find((p) => p.id === chapter.pgnId && p.deletedAt == null);
-      if (pgn === undefined) continue;
-      const tree = normalizePgn(pgn.pgn);
-      let choices = tree.rootMoveIds;
+      const tree = library.repertoireMoves.get(chapter.pgnId);
+      if (tree === undefined) continue;
+      let choices = tree.get(null) ?? [];
       for (const step of line) {
-        const candidates = choices.map((id) => tree.moves[id]).filter((m) => m !== undefined);
-        const matched = candidates.find((m) => `${m.from}${m.to}${m.promotion ?? ""}` === step.uci);
+        const candidates = choices;
+        const matched = candidates.find((m) => m.uci === step.uci);
         const details = {
           ply: step.ply,
-          positionKey: positionKey(createChessPosition(step.before)),
+          positionKey: step.beforeKey,
           repertoire: { handle: repertoire.handle, name: repertoire.name },
           chapter: { handle: chapter.handle, name: chapter.name },
         };
         if (matched === undefined) {
           const expected = candidates[0];
-          const turn = createChessPosition(step.before).turn === "w" ? "white" : "black";
+          const turn = step.beforeKey.split(" ")[1] === "w" ? "white" : "black";
           if (
             expected !== undefined &&
             turn === game.userColor &&
@@ -172,33 +172,36 @@ export function analyzeGame(game: StoredGame, library: GameLibrary): StoredGame 
           )
             result.repertoireMistake = {
               ...details,
-              playedSan: step.move.san,
+              playedSan: step.san,
               expectedSan: expected.san,
-              uciPath: [
-                ...line.slice(0, step.ply - 1).map((m) => m.uci),
-                `${expected.from}${expected.to}${expected.promotion ?? ""}`,
-              ].join(" "),
+              uciPath: [...line.slice(0, step.ply - 1).map((m) => m.uci), expected.uci].join(" "),
             };
           break;
         }
         if (result.latestRepertoireMove === null || step.ply > result.latestRepertoireMove.ply)
-          result.latestRepertoireMove = { ...details, san: step.move.san };
-        choices = matched.next;
+          result.latestRepertoireMove = { ...details, san: step.san };
+        choices = tree.get(matched.moveId) ?? [];
       }
     }
   }
   return result;
 }
-export function positionMoves(games: StoredGame[], key: string, color: GameColor): PositionMoves {
+export function positionMoves(
+  games: StoredGame[],
+  key: string,
+  color: GameColor,
+  occurrences: MoveOccurrence[],
+): PositionMoves {
   const moves = new Map<string, PositionMoveStat>();
   const recentGames: PositionMoves["recentGames"] = [];
+  const byGame = groupMovesBySource(occurrences);
   for (const game of filterGames(games, { color })) {
     if (game.result === "*") continue;
-    const step = mainline(game.pgn).find((s) => positionKey(createChessPosition(s.before)) === key);
+    const step = byGame.get(game.id)?.find((s) => s.beforeKey === key);
     if (step === undefined) continue;
     const stat = moves.get(step.uci) ?? {
       uci: step.uci,
-      san: step.move.san,
+      san: step.san,
       games: 0,
       whiteWins: 0,
       draws: 0,
@@ -224,7 +227,7 @@ export function positionMoves(games: StoredGame[], key: string, color: GameColor
       result: game.result,
       speed: game.speed,
       timeControl: game.timeControl,
-      move: { ply: step.ply, uci: step.uci, san: step.move.san },
+      move: { ply: step.ply, uci: step.uci, san: step.san },
     });
   }
   return {
@@ -237,7 +240,7 @@ export function positionMoves(games: StoredGame[], key: string, color: GameColor
 }
 export function mistakeLinks(games: StoredGame[], library: GameLibrary): TrainingMistakeLink[] {
   return games.flatMap((game) => {
-    const mistake = analyzeGame(game, library).repertoireMistake;
+    const mistake = game.repertoireMistake;
     if (mistake === null) return [];
     const rep = library.repertoires.find(
       (r) => r.handle === mistake.repertoire.handle && r.deletedAt == null,

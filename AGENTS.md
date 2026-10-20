@@ -56,6 +56,25 @@ Cloudflare Pages project `enpassant`.
   transaction. Do not silently overwrite unrelated concurrent edits.
 - Future encrypted sync must remain an optional adapter; it must not become the
   source of truth or a prerequisite for editing and training.
+- The authorized local storage restructuring uses schema version 3 in the same
+  `en-passant-local-v1` database. Its additive v1 upgrade indexes existing local
+  documents only; it never imports backups or account-linked data. The v2-to-v3
+  upgrade removes unused secondary indexes without rebuilding occurrences.
+- Keep only indexes queried by production code: chapters `by-repertoire`, both
+  move stores `by-source`, and game moves `by-position`. Add further indexes
+  when an actual query needs them.
+- `repertoire-moves` and `game-moves` are derived occurrence stores. Write source
+  documents through `localDatabase().commit()` so documents and indexes commit
+  atomically. Do not write derived stores directly or use occurrence ids as
+  permanent training identities; ids are scoped to a document's current contents.
+- Use targeted `read([{ store, key?, index? }])` queries for normal operations.
+  `read()` without arguments is a complete source snapshot, excluding derived
+  indexes. Position indexes share canonical position keys but preserve separate
+  occurrences, variation order, and source ownership. Keep training schedules
+  and current game-analysis behavior unchanged until separately requested.
+- Any change to the persisted occurrence format or indexing semantics needs an
+  explicit schema version and a tested rebuild. Upgrade failures must roll back
+  and preserve source documents; never recover by resetting the database.
 
 ## Tests And Checks
 

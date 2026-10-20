@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import type { StoredGame } from "../../src/lib/gameContracts";
 
 export const STORAGE_ORIGIN_PATH = "/stockfish-18-lite-single.js";
 
@@ -125,6 +126,7 @@ export async function seedIndexedDb(
     chapters: ChapterRecord[];
     pgns: PgnRecord[];
     trainingLineSchedules?: TrainingLineScheduleRecord[];
+    games?: StoredGame[];
     clearLocalStorage?: boolean;
   },
 ): Promise<void> {
@@ -141,6 +143,7 @@ export async function seedIndexedDb(
       deletedAt: record.deletedAt,
     })),
     trainingLineSchedules: records.trainingLineSchedules ?? [],
+    games: records.games ?? [],
   };
   await gotoStorageOrigin(page);
   await page.evaluate(
@@ -176,7 +179,7 @@ export async function seedIndexedDb(
 
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(
-          ["repertoires", "chapters", "pgns", "training-line-schedules", "metadata"],
+          ["repertoires", "chapters", "pgns", "training-line-schedules", "metadata", "games"],
           "readwrite",
         );
         transaction.onerror = () => reject(transaction.error);
@@ -192,6 +195,9 @@ export async function seedIndexedDb(
         }
         for (const pgn of records.pgns) {
           transaction.objectStore("pgns").put(pgn, pgn.id);
+        }
+        for (const game of records.games) {
+          transaction.objectStore("games").put(game, game.id);
         }
         for (const schedule of records.trainingLineSchedules) {
           const key = `${schedule.repertoireId}/${schedule.chapterId}/${schedule.uciPath}`;
@@ -255,4 +261,24 @@ async function readObjectStore<T>(
       { storeName },
     )
     .then((records) => records.map(mapRecord));
+}
+
+export async function storedDatabaseSchema(page: Page) {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("en-passant-local-v1");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const stores = [...db.objectStoreNames];
+    const tx = db.transaction(stores, "readonly");
+    const schema = {
+      version: db.version,
+      indexes: Object.fromEntries(
+        stores.map((name) => [name, [...tx.objectStore(name).indexNames]]),
+      ),
+    };
+    db.close();
+    return schema;
+  });
 }

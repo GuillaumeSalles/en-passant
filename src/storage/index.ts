@@ -8,9 +8,11 @@ import { trainingLineReviewKey } from "@/lib/AppState";
 import { limitRepertoireNameLength } from "@/lib/repertoireNames";
 import { localDatabase, updateDatabase } from "./localDatabase";
 import type {
-  DatabaseRecord,
+  SourceRecord,
   DatabaseSnapshot,
   StoreName,
+  ReadStoreName,
+  DatabaseQuery,
   DatabaseCommit,
 } from "./databaseContract";
 import { publishRecordChanges, type StorageRecordRef } from "./recordChanges";
@@ -28,19 +30,19 @@ export type {
 } from "./contracts";
 
 const stamp = () => ({ updatedAt: new Date().toISOString(), deletedAt: null });
-export function records<T>(snapshot: DatabaseSnapshot, store: StoreName): T[] {
+export function records<T>(snapshot: DatabaseSnapshot, store: ReadStoreName): T[] {
   return snapshot.records.filter((r) => r.store === store).map((r) => JSON.parse(r.value) as T);
 }
-export function record(store: StoreName, id: string, value: unknown): DatabaseRecord {
+export function record(store: StoreName, id: string, value: unknown): SourceRecord {
   return { store, id, value: JSON.stringify(value) };
 }
-function put(snapshot: DatabaseSnapshot, values: DatabaseRecord[]): DatabaseCommit {
+function put(snapshot: DatabaseSnapshot, values: SourceRecord[]): DatabaseCommit {
   return { expectedVersion: snapshot.version, put: values, remove: [] };
 }
 function active<T extends { deletedAt?: string | null }>(values: T[]): T[] {
   return values.filter((v) => v.deletedAt == null);
 }
-function pgnRecord(id: string, pgn: string): DatabaseRecord {
+function pgnRecord(id: string, pgn: string): SourceRecord {
   return record("pgns", id, {
     id,
     pgn,
@@ -51,8 +53,9 @@ function pgnRecord(id: string, pgn: string): DatabaseRecord {
 async function change(
   edit: (snapshot: DatabaseSnapshot) => DatabaseCommit,
   refs: StorageRecordRef[],
+  queries: readonly DatabaseQuery[],
 ) {
-  await updateDatabase(edit);
+  await updateDatabase(edit, queries);
   publishRecordChanges(refs);
 }
 export async function createRepertoireAndChapter(
@@ -91,6 +94,11 @@ export async function createRepertoireAndChapter(
       { kind: "chapter", id: chapter.id },
       { kind: "pgn", id: chapter.pgnId },
     ],
+    [
+      { store: "repertoires", key: repertoire.id },
+      { store: "chapters", key: chapter.id },
+      { store: "pgns", key: chapter.pgnId },
+    ],
   );
 }
 export async function createChapter(chapter: SerializedChapter, pgn: string) {
@@ -123,11 +131,17 @@ export async function createChapter(chapter: SerializedChapter, pgn: string) {
       { kind: "chapter", id: chapter.id },
       { kind: "pgn", id: chapter.pgnId },
     ],
+    [
+      { store: "repertoires", key: chapter.repertoireId },
+      { store: "chapters", key: chapter.id },
+      { store: "pgns", key: chapter.pgnId },
+    ],
   );
 }
 export async function getPgn(id: string): Promise<string | undefined> {
-  return active(records<StoredPgn>(await localDatabase().read(), "pgns")).find((p) => p.id === id)
-    ?.pgn;
+  return active(
+    records<StoredPgn>(await localDatabase().read([{ store: "pgns", key: id }]), "pgns"),
+  ).find((p) => p.id === id)?.pgn;
 }
 export async function savePgnMutation(id: string, pgn: string, mutations: PgnMutation[]) {
   if (mutations.length === 0) return;
@@ -138,6 +152,7 @@ export async function savePgnMutation(id: string, pgn: string, mutations: PgnMut
       return put(s, [pgnRecord(id, pgn)]);
     },
     [{ kind: "pgn", id }],
+    [{ store: "pgns", key: id }],
   );
 }
 export async function updateRepertoire(value: NewSerializedRepertoire) {
@@ -156,6 +171,7 @@ export async function updateRepertoire(value: NewSerializedRepertoire) {
           : [],
       ),
     [{ kind: "repertoire", id: value.id }],
+    [{ store: "repertoires", key: value.id }],
   );
 }
 export async function updateChapter(value: SerializedChapter) {
@@ -174,6 +190,7 @@ export async function updateChapter(value: SerializedChapter) {
           : [],
       ),
     [{ kind: "chapter", id: value.id }],
+    [{ store: "chapters", key: value.id }],
   );
 }
 function deletion(
@@ -204,7 +221,15 @@ function deletion(
   };
 }
 export async function deleteChapter(chapterId: string, _pgnId: string) {
-  await change((s) => deletion(s, [chapterId]), [{ kind: "chapter", id: chapterId }]);
+  await change(
+    (s) => deletion(s, [chapterId]),
+    [{ kind: "chapter", id: chapterId }],
+    [
+      { store: "chapters", key: chapterId },
+      { store: "pgns" },
+      { store: "training-line-schedules" },
+    ],
+  );
 }
 export async function deleteRepertoire(id: string) {
   await change(
@@ -217,6 +242,12 @@ export async function deleteRepertoire(id: string) {
         id,
       ),
     [{ kind: "repertoire", id }],
+    [
+      { store: "repertoires", key: id },
+      { store: "chapters", index: "by-repertoire", key: id },
+      { store: "pgns" },
+      { store: "training-line-schedules" },
+    ],
   );
 }
 export async function saveTrainingLineSchedule(schedule: TrainingLineReview) {
@@ -234,17 +265,25 @@ export async function saveTrainingLineSchedule(schedule: TrainingLineReview) {
       ]);
     },
     [{ kind: "training-line-schedule", id }],
+    [{ store: "chapters", key: schedule.chapterId }],
   );
 }
 export async function getAllRepertoires() {
-  return active(records<StoredRepertoire>(await localDatabase().read(), "repertoires"));
+  return active(
+    records<StoredRepertoire>(
+      await localDatabase().read([{ store: "repertoires" }]),
+      "repertoires",
+    ),
+  );
 }
 export async function getAllChapters() {
-  return active(records<StoredChapter>(await localDatabase().read(), "chapters"));
+  return active(
+    records<StoredChapter>(await localDatabase().read([{ store: "chapters" }]), "chapters"),
+  );
 }
 export async function getAllTrainingLineSchedules(): Promise<TrainingLineReview[]> {
   return records<StoredTrainingLineSchedule>(
-    await localDatabase().read(),
+    await localDatabase().read([{ store: "training-line-schedules" }]),
     "training-line-schedules",
   );
 }
@@ -255,7 +294,11 @@ export type InitialRepertoireLoad = {
   createdDemo: boolean;
 };
 export async function getInitialRepertoiresAndChapters(): Promise<InitialRepertoireLoad> {
-  const s = await localDatabase().read();
+  const s = await localDatabase().read([
+    { store: "repertoires" },
+    { store: "chapters" },
+    { store: "training-line-schedules" },
+  ]);
   return {
     repertoires: active(records<StoredRepertoire>(s, "repertoires")),
     chapters: active(records<StoredChapter>(s, "chapters")),
