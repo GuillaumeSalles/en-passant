@@ -1,3 +1,4 @@
+import { reportStorageError } from "@/storage/status";
 import { useStore } from "@/app/AppStateProvider";
 import type { AppState, Context } from "./AppState";
 import { useRouteContext } from "./useRouteContext";
@@ -5,10 +6,7 @@ import { Store, StoreState } from "@/lib/createStore";
 import { type Storage, storage } from "@/storage";
 import { useNavigate } from "@solidjs/router";
 import { untrack } from "solid-js";
-import { isSignedIn } from "@/lib/authSession";
-import { recordCachedMoveAdditions } from "@/lib/signupNudge";
 import { saveLatestPgnMutation, saveLatestPgnMutations } from "@/storage/pgnPersistence";
-import { queueRepertoireSync } from "@/storage/backendSync";
 import { writeEngineEnabledPreference } from "@/lib/enginePreference";
 
 import type { MoveSound, MutationResult } from "./mutationEffects";
@@ -35,14 +33,16 @@ function runMutationEffects(result: MutationResult): void {
   for (const effect of effects) {
     if (effect.type === "play-sound") {
       playSound(effect.sound);
-    } else if (effect.type === "record-cached-move" && !isSignedIn()) {
-      recordCachedMoveAdditions(1);
     } else if (effect.type === "persist-pgn-mutation") {
-      void saveLatestPgnMutation(effect.pgnId, effect.pgn, effect.mutation);
+      void saveLatestPgnMutation(effect.pgnId, effect.pgn, effect.mutation).catch(
+        reportStorageError,
+      );
     } else if (effect.type === "persist-pgn-mutations") {
-      void saveLatestPgnMutations(effect.pgnId, effect.pgn, effect.mutations);
+      void saveLatestPgnMutations(effect.pgnId, effect.pgn, effect.mutations).catch(
+        reportStorageError,
+      );
     } else if (effect.type === "persist-training-line-schedule") {
-      void storage.saveTrainingLineSchedule(effect.schedule).then(queueRepertoireSync);
+      void storage.saveTrainingLineSchedule(effect.schedule).catch(reportStorageError);
     } else if (effect.type === "persist-engine-enabled") {
       writeEngineEnabledPreference(effect.isEnabled);
     }
@@ -88,7 +88,14 @@ export function useMutation(
     const route = untrack(ctx);
     const mutationContext = { store, state: store.state, route, router, storage };
     if (options?.context === true) {
-      return untrack(() => (mutation as ContextMutation)(mutationContext, ...args));
+      try {
+        const pending = untrack(() => (mutation as ContextMutation)(mutationContext, ...args));
+        if (pending instanceof Promise) void pending.catch(reportStorageError);
+        return pending;
+      } catch (error) {
+        reportStorageError(error);
+        throw error;
+      }
     }
 
     const result = untrack(() =>

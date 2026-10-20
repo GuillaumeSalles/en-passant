@@ -3,8 +3,7 @@ import { expect, test } from "./fixtures";
 import {
   advanceTrainingPacing,
   collectUnexpectedConsole,
-  mockSignedInUser,
-  mockSignedOutAuth,
+  expectLocalOnly,
   pausePacingClock,
   seedIndexedDb,
   type ChapterRecord,
@@ -66,7 +65,7 @@ async function dragPiece(page: Page, from: string, to: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await mockSignedOutAuth(page);
+  await expectLocalOnly(page);
 });
 
 test("lists scheduled lines by training priority", async ({ page }) => {
@@ -316,26 +315,6 @@ test("reviews every due line across chapters and stops before future lines", asy
 });
 
 test("stops an imported-mistake exercise at the scheduled partial ply", async ({ page }) => {
-  const session = await mockSignedInUser(page);
-  session.signIn();
-  await page.route("**/api/games/training-mistakes", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        links: [
-          {
-            chapterId: chapter.id,
-            uciPath: "e2e4 e7e5 g1f3",
-            game: {
-              id: "lichess-mistake",
-              createdAt: 1_765_000_000_000,
-              opponentName: "Opponent",
-            },
-          },
-        ],
-      }),
-    });
-  });
   await seedIndexedDb(page, {
     repertoires: [repertoire],
     chapters: [chapter],
@@ -350,10 +329,21 @@ test("stops an imported-mistake exercise at the scheduled partial ply", async ({
     ],
     trainingLineSchedules: [schedule("e2e4 e7e5 g1f3", 0, 0)],
   });
+  await page.evaluate(async () => {
+    const modulePath = "/src/lib/games.ts";
+    const games = (await import(
+      /* @vite-ignore */ modulePath
+    )) as typeof import("../../src/lib/games");
+    await games.importGames(
+      '[White "Player"]\n[Black "Opponent"]\n\n1. e4 e5 2. Bc4 *',
+      "Player",
+      "white",
+    );
+  });
   await page.goto("/app/training");
   await expect(page.getByRole("link", { name: "Review game vs Opponent" })).toHaveAttribute(
     "href",
-    "/app/games/lichess-mistake",
+    /\/app\/games\/[a-z0-9-]+$/i,
   );
   await page
     .locator("[data-training-queue-line]")

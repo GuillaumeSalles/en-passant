@@ -1,6 +1,6 @@
 import { createEffect } from "solid-js";
 import { useState } from "@/app/AppStateProvider";
-import { loadPgn } from "@/storage/backendSync";
+import { getPgn as loadPgn } from "@/storage";
 import { useMutation } from "./useMutation";
 import {
   AppState,

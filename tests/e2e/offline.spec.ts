@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { mockSignedOutAuth } from "./helpers";
+import { seedIndexedDb } from "./helpers";
 
 async function waitForServiceWorkerControl(page: Page): Promise<void> {
   await page.evaluate(async () => {
@@ -13,7 +13,14 @@ async function waitForServiceWorkerControl(page: Page): Promise<void> {
 }
 
 test("starts offline with the cached shell and local repertoire", async ({ context, page }) => {
-  await mockSignedOutAuth(page);
+  const meta = { updatedAt: "2026-10-20", deletedAt: null, dirty: false };
+  await seedIndexedDb(page, {
+    repertoires: [{ id: "r", handle: "local", name: "Local", orientation: "white", ...meta }],
+    chapters: [
+      { id: "c", repertoireId: "r", pgnId: "p", handle: "chapter", name: "Chapter", ...meta },
+    ],
+    pgns: [{ id: "p", pgn: "1. e4 e5 *", ...meta }],
+  });
   await page.goto("/app");
   await expect(page.locator("[data-square]")).toHaveCount(64);
   await expect(page.locator("[data-moves-tree]")).toBeVisible();

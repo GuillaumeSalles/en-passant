@@ -3,13 +3,11 @@ import { expect, test } from "./fixtures";
 import {
   advanceLearningPacing,
   advanceTrainingPacing,
-  clearLocalStorageAndIndexedDb,
   collectUnexpectedConsole,
   enableEngine,
   firstStoredPgn,
   expectTrainingInputReady,
-  mockSignedOutAuth,
-  mockSignedInUser,
+  expectLocalOnly,
   pausePacingClock,
   seedIndexedDb,
   storedPgns,
@@ -95,207 +93,7 @@ const zetaChapter = {
 const defaultPgn = "1. e4 e5 2. Nf3 Nc6 3. Bc4";
 
 test.beforeEach(async ({ page }) => {
-  await mockSignedOutAuth(page);
-});
-
-test("IndexedDB v4 wipes pre-R2 local repertoire data", async ({ page }) => {
-  await page.goto("/stockfish-18-lite-single.js");
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase("en-passant");
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve();
-    });
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("en-passant", 1);
-      request.onerror = () => reject(request.error);
-      request.onupgradeneeded = () => {
-        for (const storeName of ["repertoires", "chapters", "pgns", "metadata"]) {
-          request.result.createObjectStore(storeName);
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-    });
-    await new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(["repertoires"], "readwrite");
-      transaction.onerror = () => reject(transaction.error);
-      transaction.oncomplete = () => {
-        db.close();
-        resolve();
-      };
-      transaction.objectStore("repertoires").put(
-        {
-          id: "snapshot-era",
-          handle: "snapshot-era",
-          name: "Snapshot era repertoire",
-          orientation: "white",
-          dirty: true,
-        },
-        "snapshot-era",
-      );
-    });
-  });
-
-  await page.goto("/app");
-
-  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
-  await expect(page.getByText("Snapshot era repertoire")).toHaveCount(0);
-});
-
-test("shows the signed-in user's move statistics for the selected position", async ({ page }) => {
-  const session = await mockSignedInUser(page);
-  session.signIn();
-  await page.route("**/api/games/position-moves?*", async (route) => {
-    const searchParams = new URL(route.request().url()).searchParams;
-    const positionKey = searchParams.get("positionKey");
-    expect(searchParams.get("color")).toBe("white");
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        positionKey,
-        playedBy: "user",
-        games: 8,
-        moves: [
-          {
-            uci: "e2e4",
-            san: "e4",
-            games: 5,
-            whiteWins: 3,
-            draws: 1,
-            blackWins: 1,
-            whiteWinRate: 0.6,
-            drawRate: 0.2,
-            blackWinRate: 0.2,
-          },
-          {
-            uci: "d2d4",
-            san: "d4",
-            games: 3,
-            whiteWins: 1,
-            draws: 1,
-            blackWins: 1,
-            whiteWinRate: 1 / 3,
-            drawRate: 1 / 3,
-            blackWinRate: 1 / 3,
-          },
-        ],
-        recentGames: [
-          {
-            id: "lichess-newest",
-            source: "lichess",
-            createdAt: 1_765_000_000_000,
-            white: { name: "Player One", rating: 1800 },
-            black: { name: "Opponent One", rating: 1810 },
-            result: "1-0",
-            speed: "blitz",
-            timeControl: "180+2",
-            move: { ply: 1, uci: "e2e4", san: "e4" },
-          },
-          {
-            id: "lichess-older",
-            source: "lichess",
-            createdAt: 1_764_000_000_000,
-            white: { name: "Opponent Two", rating: 1750 },
-            black: { name: "Player One", rating: 1800 },
-            result: "0-1",
-            speed: "rapid",
-            timeControl: "600+0",
-            move: { ply: 1, uci: "e2e4", san: "e4" },
-          },
-        ],
-      }),
-    });
-  });
-  await page.route("**/api/opening-explorer/masters?*", async (route) => {
-    const positionKey = new URL(route.request().url()).searchParams.get("positionKey");
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        source: "lichess-masters",
-        positionKey,
-        since: null,
-        until: null,
-        games: 6,
-        moves: [
-          {
-            uci: "e7e5",
-            san: "e5",
-            games: 6,
-            whiteWins: 2,
-            draws: 3,
-            blackWins: 1,
-            whiteWinRate: 1 / 3,
-            drawRate: 0.5,
-            blackWinRate: 1 / 6,
-          },
-        ],
-        topGames: [
-          {
-            id: "master-1",
-            white: { name: "Magnus Carlsen", rating: 2882 },
-            black: { name: "Fabiano Caruana", rating: 2820 },
-            result: "1/2-1/2",
-            moveUci: "e7e5",
-          },
-        ],
-      }),
-    });
-  });
-
-  await openRepertoire(page);
-
-  const stats = page.getByRole("region", { name: "Your games" });
-  const resizeHandle = page.getByRole("separator", {
-    name: "Resize moves and your games panels",
-  });
-  await expect(resizeHandle).toBeVisible();
-  await resizeHandle.hover();
-  await expect(resizeHandle.locator("[data-resize-line]")).not.toHaveCSS("animation-name", "none");
-  const statsHeightBeforeResize = (await stats.boundingBox())?.height;
-  await resizeHandle.focus();
-  await resizeHandle.press("ArrowDown");
-  const statsHeightAfterResize = (await stats.boundingBox())?.height;
-  expect(statsHeightBeforeResize).toBeDefined();
-  expect(statsHeightAfterResize).toBeDefined();
-  expect(statsHeightAfterResize).toBeLessThan(statsHeightBeforeResize ?? 0);
-  const handleBox = await resizeHandle.boundingBox();
-  expect(handleBox).not.toBeNull();
-  if (handleBox !== null) {
-    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 40, {
-      steps: 4,
-    });
-    await page.mouse.up();
-  }
-  const statsHeightAfterDrag = (await stats.boundingBox())?.height;
-  expect(statsHeightAfterDrag).toBeLessThan(statsHeightAfterResize ?? 0);
-  await expect(stats.getByRole("cell", { name: "62.5% of games, 5 games" })).toBeVisible();
-  await expect(
-    stats.getByRole("img", {
-      name: "e4 results: 3 white wins (60%), 1 draw (20%), 1 black win (20%)",
-    }),
-  ).toBeVisible();
-  await expect(stats.getByRole("cell", { name: "Total", exact: true })).toBeVisible();
-  await expect(
-    stats.getByRole("img", {
-      name: "Total results: 4 white wins (50%), 2 draws (25%), 2 black wins (25%)",
-    }),
-  ).toBeVisible();
-  const recentGames = stats.getByLabel("Recent games").getByRole("link");
-  await expect(recentGames).toHaveCount(2);
-  await expect(recentGames.nth(0)).toHaveAttribute("href", "/app/games/lichess-newest");
-  await expect(recentGames.nth(1)).toHaveAttribute("href", "/app/games/lichess-older");
-  await expect(stats.locator("tbody tr").first()).toHaveAttribute("data-position-move", "e2e4");
-  await stats.locator('[data-position-move="e2e4"]').click();
-  await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
-  await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
-  await page.getByRole("tab", { name: "Masters" }).click();
-  const masters = page.getByRole("region", { name: "Masters" });
-  await expect(masters.getByRole("button", { name: "Play e5" })).toBeVisible();
-  await expect(masters.getByLabel("Top master games")).toContainText(
-    "Magnus Carlsen (2882) – Fabiano Caruana (2820)",
-  );
+  await expectLocalOnly(page);
 });
 
 async function seedRepertoire(
@@ -317,10 +115,6 @@ async function seedRepertoire(
       dirty: false,
     })),
   });
-}
-
-async function resetLocalAppData(page: Page) {
-  await clearLocalStorageAndIndexedDb(page);
 }
 
 async function openRepertoire(page: Page, pgn = defaultPgn) {
@@ -731,28 +525,6 @@ async function squareCenter(page: Page, square: string) {
   };
 }
 
-test("creates a demo London System repertoire on first open", async ({ page }) => {
-  const consoleMessages = collectUnexpectedConsole(page);
-  await resetLocalAppData(page);
-  await page.evaluate(() => {
-    window.localStorage.setItem("en_passant_repertoire_bootstrap_v1", "1");
-  });
-
-  await page.goto("/app");
-
-  await expect(page).toHaveURL(/\/app\/repertoires\/demo-repertoire\/london-system$/);
-  await expect(page.getByText("Demo repertoire").first()).toBeVisible();
-  await expect(page.getByText("London system").first()).toBeVisible();
-  await expect(page.locator("[data-square]")).toHaveCount(64);
-
-  const storedPgn = await firstStoredPgn(page);
-
-  expect(storedPgn).toContain("1. d4 Nf6");
-  expect(storedPgn).toContain("{Bishop out before e3.}");
-  expect(storedPgn).toContain("(2... g6 {Castle first; c4 can wait.}");
-  expect(consoleMessages).toEqual([]);
-});
-
 test("repertoire page renders without console warnings", async ({ page }) => {
   const consoleMessages = collectUnexpectedConsole(page);
   const stockfishWorkers: string[] = [];
@@ -862,27 +634,7 @@ test("moves navigation into a drawer and stacks the panel on mobile and tablet",
   const drawerButton = page.getByRole("button", { name: "Open navigation" });
   await drawerButton.click();
   await expect(page.getByRole("heading", { name: "En passant" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
-});
-
-test("dismisses the signup nudge before opening the auth dialog", async ({ page }) => {
-  await seedRepertoire(page);
-  await page.evaluate(() => {
-    localStorage.setItem("en_passant_signup_nudge_move_count", "5");
-  });
-  await page.goto("/app/repertoires/untitled-repertoire/chapter-1");
-  await expectRepertoireReady(page);
-
-  const signupNudge = page.getByText(
-    "Sign up to make sure you don't lose your repertoires. It's free.",
-  );
-  await expect(signupNudge).toBeVisible();
-
-  await page.getByRole("button", { name: "Sign up", exact: true }).click();
-
-  await expect(signupNudge).toBeHidden();
-  await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
-  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByRole("button", { name: "About" })).toBeVisible();
 });
 
 for (const orientation of ["white", "black"] as const) {
@@ -1082,7 +834,7 @@ test("creates a chapter from the repertoire overview before training", async ({ 
   ).toBeVisible();
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const openRequest = indexedDB.open("en-passant");
+      const openRequest = indexedDB.open("en-passant-local-v1");
       openRequest.onerror = () => reject(openRequest.error);
       openRequest.onsuccess = () => resolve(openRequest.result);
     });
@@ -2016,7 +1768,7 @@ test("creates a repertoire from the create repertoire menu", async ({ page }) =>
   await expect(page).toHaveURL(/\/app\/repertoires\/untitled-repertoire-1\/chapter-1$/);
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const openRequest = indexedDB.open("en-passant");
+      const openRequest = indexedDB.open("en-passant-local-v1");
       openRequest.onerror = () => reject(openRequest.error);
       openRequest.onsuccess = () => resolve(openRequest.result);
     });
@@ -2242,7 +1994,7 @@ test("renames a repertoire and redirects to its clean handle", async ({ page }) 
   await page.waitForFunction(
     async ({ expectedName, expectedHandle }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const openRequest = indexedDB.open("en-passant");
+        const openRequest = indexedDB.open("en-passant-local-v1");
         openRequest.onerror = () => reject(openRequest.error);
         openRequest.onsuccess = () => resolve(openRequest.result);
       });
@@ -2273,7 +2025,7 @@ test("shows committed repertoire changes in another tab", async ({ page, context
 
   const secondTab = await context.newPage();
   const secondTabConsoleMessages = collectUnexpectedConsole(secondTab);
-  await mockSignedOutAuth(secondTab);
+  await expectLocalOnly(secondTab);
   await secondTab.goto("/app/repertoires/untitled-repertoire/chapter-1");
   await expectRepertoireReady(secondTab);
 
@@ -2311,7 +2063,7 @@ test("renames a chapter and redirects to its clean handle", async ({ page }) => 
   await page.waitForFunction(
     async ({ expectedName, expectedHandle }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const openRequest = indexedDB.open("en-passant");
+        const openRequest = indexedDB.open("en-passant-local-v1");
         openRequest.onerror = () => reject(openRequest.error);
         openRequest.onsuccess = () => resolve(openRequest.result);
       });
@@ -2352,7 +2104,7 @@ test("deleting a chapter keeps its repertoire when other chapters remain", async
   await expect(page.getByText("Chapter 2")).toHaveCount(0);
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const openRequest = indexedDB.open("en-passant");
+      const openRequest = indexedDB.open("en-passant-local-v1");
       openRequest.onerror = () => reject(openRequest.error);
       openRequest.onsuccess = () => resolve(openRequest.result);
     });
@@ -2405,7 +2157,7 @@ test("does not allow deleting the last repertoire", async ({ page }) => {
   await expect(page.getByText("Untitled Repertoire").first()).toBeVisible();
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const openRequest = indexedDB.open("en-passant");
+      const openRequest = indexedDB.open("en-passant-local-v1");
       openRequest.onerror = () => reject(openRequest.error);
       openRequest.onsuccess = () => resolve(openRequest.result);
     });
@@ -2439,7 +2191,7 @@ test("does not allow deleting the last chapter", async ({ page }) => {
   await expect(page.getByText("Chapter 1").first()).toBeVisible();
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const openRequest = indexedDB.open("en-passant");
+      const openRequest = indexedDB.open("en-passant-local-v1");
       openRequest.onerror = () => reject(openRequest.error);
       openRequest.onsuccess = () => resolve(openRequest.result);
     });

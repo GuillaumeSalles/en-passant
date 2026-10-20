@@ -33,18 +33,23 @@ export async function applyRecordChangesToState(
   reads: RecordChangeReads = storageReads,
 ): Promise<void> {
   const kinds = new Set(records.map((record) => record.kind));
-  const loadedPgnIds = [
-    ...new Set(
-      records
-        .filter((record) => record.kind === "pgn" && state.pgns[record.id] !== undefined)
-        .map((record) => record.id),
-    ),
-  ];
+  const structureChanged = kinds.has("repertoire") || kinds.has("chapter");
+  const loadedPgnIds = structureChanged
+    ? Object.keys(state.pgns)
+    : [
+        ...new Set(
+          records
+            .filter((record) => record.kind === "pgn" && state.pgns[record.id] !== undefined)
+            .map((record) => record.id),
+        ),
+      ];
 
   const [repertoires, chapters, trainingLineSchedules, pgns] = await Promise.all([
     kinds.has("repertoire") ? reads.getAllRepertoires() : null,
-    kinds.has("chapter") ? reads.getAllChapters() : null,
-    kinds.has("training-line-schedule") ? reads.getAllTrainingLineSchedules() : null,
+    structureChanged ? reads.getAllChapters() : null,
+    structureChanged || kinds.has("training-line-schedule")
+      ? reads.getAllTrainingLineSchedules()
+      : null,
     Promise.all(
       loadedPgnIds.map(async (id) => ({
         id,

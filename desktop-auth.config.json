@@ -1,7 +1,0 @@
-{
-  "appHost": "enpassant",
-  "productionAppOrigin": "https://enpassant.io",
-  "clientId": "electron",
-  "loopbackCallbackPath": "/auth/callback",
-  "brokerPath": "/app/auth/desktop?desktop_auth=google"
-}

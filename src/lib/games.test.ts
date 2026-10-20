@@ -1,99 +1,34 @@
 import { describe, expect, test } from "vitest";
-import {
-  loadGame,
-  loadGames,
-  loadLichessImport,
-  loadPositionMoves,
-  loadTrainingMistakeLinks,
-  startLichessImport,
-} from "./games";
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
+import { parseGameImport, positionMoves, filterGames, analyzeGame } from "./localGames";
+import { positionKey, createChessPosition } from "./chess";
+const pgn = '[White "Alice"]\n[Black "Bob"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 *';
+describe("local games", () => {
+  test("imports PGNs with player perspective and computes position statistics", () => {
+    const games = parseGameImport(pgn, "Alice", "black", () => "one");
+    expect(games[0]?.userColor).toBe("white");
+    expect(games[0]?.opponentName).toBe("Bob");
+    const stats = positionMoves(games, positionKey(createChessPosition()), "white");
+    expect(stats.games).toBe(1);
+    expect(stats.moves[0]).toMatchObject({ san: "e4", whiteWins: 1, whiteWinRate: 1 });
+    expect(filterGames(games, { color: "black" })).toEqual([]);
   });
-}
-
-describe("trusted game API contracts", () => {
-  test("returns games without frontend field validation", async () => {
-    const games = [{ id: "game-from-backend", addedContractField: true }];
-    const result = await loadGames({}, { fetcher: async () => jsonResponse({ games, total: 42 }) });
-
-    expect(result).toEqual({ ok: true, games, total: 42 });
+  test("imports multiple games and rejects invalid moves or a mismatched player", () => {
+    expect(parseGameImport(`${pgn}\n\n${pgn}`, "", "white", () => "id")).toHaveLength(2);
+    expect(() => parseGameImport(pgn, "Nobody", "white", () => "id")).toThrow("not in");
+    expect(() => parseGameImport("1. e5 *", "", "white", () => "id")).toThrow();
   });
-
-  test("returns a game without frontend field validation", async () => {
-    const game = { id: "game-from-backend", addedContractField: true };
-    const result = await loadGame("game-from-backend", {
-      fetcher: async () => jsonResponse({ game }),
+  test("finds repertoire coverage without network access", () => {
+    const game = parseGameImport(pgn, "Alice", "white", () => "id")[0];
+    if (game === undefined) throw Error("game");
+    const metadata = { updatedAt: "today", deletedAt: null };
+    const result = analyzeGame(game, {
+      repertoires: [{ id: "r", handle: "white", name: "White", orientation: "white", ...metadata }],
+      chapters: [
+        { id: "c", repertoireId: "r", pgnId: "p", handle: "king", name: "King", ...metadata },
+      ],
+      pgns: [{ id: "p", pgn: "1. e4 e5 2. Bc4 *", byteSize: 20, ...metadata }],
     });
-
-    expect(result).toEqual({ ok: true, game });
-  });
-
-  test("does not recheck server-owned position statistics invariants", async () => {
-    const data = {
-      positionKey: "backend-owned-position-key",
-      playedBy: "user",
-      games: 2,
-      moves: [],
-      recentGames: [],
-    };
-    const result = await loadPositionMoves("position-key", "white", {
-      fetcher: async () => jsonResponse(data),
-    });
-
-    expect(result).toEqual({ ok: true, data });
-  });
-
-  test("loads imported games associated with scheduled mistake lines", async () => {
-    const links = [
-      {
-        chapterId: "chapter",
-        uciPath: "e2e4 e7e5 g1f3",
-        game: { id: "lichess-game", createdAt: 123, opponentName: "Opponent" },
-      },
-    ];
-    const result = await loadTrainingMistakeLinks({
-      fetcher: async () => jsonResponse({ links }),
-    });
-
-    expect(result).toEqual({ ok: true, links });
-  });
-
-  test("starts an asynchronous Lichess import without a game limit", async () => {
-    let request: RequestInit | undefined;
-    const gameImport = {
-      id: "import-id",
-      source: "lichess",
-      account: "PlayerOne",
-      kind: "backfill",
-      status: "queued",
-      processedGames: 0,
-      totalGames: null,
-      error: null,
-      createdAt: "2026-07-23T00:00:00.000Z",
-      startedAt: null,
-      updatedAt: "2026-07-23T00:00:00.000Z",
-      completedAt: null,
-    } as const;
-    const result = await startLichessImport("PlayerOne", {
-      fetcher: async (_input, init) => {
-        request = init;
-        return jsonResponse({ import: gameImport }, 202);
-      },
-    });
-
-    expect(JSON.parse(String(request?.body))).toEqual({ handle: "PlayerOne" });
-    expect(result).toEqual({ ok: true, import: gameImport });
-  });
-
-  test("loads the current import state", async () => {
-    const result = await loadLichessImport({
-      fetcher: async () => jsonResponse({ import: null }),
-    });
-
-    expect(result).toEqual({ ok: true, import: null });
+    expect(result.latestRepertoireMove?.san).toBe("e5");
+    expect(result.repertoireMistake).toMatchObject({ playedSan: "Nf3", expectedSan: "Bc4" });
   });
 });

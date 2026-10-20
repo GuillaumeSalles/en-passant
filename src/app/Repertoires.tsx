@@ -16,7 +16,6 @@ import {
   updateChapter as updateChapterInStorage,
   updateRepertoire as updateRepertoireInStorage,
 } from "@/storage";
-import { queueRepertoireSync } from "@/storage/backendSync";
 import { DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InlineEditInput } from "@/components/ui/inline-edit-input";
@@ -104,7 +103,6 @@ export async function deleteChapter(
     state.set("chapters", { status: "success", data: newChapters });
     state.set("pgns", newPgns);
     await deleteChapterFromStorage(chapterId, chapterToDelete.pgnId);
-    queueRepertoireSync();
     return;
   }
 
@@ -119,7 +117,6 @@ export async function deleteChapter(
   }
 
   await deleteChapterFromStorage(chapterId, chapterToDelete.pgnId);
-  queueRepertoireSync();
 }
 
 async function deleteRepertoire(
@@ -172,7 +169,6 @@ async function deleteRepertoire(
       deleteChapterFromStorage(chapterId, pgnId),
     ),
   ]);
-  queueRepertoireSync();
 }
 
 async function renameRepertoire(
@@ -203,7 +199,6 @@ async function renameRepertoire(
   }
 
   await updateRepertoireInStorage(renamedRepertoire);
-  queueRepertoireSync();
 }
 
 async function renameChapter(
@@ -244,7 +239,6 @@ async function renameChapter(
   }
 
   await updateChapterInStorage(renamedChapter);
-  queueRepertoireSync();
 }
 
 export function Repertoires() {
@@ -273,6 +267,12 @@ export function Repertoires() {
     <Show when={repertoires().status === "success" && chapters().status === "success"}>
       <>
         <TrainingSidebarLink />
+        <a
+          class="mx-2 mt-1 block rounded px-2 py-1 text-sm hover:bg-muted"
+          href={`${APP_ROOT}/games`}
+        >
+          Games
+        </a>
         <div class="flex flex-row justify-between pl-4 pr-2 pt-2">
           <h2 class="pt-0.5 text-sm text-muted-foreground">Repertoires</h2>
           <NewRepertoireMenu

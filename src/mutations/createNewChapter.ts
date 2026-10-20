@@ -2,7 +2,6 @@ import { Chapter, emptyNormalizedPgn, normalizePgn, toPgn } from "@/lib/AppState
 import { uniqueHandle } from "@/lib/handles";
 import { repertoirePath } from "@/lib/routes";
 import { MutationContext } from "@/lib/useMutation";
-import { queueRepertoireSync } from "@/storage/backendSync";
 import { MAX_CHAPTERS_PER_REPERTOIRE } from "@/lib/repertoireLimits";
 
 export async function createNewChapter(
@@ -51,6 +50,8 @@ export async function createChapterAndNavigate(
     pgnId,
   };
 
+  await createChapter(newChapter, toPgn(pgn));
+
   state.set("chapters", {
     status: "success",
     data: { ...state.chapters.data, [chapterId]: newChapter },
@@ -62,7 +63,5 @@ export async function createChapterAndNavigate(
 
   router.push(repertoirePath(repertoire.handle, chapterHandle));
 
-  await createChapter(newChapter, toPgn(pgn));
-  queueRepertoireSync();
   return newChapter;
 }

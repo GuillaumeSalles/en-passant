@@ -64,50 +64,6 @@ export type TrainingLineScheduleRecord = {
   dirty: boolean;
 };
 
-type SyncChanges = {
-  repertoires: unknown[];
-  chapters: unknown[];
-  pgns: unknown[];
-};
-
-export function acceptedSyncChanges(body: unknown): SyncChanges {
-  const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : emptyChanges();
-  return {
-    repertoires: Array.isArray(changes["repertoires"]) ? changes["repertoires"] : [],
-    chapters: Array.isArray(changes["chapters"]) ? changes["chapters"] : [],
-    pgns: [],
-  };
-}
-
-export function acceptedPgnAcknowledgment(body: unknown): unknown {
-  const changes = isRecord(body) && isRecord(body["changes"]) ? body["changes"] : null;
-  const mutation = changes !== null && Array.isArray(changes["pgns"]) ? changes["pgns"][0] : null;
-  if (!isRecord(mutation)) return null;
-  return {
-    id: mutation["id"],
-    revision: "server-ack-revision",
-    byteSize: 0,
-    updatedAt: "2026-06-26T00:00:01.000Z",
-    deletedAt: mutation["deletedAt"] ?? null,
-  };
-}
-
-export function pgnSnapshot(id: string, pgn: string, updatedAt: string) {
-  return {
-    id,
-    revision: `revision-${id}`,
-    byteSize: new TextEncoder().encode(pgn).byteLength,
-    updatedAt,
-    deletedAt: null,
-  };
-}
-
-export type MockAuthSession = {
-  pgnUploads: { id: string; pgn: string }[];
-  signIn: () => void;
-  signOut: () => void;
-};
-
 export function collectUnexpectedConsole(page: Page): string[] {
   const consoleMessages: string[] = [];
   page.on("console", (message) => {
@@ -128,163 +84,11 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export async function mockSignedOutAuth(page: Page): Promise<void> {
-  await page.route("**/api/auth/get-session", async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: { "content-type": "application/json" },
-      body: "null",
-    });
+export async function expectLocalOnly(page: Page): Promise<void> {
+  await page.route("**/api/**", async (route) => {
+    await route.abort();
+    throw new Error(`Unexpected backend request: ${route.request().url()}`);
   });
-  await page.route("**/api/sync", async (route) => {
-    await route.fulfill({
-      status: 401,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ error: "unauthorized" }),
-    });
-  });
-  await page.route("**/api/games/position-moves?*", async (route) => {
-    await route.fulfill({
-      status: 401,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ error: "unauthorized" }),
-    });
-  });
-}
-
-export async function mockSignedInUser(
-  page: Page,
-  onSync?: () => void,
-  image: string | null = null,
-  syncResponseForRequest?: (body: unknown) => unknown,
-  remotePgnBodies: Record<string, string> = {},
-): Promise<MockAuthSession> {
-  let isSignedIn = false;
-  const pgnBodies = new Map(Object.entries(remotePgnBodies));
-  const pgnUploads: { id: string; pgn: string }[] = [];
-  await page.route("**/api/auth/get-session", async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(
-        isSignedIn
-          ? {
-              user: {
-                id: "player-user",
-                email: "player@example.com",
-                emailVerified: true,
-                name: "Player One",
-                image,
-                createdAt: "2026-06-26T00:00:00.000Z",
-                updatedAt: "2026-06-26T00:00:00.000Z",
-              },
-              session: {
-                id: "player-session",
-                token: "player-session-token",
-                userId: "player-user",
-                expiresAt: "2026-07-26T00:00:00.000Z",
-                createdAt: "2026-06-26T00:00:00.000Z",
-                updatedAt: "2026-06-26T00:00:00.000Z",
-              },
-            }
-          : null,
-      ),
-    });
-  });
-  await page.route("**/api/sync", async (route) => {
-    onSync?.();
-    const body = route.request().postDataJSON() as unknown;
-    const responseBody = syncResponseForRequest?.(body) ?? {
-      cursor: "2026-06-26T00:00:01.000Z",
-      changes: acceptedSyncChanges(body),
-      acknowledgedPgn: acceptedPgnAcknowledgment(body),
-    };
-    await route.fulfill({
-      status: isSignedIn ? 200 : 401,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(isSignedIn ? responseBody : { error: "unauthorized" }),
-    });
-  });
-  await page.route("**/api/pgns/*", async (route) => {
-    const pgnId = decodeURIComponent(
-      new URL(route.request().url()).pathname.split("/").at(-1) ?? "",
-    );
-    if (!isSignedIn) {
-      await route.fulfill({
-        status: 401,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ error: "unauthorized" }),
-      });
-      return;
-    }
-
-    if (route.request().method() === "PUT") {
-      const pgn = route.request().postData() ?? "";
-      pgnBodies.set(pgnId, pgn);
-      pgnUploads.push({ id: pgnId, pgn });
-      await route.fulfill({
-        status: 201,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: pgnId,
-          revision: `revision-${pgnId}`,
-          byteSize: new TextEncoder().encode(pgn).byteLength,
-          updatedAt: "2026-06-26T00:00:01.000Z",
-          deletedAt: null,
-        }),
-      });
-      return;
-    }
-
-    const pgn = pgnBodies.get(pgnId);
-    if (pgn === undefined) {
-      await route.fulfill({
-        status: 404,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ error: "pgn_not_found" }),
-      });
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      headers: {
-        "content-type": "application/x-chess-pgn; charset=utf-8",
-        "x-pgn-revision": `revision-${pgnId}`,
-      },
-      body: pgn,
-    });
-  });
-  await page.route("**/api/games/position-moves?*", async (route) => {
-    const requestedPositionKey = new URL(route.request().url()).searchParams.get("positionKey");
-    await route.fulfill({
-      status: isSignedIn ? 200 : 401,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(
-        isSignedIn
-          ? {
-              positionKey: requestedPositionKey,
-              playedBy: "user",
-              games: 0,
-              moves: [],
-              recentGames: [],
-            }
-          : { error: "unauthorized" },
-      ),
-    });
-  });
-  return {
-    pgnUploads,
-    signIn() {
-      isSignedIn = true;
-    },
-    signOut() {
-      isSignedIn = false;
-    },
-  };
-}
-
-export function emptyChanges(): SyncChanges {
-  return { repertoires: [], chapters: [], pgns: [] };
 }
 
 export async function gotoStorageOrigin(page: Page): Promise<void> {
@@ -303,7 +107,7 @@ export async function clearLocalStorageAndIndexedDb(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const deleteIndexedDb = () =>
       new Promise<void>((resolve, reject) => {
-        const deleteRequest = indexedDB.deleteDatabase("en-passant");
+        const deleteRequest = indexedDB.deleteDatabase("en-passant-local-v1");
         deleteRequest.onerror = () => reject(deleteRequest.error);
         deleteRequest.onblocked = () => reject(new Error("Database deletion blocked"));
         deleteRequest.onsuccess = () => resolve();
@@ -322,7 +126,6 @@ export async function seedIndexedDb(
     pgns: PgnRecord[];
     trainingLineSchedules?: TrainingLineScheduleRecord[];
     clearLocalStorage?: boolean;
-    authenticatedUserId?: string;
   },
 ): Promise<void> {
   const preparedRecords = {
@@ -344,14 +147,14 @@ export async function seedIndexedDb(
     async ({ records }) => {
       const deleteIndexedDb = () =>
         new Promise<void>((resolve, reject) => {
-          const deleteRequest = indexedDB.deleteDatabase("en-passant");
+          const deleteRequest = indexedDB.deleteDatabase("en-passant-local-v1");
           deleteRequest.onerror = () => reject(deleteRequest.error);
           deleteRequest.onblocked = () => reject(new Error("Database deletion blocked"));
           deleteRequest.onsuccess = () => resolve();
         });
       const openSeedDatabase = () =>
         new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant", 4);
+          const openRequest = indexedDB.open("en-passant-local-v1", 1);
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onupgradeneeded = () => {
             const db = openRequest.result;
@@ -360,6 +163,7 @@ export async function seedIndexedDb(
             db.createObjectStore("pgns");
             db.createObjectStore("training-line-schedules");
             db.createObjectStore("metadata");
+            db.createObjectStore("games");
           };
           openRequest.onsuccess = () => resolve(openRequest.result);
         });
@@ -392,11 +196,6 @@ export async function seedIndexedDb(
         for (const schedule of records.trainingLineSchedules) {
           const key = `${schedule.repertoireId}/${schedule.chapterId}/${schedule.uciPath}`;
           transaction.objectStore("training-line-schedules").put(schedule, key);
-        }
-        if (records.authenticatedUserId !== undefined) {
-          transaction
-            .objectStore("metadata")
-            .put(records.authenticatedUserId, "authenticated-user-id");
         }
       });
     },
@@ -439,7 +238,7 @@ async function readObjectStore<T>(
     .evaluate(
       async ({ storeName }) => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const openRequest = indexedDB.open("en-passant");
+          const openRequest = indexedDB.open("en-passant-local-v1");
           openRequest.onerror = () => reject(openRequest.error);
           openRequest.onsuccess = () => resolve(openRequest.result);
         });

@@ -32,35 +32,5 @@
     "solid/prefer-show": "error",
     "solid/no-proxy-apis": "error",
     "solid/prefer-classlist": "error"
-  },
-  "overrides": [
-    {
-      "files": ["apps/native/**/*.ts", "apps/native/**/*.tsx"],
-      "rules": {
-        "solid/jsx-no-duplicate-props": "off",
-        "solid/jsx-no-undef": "off",
-        "solid/jsx-uses-vars": "off",
-        "solid/no-unknown-namespaces": "off",
-        "solid/no-innerhtml": "off",
-        "solid/jsx-no-script-url": "off",
-        "solid/components-return-once": "off",
-        "solid/no-destructure": "off",
-        "solid/prefer-for": "off",
-        "solid/reactivity": "off",
-        "solid/event-handlers": "off",
-        "solid/imports": "off",
-        "solid/style-prop": "off",
-        "solid/no-react-deps": "off",
-        "solid/no-react-specific-props": "off",
-        "solid/self-closing-comp": "off",
-        "solid/no-array-handlers": "off",
-        "solid/prefer-show": "off",
-        "solid/no-proxy-apis": "off",
-        "solid/prefer-classlist": "off",
-        "react/rules-of-hooks": "error",
-        "react/exhaustive-deps": "error"
-      },
-      "plugins": ["react"]
-    }
-  ]
+  }
 }

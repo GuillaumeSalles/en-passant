@@ -8,7 +8,6 @@ import {
 } from "@/lib/AppState";
 import { handleFromName, uniqueHandle } from "@/lib/handles";
 import { MutationContext } from "@/lib/useMutation";
-import { queueRepertoireSync } from "@/storage/backendSync";
 import { repertoirePath } from "@/lib/routes";
 import { formatRepertoireName } from "@/lib/repertoireNames";
 import { MAX_REPERTOIRES } from "@/lib/repertoireLimits";
@@ -69,6 +68,8 @@ export async function createNewRepertoire(
     pgnId,
   };
 
+  await createRepertoireAndChapter(newRepertoire, newChapter, toPgn(pgn));
+
   state.set("repertoires", {
     status: "success",
     data: {
@@ -90,9 +91,6 @@ export async function createNewRepertoire(
       data: pgn,
     },
   });
-
-  await createRepertoireAndChapter(newRepertoire, newChapter, toPgn(pgn));
-  queueRepertoireSync();
 
   router.push(repertoirePath(repertoireHandle, chapterHandle));
 }

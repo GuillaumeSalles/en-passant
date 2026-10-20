@@ -64,47 +64,4 @@ describe("record change channel", () => {
     });
     expect(listener).toHaveBeenCalledOnce();
   });
-
-  test("publishes and validates database clear coordination messages", () => {
-    const broadcastChannel = new FakeBroadcastChannel();
-    const channel = createRecordChangeChannel(broadcastChannel);
-    const requestListener = vi.fn();
-    const resultListener = vi.fn();
-    const unsubscribeFromRequests = channel.subscribeToDatabaseClearRequests(requestListener);
-    const unsubscribeFromResults = channel.subscribeToDatabaseClearResults(resultListener);
-
-    channel.publishDatabaseClearRequested("clear-1");
-    channel.publishDatabaseClearFinished("clear-1", true);
-
-    expect(broadcastChannel.postMessage).toHaveBeenNthCalledWith(1, {
-      type: "database-clear-requested",
-      requestId: "clear-1",
-    });
-    expect(broadcastChannel.postMessage).toHaveBeenNthCalledWith(2, {
-      type: "database-clear-finished",
-      requestId: "clear-1",
-      succeeded: true,
-    });
-
-    broadcastChannel.receive({ type: "database-clear-requested", requestId: 1 });
-    broadcastChannel.receive({
-      type: "database-clear-finished",
-      requestId: "clear-1",
-      succeeded: "yes",
-    });
-    broadcastChannel.receive({ type: "database-clear-requested", requestId: "clear-1" });
-    broadcastChannel.receive({
-      type: "database-clear-finished",
-      requestId: "clear-1",
-      succeeded: false,
-    });
-
-    expect(requestListener).toHaveBeenCalledOnce();
-    expect(requestListener).toHaveBeenCalledWith("clear-1");
-    expect(resultListener).toHaveBeenCalledOnce();
-    expect(resultListener).toHaveBeenCalledWith({ requestId: "clear-1", succeeded: false });
-
-    unsubscribeFromRequests();
-    unsubscribeFromResults();
-  });
 });

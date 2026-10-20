@@ -10,24 +10,28 @@ type QueueEntry = {
   isRunning: boolean;
   idle: Promise<void>;
   resolveIdle: () => void;
+  rejectIdle: (error: unknown) => void;
 };
 
-function createIdlePromise(): { idle: Promise<void>; resolveIdle: () => void } {
+function createIdlePromise() {
   let resolveIdle: () => void = () => {};
-  const idle = new Promise<void>((resolve) => {
+  let rejectIdle: (error: unknown) => void = () => {};
+  const idle = new Promise<void>((resolve, reject) => {
+    rejectIdle = reject;
     resolveIdle = resolve;
   });
-  return { idle, resolveIdle };
+  return { idle, resolveIdle, rejectIdle };
 }
 
 function createEntry(pgn: string, mutations: PgnMutation[]): QueueEntry {
-  const { idle, resolveIdle } = createIdlePromise();
+  const { idle, resolveIdle, rejectIdle } = createIdlePromise();
   return {
     latestPgn: pgn,
     pendingMutations: mutations,
     isRunning: false,
     idle,
     resolveIdle,
+    rejectIdle,
   };
 }
 
@@ -45,7 +49,8 @@ export function createPgnMutationSaveQueue(writePgn: PgnWriter, afterWrite: Afte
       try {
         await writePgn(id, pgn, mutations);
         afterWrite();
-      } catch {
+      } catch (error) {
+        entry.rejectIdle(error);
         entry.pendingMutations = [...mutations, ...entry.pendingMutations];
         break;
       }
@@ -66,9 +71,10 @@ export function createPgnMutationSaveQueue(writePgn: PgnWriter, afterWrite: Afte
       existing.latestPgn = pgn;
       existing.pendingMutations.push(...mutations);
       if (!existing.isRunning) {
-        const { idle, resolveIdle } = createIdlePromise();
+        const { idle, resolveIdle, rejectIdle } = createIdlePromise();
         existing.idle = idle;
         existing.resolveIdle = resolveIdle;
+        existing.rejectIdle = rejectIdle;
         void drain(id, existing);
       }
       return existing.idle;

@@ -6,7 +6,7 @@ describe("shouldRegisterServiceWorker", () => {
     expect(shouldRegisterServiceWorker(true, "https:", true)).toBe(true);
   });
 
-  test("does not register for the bundled desktop renderer", () => {
+  test("does not register on unsupported URL schemes", () => {
     expect(shouldRegisterServiceWorker(true, "app:", true)).toBe(false);
   });
 

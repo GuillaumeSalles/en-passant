@@ -52,13 +52,13 @@ export type StoredGame = {
 
 export type GamesResult =
   | { ok: true; games: StoredGame[]; total: number }
-  | { ok: false; reason: "unauthorized" | "not-found" | "unavailable" };
+  | { ok: false; reason: "not-found" | "unavailable" };
 
 export type GameResult =
   | { ok: true; game: StoredGame }
   | {
       ok: false;
-      reason: "unauthorized" | "not-found" | "unavailable";
+      reason: "not-found" | "unavailable";
     };
 
 export type PositionMoveStat = {
@@ -95,7 +95,7 @@ export type PositionMoves = {
 
 export type PositionMovesResult =
   | { ok: true; data: PositionMoves }
-  | { ok: false; reason: "unauthorized" | "unavailable" };
+  | { ok: false; reason: "unavailable" };
 
 export type TrainingMistakeLink = {
   chapterId: string;
@@ -109,28 +109,4 @@ export type TrainingMistakeLink = {
 
 export type TrainingMistakeLinksResult =
   | { ok: true; links: TrainingMistakeLink[] }
-  | { ok: false; reason: "unauthorized" | "unavailable" };
-
-export type GameImportState = {
-  id: string;
-  source: "lichess";
-  account: string;
-  kind: "backfill" | "poll";
-  status: "queued" | "running" | "completed" | "failed";
-  processedGames: number;
-  totalGames: number | null;
-  error:
-    | "lichess-user-not-found"
-    | "lichess-unavailable"
-    | "invalid-lichess-response"
-    | "queue-delivery-failed"
-    | null;
-  createdAt: string;
-  startedAt: string | null;
-  updatedAt: string;
-  completedAt: string | null;
-};
-
-export type GameImportResult =
-  | { ok: true; import: GameImportState | null }
-  | { ok: false; reason: "unauthorized" | "unavailable" };
+  | { ok: false; reason: "unavailable" };

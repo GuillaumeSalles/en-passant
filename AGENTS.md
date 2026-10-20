@@ -5,13 +5,13 @@ Cloudflare Pages project `enpassant`.
 
 ## Non-Negotiables
 
-- Do not import backend source. Use HTTP contracts such as `/api/auth/*`,
-  `/api/pgns/:id`, `POST /api/sync`, `/api/games/*`, and
-  `/api/game-imports/:source`.
-- Treat successful backend responses as trusted, strictly defined HTTP
-  contracts. Type them at the request boundary; do not add frontend runtime
-  schema validation, field-by-field parsing, or checks of server-owned
-  invariants.
+- The app is local-only. Do not add authentication, backend calls, or automatic
+  imports/migrations. Production backups are imported only through an explicit user action.
+- This repository contains only the browser app. Persist through IndexedDB.
+  Native clients and SQLite support are deferred; do not reintroduce them.
+- Never delete or reset a library to recover from an error. Report the failure and
+  preserve the original data. Keep database schema versions explicit.
+- Do not import closed-source backend code into this GPL repository.
 - Do not use `any`; prefer generics, `unknown`, or explicit tuple inference.
 - Keep chess rules, PGN parsing, move tree mutation, NAG handling, and
   serialization testable outside UI components.
@@ -47,16 +47,15 @@ Cloudflare Pages project `enpassant`.
 - Add abstractions only when they remove real duplication, isolate a real
   boundary, or simplify reactivity.
 
-## Authenticated Storage Boundary
+## Local Storage Boundary
 
-- IndexedDB data owned by an authenticated user must be deleted when that
-  session is explicitly ended, expires, is revoked, changes users, or an
-  authenticated API returns `401`. Reload after deletion so stale in-memory
-  state cannot recreate the database.
-- Preserve anonymous IndexedDB data when no authenticated-user marker exists.
-  Do not treat transient network or server failures as confirmed sign-out.
-- Store the authenticated user id alongside its data in IndexedDB metadata and
-  compare it with the server session before accepting or syncing local data.
+- New stores use `en-passant-local-v1` names and never read legacy account-linked stores.
+- Persist complete PGNs and training schedules in atomic transactions. Await durable
+  writes and report failures; never claim a failed save succeeded.
+- IndexedDB commits check an expected revision and write related records in one
+  transaction. Do not silently overwrite unrelated concurrent edits.
+- Future encrypted sync must remain an optional adapter; it must not become the
+  source of truth or a prerequisite for editing and training.
 
 ## Tests And Checks
 
@@ -90,10 +89,9 @@ effects.
 
 ## E2E Rules
 
-- Use helpers from `tests/e2e/helpers.ts` for console collection, auth mocks,
+- Use helpers from `tests/e2e/helpers.ts` for console collection,
   IndexedDB seeding, and stored-data reads.
-- Non-auth specs must mock auth/session endpoints instead of calling real Better
-  Auth routes.
+- Local-only regression specs assert that no `/api/*` requests occur.
 - Seed IndexedDB from a stable same-origin static asset such as
   `/stockfish-17-lite-single.js`; avoid `/favicon.ico`.
 - Wait for user-ready controls, preferably helpers such as
@@ -102,8 +100,10 @@ effects.
   `--force` and `reuseExistingServer: false`. Direct Playwright CLI invocations
   default to port 5174; prefer the npm script so unrelated dev servers do not
   block the run.
-- For auth/storage work, iterate with
-  `npm run test:e2e -- tests/e2e/auth.spec.ts`.
+- For storage work, iterate with
+  `npm run test:e2e -- tests/e2e/storage.spec.ts`.
+- Do not edit or format app sources while browser tests are running: Vite's live
+  reload can invalidate the test's component tree.
 
 ## Formatting And Names
 
@@ -138,5 +138,5 @@ effects.
 
 ## Dependency Notes
 
-The repository enables `legacy-peer-deps` in `.npmrc` because Better Auth still
-declares a Solid 1 peer range while this frontend uses Solid 2.
+The repository enables `legacy-peer-deps` in `.npmrc` for the Solid 2 prerelease
+dependency graph.

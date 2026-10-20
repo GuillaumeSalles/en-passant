@@ -12,7 +12,7 @@ import {
 import { StoreState } from "@/lib/createStore";
 import { MutationContext } from "@/lib/useMutation";
 import { trainingLineScheduleKey } from "@/mutations/learningSession";
-import { queueRepertoireSync } from "@/storage/backendSync";
+import { reportStorageError } from "@/storage/status";
 import type { TrainingLineReview } from "@/lib/AppState";
 
 export const FAILED_MOVE_SUCCESS_REPETITIONS = 3;
@@ -356,7 +356,7 @@ function finishTrainingLineAttempt(
 
 function persistSchedule(ctx: MutationContext, schedule: TrainingLineReview | null): void {
   if (schedule === null) return;
-  void ctx.storage.saveTrainingLineSchedule(schedule).then(queueRepertoireSync);
+  void ctx.storage.saveTrainingLineSchedule(schedule).catch(reportStorageError);
 }
 
 export function completeTrainingLine(

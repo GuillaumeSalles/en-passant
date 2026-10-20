@@ -660,7 +660,6 @@ test("move on main line", () => {
   forward(state, ctx);
   expect(moveFromChessboard(state, ctx, "e7", "e5", "bP")).toEqual([
     { type: "play-sound", sound: "Move" },
-    { type: "record-cached-move" },
     expect.objectContaining({
       type: "persist-pgn-mutation",
       mutation: {

@@ -86,14 +86,6 @@ test("design dialogs fill the mobile viewport", async ({ page }) => {
   expect(box?.y).toBe(0);
 });
 
-test("shows the signup nudge on the design page", async ({ page }) => {
-  await page.goto("/design");
-
-  await expect(
-    page.getByText("Sign up to make sure you don't lose your repertoires. It's free."),
-  ).toBeVisible();
-});
-
 test("shows every training mastery badge on the design page", async ({ page }) => {
   await page.goto("/design");
 

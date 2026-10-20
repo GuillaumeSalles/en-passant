@@ -10,21 +10,7 @@ export type RecordChangedMessage = {
   records: StorageRecordRef[];
 };
 
-export type DatabaseClearRequestedMessage = {
-  type: "database-clear-requested";
-  requestId: string;
-};
-
-export type DatabaseClearFinishedMessage = {
-  type: "database-clear-finished";
-  requestId: string;
-  succeeded: boolean;
-};
-
-export type StorageBroadcastMessage =
-  | RecordChangedMessage
-  | DatabaseClearRequestedMessage
-  | DatabaseClearFinishedMessage;
+export type StorageBroadcastMessage = RecordChangedMessage;
 
 type RecordChangeBroadcastChannel = {
   postMessage: (message: StorageBroadcastMessage) => void;
@@ -32,7 +18,7 @@ type RecordChangeBroadcastChannel = {
   removeEventListener: (type: "message", listener: (event: MessageEvent<unknown>) => void) => void;
 };
 
-const CHANNEL_NAME = "en-passant:record-changes";
+const CHANNEL_NAME = "en-passant-local-v1:record-changes";
 const RECORD_KINDS = new Set<StorageRecordKind>([
   "repertoire",
   "chapter",
@@ -63,35 +49,10 @@ function isRecordChangedMessage(value: unknown): value is RecordChangedMessage {
   );
 }
 
-function isDatabaseClearRequestedMessage(value: unknown): value is DatabaseClearRequestedMessage {
-  return (
-    isRecord(value) &&
-    value["type"] === "database-clear-requested" &&
-    typeof value["requestId"] === "string"
-  );
-}
-
-function isDatabaseClearFinishedMessage(value: unknown): value is DatabaseClearFinishedMessage {
-  return (
-    isRecord(value) &&
-    value["type"] === "database-clear-finished" &&
-    typeof value["requestId"] === "string" &&
-    typeof value["succeeded"] === "boolean"
-  );
-}
-
 export function createRecordChangeChannel(channel: RecordChangeBroadcastChannel | null) {
   function publishRecordChanges(records: StorageRecordRef[]): void {
     if (records.length === 0) return;
     channel?.postMessage({ type: "record-changed", records });
-  }
-
-  function publishDatabaseClearRequested(requestId: string): void {
-    channel?.postMessage({ type: "database-clear-requested", requestId });
-  }
-
-  function publishDatabaseClearFinished(requestId: string, succeeded: boolean): void {
-    channel?.postMessage({ type: "database-clear-finished", requestId, succeeded });
   }
 
   function subscribeToRecordChanges(listener: (records: StorageRecordRef[]) => void): () => void {
@@ -107,42 +68,7 @@ export function createRecordChangeChannel(channel: RecordChangeBroadcastChannel 
     return () => channel.removeEventListener("message", receive);
   }
 
-  function subscribeToDatabaseClearRequests(listener: (requestId: string) => void): () => void {
-    if (channel === null) return () => undefined;
-
-    function receive(event: MessageEvent<unknown>): void {
-      if (isDatabaseClearRequestedMessage(event.data)) {
-        listener(event.data.requestId);
-      }
-    }
-
-    channel.addEventListener("message", receive);
-    return () => channel.removeEventListener("message", receive);
-  }
-
-  function subscribeToDatabaseClearResults(
-    listener: (result: { requestId: string; succeeded: boolean }) => void,
-  ): () => void {
-    if (channel === null) return () => undefined;
-
-    function receive(event: MessageEvent<unknown>): void {
-      if (isDatabaseClearFinishedMessage(event.data)) {
-        listener({ requestId: event.data.requestId, succeeded: event.data.succeeded });
-      }
-    }
-
-    channel.addEventListener("message", receive);
-    return () => channel.removeEventListener("message", receive);
-  }
-
-  return {
-    publishRecordChanges,
-    publishDatabaseClearRequested,
-    publishDatabaseClearFinished,
-    subscribeToRecordChanges,
-    subscribeToDatabaseClearRequests,
-    subscribeToDatabaseClearResults,
-  };
+  return { publishRecordChanges, subscribeToRecordChanges };
 }
 
 const browserChannel =
@@ -153,9 +79,4 @@ const browserChannel =
 const recordChangeChannel = createRecordChangeChannel(browserChannel);
 
 export const publishRecordChanges = recordChangeChannel.publishRecordChanges;
-export const publishDatabaseClearRequested = recordChangeChannel.publishDatabaseClearRequested;
-export const publishDatabaseClearFinished = recordChangeChannel.publishDatabaseClearFinished;
 export const subscribeToRecordChanges = recordChangeChannel.subscribeToRecordChanges;
-export const subscribeToDatabaseClearRequests =
-  recordChangeChannel.subscribeToDatabaseClearRequests;
-export const subscribeToDatabaseClearResults = recordChangeChannel.subscribeToDatabaseClearResults;

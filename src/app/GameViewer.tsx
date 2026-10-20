@@ -23,21 +23,17 @@ import { TimeControl } from "@/components/TimeControl";
 import { useSquareHighlights } from "@/components/useSquareHighlights";
 import { useStore } from "@/app/AppStateProvider";
 import { StoreState } from "@/lib/createStore";
-import { authStatus, currentAuthUser } from "@/lib/authSession";
 import { loadGame, type StoredGame } from "@/lib/games";
 import { APP_ROOT, repertoireMovePath, trainingLinePath } from "@/lib/routes";
 import { Engine } from "@/lib/engine";
 import { useMutation } from "@/lib/useMutation";
 import { useSelector } from "@/lib/useSelector";
 import { useGlobalShortcuts } from "@/lib/useGlobalShortcuts";
-import { useRouteContext } from "@/lib/useRouteContext";
-import { syncRepertoireFromBackend } from "@/storage/backendSync";
 
 type LoadState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success"; game: StoredGame }
-  | { status: "signed-out" }
   | { status: "not-found" }
   | { status: "error"; message: string };
 
@@ -71,9 +67,6 @@ function titleForGame(game: StoredGame): string {
 }
 
 function errorMessage(reason: string): string {
-  if (reason === "unauthorized") {
-    return "Sign in to review this game.";
-  }
   if (reason === "not-found") {
     return "This imported game was not found.";
   }
@@ -100,11 +93,7 @@ function mainLineMoveIdAtPly(game: StoredGame, ply: number): number | null {
   return moveId ?? null;
 }
 
-function GameViewerMessage(props: { title: string; action?: "signin" | "games" }) {
-  function openAuthDialog(): void {
-    document.dispatchEvent(new CustomEvent("en-passant:open-auth-dialog"));
-  }
-
+function GameViewerMessage(props: { title: string; action?: "games" }) {
   return (
     <FullWidthLayout
       title={<h1 class="truncate text-base font-medium">Game</h1>}
@@ -114,11 +103,6 @@ function GameViewerMessage(props: { title: string; action?: "signin" | "games" }
       <div class="p-4">
         <div class="max-w-md rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
           <p>{props.title}</p>
-          <Show when={props.action === "signin"}>
-            <Button size="sm" class="mt-3" onClick={openAuthDialog}>
-              Sign in
-            </Button>
-          </Show>
           <Show when={props.action === "games"}>
             <Button size="sm" class="mt-3" href={`${APP_ROOT}/games`}>
               Games
@@ -133,7 +117,6 @@ function GameViewerMessage(props: { title: string; action?: "signin" | "games" }
 export function GameViewer(props: { gameId: string }) {
   useGlobalShortcuts({ allowEditing: false });
   const store = useStore();
-  const route = useRouteContext();
   const [state, setState] = createSignal<LoadState>({ status: "idle" });
   const currentFen = useSelector(selectFen);
   const orientation = useSelector(selectOrientation);
@@ -155,22 +138,11 @@ export function GameViewer(props: { gameId: string }) {
 
   createEffect(
     () => ({
-      authStatus: authStatus(),
       gameId: props.gameId,
-      userId: currentAuthUser()?.id ?? null,
     }),
-    ({ authStatus: status, gameId, userId }) => {
+    ({ gameId }) => {
       requestId += 1;
       const currentRequestId = requestId;
-
-      if (status === "loading") {
-        setState({ status: "idle" });
-        return;
-      }
-      if (userId === null) {
-        setState({ status: "signed-out" });
-        return;
-      }
 
       setState({ status: "loading" });
       loadGame(gameId).then((result) => {
@@ -181,9 +153,6 @@ export function GameViewer(props: { gameId: string }) {
         if (result.ok) {
           resetImportedGameState(store.state, result.game);
           setState({ status: "success", game: result.game });
-          if (result.game.repertoireMistake != null) {
-            void syncRepertoireFromBackend(store.state, route()).catch(() => undefined);
-          }
         } else if (result.reason === "not-found") {
           setState({ status: "not-found" });
         } else {
@@ -273,24 +242,17 @@ export function GameViewer(props: { gameId: string }) {
       when={game()}
       fallback={
         <Show
-          when={state().status === "signed-out"}
+          when={state().status === "not-found"}
           fallback={
             <Show
-              when={state().status === "not-found"}
-              fallback={
-                <Show
-                  when={state().status === "error"}
-                  fallback={<GameViewerMessage title="Loading game..." />}
-                >
-                  <GameViewerMessage title={currentErrorMessage()} />
-                </Show>
-              }
+              when={state().status === "error"}
+              fallback={<GameViewerMessage title="Loading game..." />}
             >
-              <GameViewerMessage title="This imported game was not found." action="games" />
+              <GameViewerMessage title={currentErrorMessage()} />
             </Show>
           }
         >
-          <GameViewerMessage title="Sign in to review this game." action="signin" />
+          <GameViewerMessage title="This imported game was not found." action="games" />
         </Show>
       }
     >

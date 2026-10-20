@@ -1,13 +1,12 @@
+import { storageError } from "@/storage/status";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, lazy, Loading, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, lazy, Loading, Show } from "solid-js";
 import { createRouter, useLocation, useNavigate } from "@solidjs/router";
 import { AppStateProvider, useState } from "@/app/AppStateProvider";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
 import { VerticalDashedDivider } from "@/components/ui/VerticalDashedDivider";
 import { Repertoires } from "@/app/Repertoires";
 import { EnPassantLogo } from "@/components/EnPassantLogo";
-import { AuthButton } from "@/components/AuthButton";
-import { SignupNudge } from "@/components/SignupNudge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,18 +21,14 @@ import { GitHub, Info, X, XLogo } from "@/components/Icons";
 import { isSafariBrowser } from "@/lib/browser";
 import { APP_ROOT, firstRepertoireChapterPath } from "@/lib/routes";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
-import { startAuthSessionRenewal } from "@/lib/authSession";
 import { useMutation } from "@/lib/useMutation";
 import { clearTrainingQueueReview } from "@/mutations/trainingSession";
-import { DesktopAuthBroker } from "@/app/DesktopAuthBroker";
-import { DesktopAuthCompletion } from "@/app/DesktopAuthCompletion";
 
 const GITHUB_REPO_URL = "https://github.com/GuillaumeSalles/en-passant";
 const FEEDBACK_URL = "https://x.com/guillaume_slls";
-const DESKTOP_AUTH_BROKER_PATH = `${APP_ROOT}/auth/desktop`;
 
 const Design = lazy(() => import("@/app/Design"));
-const Debug = lazy(() => import("@/app/Debug"));
+
 const GameViewer = lazy(() => import("@/app/GameViewer"));
 const Games = lazy(() => import("@/app/Games"));
 const Training = lazy(() => import("@/app/Training"));
@@ -86,7 +81,6 @@ function GlobalActions(props: {
       <Show when={props.showAbout}>
         <AboutDialog buttonClass={props.buttonClass} />
       </Show>
-      <AuthButton class={props.buttonClass} menuSide={props.menuSide} />
     </div>
   );
 }
@@ -171,8 +165,6 @@ function AppShell(props: { children?: JSX.Element }) {
   const location = useLocation();
   const onClearTrainingQueueReview = useMutation(clearTrainingQueueReview);
 
-  onSettled(() => startAuthSessionRenewal());
-
   const hasRightPanel = createMemo(() => appShellHasRightPanel(location.pathname));
 
   createEffect(
@@ -246,9 +238,17 @@ function AppShell(props: { children?: JSX.Element }) {
             </aside>
           </>
         </Show>
+        <Show when={storageError()}>
+          <div
+            role="alert"
+            class="fixed bottom-4 left-4 right-4 z-50 rounded border bg-background p-4"
+          >
+            Your changes could not be saved: {storageError()}. Keep this window open and export your
+            PGN before closing.
+          </div>
+        </Show>
         {props.children}
-        <DesktopAuthCompletion />
-        <SignupNudge />
+
         <div id="drag-overlay" class="pointer-events-none absolute inset-0 z-10" />
       </div>
     </MobileNavigationProvider>
@@ -344,10 +344,7 @@ function Root(props: { children?: JSX.Element }) {
   }
 
   return (
-    <Show
-      when={location.pathname !== DESKTOP_AUTH_BROKER_PATH}
-      fallback={<Loading on={location.pathname}>{props.children}</Loading>}
-    >
+    <>
       <Show
         when={isAppRoute()}
         fallback={<Loading on={location.pathname}>{props.children}</Loading>}
@@ -360,7 +357,7 @@ function Root(props: { children?: JSX.Element }) {
           </AppShell>
         </AppStateProvider>
       </Show>
-    </Show>
+    </>
   );
 }
 
@@ -371,9 +368,9 @@ export default function App() {
 const AppRouter = createRouter({
   routes: [
     { path: "/design", component: Design },
-    { path: "/debug", component: Debug },
+
     { path: APP_ROOT, component: AppRootRoute },
-    { path: DESKTOP_AUTH_BROKER_PATH, component: DesktopAuthBroker },
+
     { path: `${APP_ROOT}/games`, component: Games },
     { path: `${APP_ROOT}/training`, component: Training },
     { path: `${APP_ROOT}/games/:gameId`, component: GameViewer },

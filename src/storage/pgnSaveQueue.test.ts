@@ -90,7 +90,9 @@ describe("createPgnMutationSaveQueue", () => {
     const afterWrite = vi.fn();
     const queue = createPgnMutationSaveQueue(writePgn, afterWrite);
 
-    await queue.savePgnMutation("chapter-pgn", "1. e4 *", e4);
+    await expect(queue.savePgnMutation("chapter-pgn", "1. e4 *", e4)).rejects.toThrow(
+      "IndexedDB failed",
+    );
     await queue.savePgnMutation("chapter-pgn", "1. e4 e5 *", e5);
 
     expect(writePgn).toHaveBeenNthCalledWith(1, "chapter-pgn", "1. e4 *", [e4]);

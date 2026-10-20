@@ -14,7 +14,6 @@ import {
 import { EvalBadge } from "@/components/EvalBadge";
 import { TrainingMasteryBadge } from "@/components/TrainingMasteryBadge";
 import { Button } from "@/components/ui/button";
-import { SignupNudgePanel } from "@/components/SignupNudge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CloseButton } from "@/components/ui/close-button";
 import {
@@ -75,8 +74,6 @@ const masteryBadgeSamples = [
   { intervalIndex: 4, interval: "14 days" },
   { intervalIndex: 5, interval: "30 days" },
 ] as const;
-
-function noop(): void {}
 
 function Section(props: { title: string; children: JSX.Element; class?: string | undefined }) {
   return (
@@ -321,9 +318,6 @@ function OverlaySamples() {
             </Tooltip>
           </TooltipProvider>
         </div>
-      </div>
-      <div class="relative h-32 overflow-hidden rounded-md border border-border bg-muted/20">
-        <SignupNudgePanel onDismiss={noop} onSignUp={noop} />
       </div>
     </SampleFrame>
   );

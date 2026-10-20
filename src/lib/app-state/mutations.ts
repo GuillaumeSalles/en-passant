@@ -86,9 +86,7 @@ function moveSoundEffect(move: Move | undefined): MutationEffect | undefined {
 
 function newMoveEffects(move: Move): MutationEffect[] {
   const sound = moveSoundEffect(move);
-  return sound === undefined
-    ? [{ type: "record-cached-move" }]
-    : [sound, { type: "record-cached-move" }];
+  return sound === undefined ? [] : [sound];
 }
 
 function uci(move: Move): string {
