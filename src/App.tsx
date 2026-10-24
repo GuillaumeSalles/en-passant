@@ -1,6 +1,7 @@
 import { storageError } from "@/storage/status";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, lazy, Loading, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, lazy, Loading, onSettled, Show } from "solid-js";
+import { initializeLichessImport, lichessImportStatus } from "@/lib/lichessImport";
 import { createRouter, useLocation, useNavigate } from "@solidjs/router";
 import { AppStateProvider, useState } from "@/app/AppStateProvider";
 import { HorizontalDashedDivider } from "@/components/ui/HorizontalDashedDivider";
@@ -161,6 +162,9 @@ function AboutDialog(props: { buttonClass?: string | undefined } = {}) {
 }
 
 function AppShell(props: { children?: JSX.Element }) {
+  onSettled(() => {
+    void initializeLichessImport();
+  });
   const [isDrawerOpen, setIsDrawerOpen] = createSignal(false);
   const location = useLocation();
   const onClearTrainingQueueReview = useMutation(clearTrainingQueueReview);
@@ -245,6 +249,17 @@ function AppShell(props: { children?: JSX.Element }) {
           >
             Your changes could not be saved: {storageError()}. Keep this window open and export your
             PGN before closing.
+          </div>
+        </Show>
+        <Show when={lichessImportStatus().phase === "error" && location.pathname !== "/app/games"}>
+          <div
+            role="alert"
+            class="fixed bottom-4 left-4 right-4 z-50 rounded border bg-background p-3 text-sm shadow-lg"
+          >
+            Lichess import: {lichessImportStatus().message}{" "}
+            <a class="underline" href="/app/games">
+              Open games
+            </a>
           </div>
         </Show>
         {props.children}

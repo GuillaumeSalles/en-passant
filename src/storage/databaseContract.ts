@@ -6,6 +6,7 @@ export const STORE_NAMES = [
   "training-line-schedules",
   "training-move-schedules",
   "games",
+  "game-imports",
 ] as const;
 export type StoreName = (typeof STORE_NAMES)[number];
 export const MOVE_STORE_NAMES = ["repertoire-moves", "game-moves"] as const;

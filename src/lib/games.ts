@@ -20,6 +20,8 @@ import type {
   TrainingMistakeLinksResult,
 } from "./gameContracts";
 import type { MoveOccurrence } from "./moveIndex";
+import { lichessGameId } from "./lichessGames";
+import { notifyGamesChanged } from "./gameUpdates";
 export type * from "./gameContracts";
 async function library(gameId?: string) {
   const snapshot = await localDatabase().read([
@@ -40,14 +42,21 @@ async function library(gameId?: string) {
   };
 }
 export async function importGames(pgn: string, player: string, color: GameColor): Promise<number> {
-  const games = parseGameImport(pgn, player, color, () => crypto.randomUUID());
+  const games = parseGameImport(pgn, player, color, () => crypto.randomUUID()).map((game) => {
+    const sourceId = lichessGameId(game);
+    return sourceId === null ? game : { ...game, id: `lichess:${sourceId}` };
+  });
   let count = 0;
   await updateDatabase(
     (s) => {
       const existing = new Set(records<StoredGame>(s, "games").map((g) => g.pgn.trim()));
+      const sourceIds = new Set(records<StoredGame>(s, "games").map(lichessGameId));
       const added = games.filter((g) => {
-        if (existing.has(g.pgn.trim())) return false;
+        const sourceId = lichessGameId(g);
+        if (existing.has(g.pgn.trim()) || (sourceId !== null && sourceIds.has(sourceId)))
+          return false;
         existing.add(g.pgn.trim());
+        sourceIds.add(sourceId);
         return true;
       });
       count = added.length;
@@ -59,6 +68,7 @@ export async function importGames(pgn: string, player: string, color: GameColor)
     },
     [{ store: "games" }],
   );
+  if (count > 0) notifyGamesChanged();
   return count;
 }
 export async function loadGames(

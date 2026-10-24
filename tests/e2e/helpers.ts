@@ -260,6 +260,18 @@ export async function storedTrainingMoves(page: Page): Promise<TrainingMoveRevie
   return readObjectStore(page, "training-move-schedules", (record) => record as TrainingMoveReview);
 }
 
+export async function storedGames(page: Page): Promise<StoredGame[]> {
+  return readObjectStore(page, "games", (record) => record as StoredGame);
+}
+
+export async function storedGameImports(page: Page) {
+  return readObjectStore(
+    page,
+    "game-imports",
+    (record) => record as { username: string; since: number | null; automatic: boolean },
+  );
+}
+
 async function readObjectStore<T>(
   page: Page,
   storeName: string,

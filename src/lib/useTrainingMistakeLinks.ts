@@ -1,5 +1,6 @@
-import { onSettled, createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import { loadTrainingMistakeLinks, type TrainingMistakeLink } from "./games";
+import { gamesVersion } from "./gameUpdates";
 
 export function trainingMistakeLinkKey(chapterId: string, uciPath: string): string {
   return `${chapterId}/${uciPath}`;
@@ -9,7 +10,7 @@ export function useTrainingMistakeLinks() {
   const [links, setLinks] = createSignal<Record<string, TrainingMistakeLink>>({});
   let requestId = 0;
 
-  onSettled(() => {
+  createEffect(gamesVersion, () => {
     requestId += 1;
     const currentRequestId = requestId;
     void loadTrainingMistakeLinks().then((result) => {

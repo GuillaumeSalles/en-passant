@@ -7,6 +7,7 @@ import {
   type PositionMoves,
 } from "@/lib/games";
 import { importedGamePath } from "@/lib/routes";
+import { gamesVersion } from "@/lib/gameUpdates";
 export function PositionMoveStats(props: {
   fen: string;
   color: GameColor;
@@ -16,7 +17,11 @@ export function PositionMoveStats(props: {
   const [error, setError] = createSignal(false);
   let request = 0;
   createEffect(
-    () => ({ key: positionKey(createChessPosition(props.fen)), color: props.color }),
+    () => ({
+      key: positionKey(createChessPosition(props.fen)),
+      color: props.color,
+      gamesVersion: gamesVersion(),
+    }),
     ({ key, color }) => {
       const current = ++request;
       setData(null);

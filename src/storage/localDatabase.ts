@@ -13,8 +13,8 @@ import type { StoredPgn } from "./contracts";
 import type { StoredGame } from "@/lib/gameContracts";
 
 export const LOCAL_DATABASE_NAME = "en-passant-local-v1";
-// v4 adds independent move schedules without changing existing sources or occurrences.
-export const LOCAL_DATABASE_VERSION = 4;
+// v5 adds opt-in game import checkpoints without changing existing sources or occurrences.
+export const LOCAL_DATABASE_VERSION = 5;
 let connection: Promise<IDBDatabase> | undefined;
 
 function request<T>(value: IDBRequest<T>): Promise<T> {

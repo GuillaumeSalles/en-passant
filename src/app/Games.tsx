@@ -1,4 +1,6 @@
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { LichessImport } from "@/components/LichessImport";
+import { gamesVersion } from "@/lib/gameUpdates";
 import { FullWidthLayout } from "@/components/FullWidthLayout";
 import { Button } from "@/components/ui/button";
 import { importGames, loadGames, type StoredGame, type GameColor } from "@/lib/games";
@@ -9,12 +11,15 @@ export default function Games() {
   const [color, setColor] = createSignal<GameColor>("white");
   const [message, setMessage] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  let requestId = 0;
   async function reload() {
+    const current = ++requestId;
     const result = await loadGames();
+    if (current !== requestId) return;
     if (result.ok) setGames(result.games);
     else setMessage("Unable to read games from this device.");
   }
-  onSettled(() => {
+  createEffect(gamesVersion, () => {
     void reload();
   });
   async function upload(file: File | undefined) {
@@ -23,7 +28,6 @@ export default function Games() {
     try {
       const count = await importGames(await file.text(), player(), color());
       setMessage(`Imported ${count} games.`);
-      await reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import failed.");
     } finally {
@@ -33,6 +37,7 @@ export default function Games() {
   return (
     <FullWidthLayout title={<h1>Games</h1>} reserveRightSlot showMobileHeaderDivider={false}>
       <div class="space-y-4 p-4">
+        <LichessImport />
         <p class="text-sm text-muted-foreground">
           Import a PGN file to review games saved on this device.
         </p>

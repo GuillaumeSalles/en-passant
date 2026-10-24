@@ -9,11 +9,12 @@ import { parseGameImport } from "../../src/lib/localGames";
 import { indexPgnMoves } from "../../src/lib/moveIndex";
 
 const currentSchema = {
-  version: 4,
+  version: 5,
   indexes: {
     chapters: ["by-repertoire"],
     "game-moves": ["by-position", "by-source"],
     games: [],
+    "game-imports": [],
     metadata: [],
     pgns: [],
     "repertoire-moves": ["by-source"],
@@ -585,108 +586,118 @@ test("move reviews merge concurrent results and reject stale source moves atomic
   expect(result.pgn).toBe("1. e4 *");
 });
 
-for (const failUpgrade of [false, true]) {
-  test(`v3 move-schedule upgrade ${failUpgrade ? "rolls back on failure" : "preserves sources, schedules and occurrences"}`, async ({
-    page,
-  }) => {
-    await expectLocalOnly(page);
-    const metadata = { updatedAt: "2026-01-01", deletedAt: null, dirty: false };
-    await seedIndexedDb(page, {
-      repertoires: [{ id: "r", name: "White", handle: "r", orientation: "white", ...metadata }],
-      chapters: [
-        { id: "c", repertoireId: "r", pgnId: "p", name: "Main", handle: "c", ...metadata },
-      ],
-      pgns: [{ id: "p", pgn: "1. e4 *", ...metadata }],
-      trainingLineSchedules: [
-        {
-          repertoireId: "r",
-          chapterId: "c",
-          uciPath: "e2e4",
-          intervalIndex: 4,
-          dueAt: 123,
-          lastReviewedAt: 100,
-          algorithmVersion: 1,
-          ...metadata,
-        },
-      ],
-    });
-    const result = await page.evaluate(
-      async ({ failUpgrade, moves }) => {
-        const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const opening = indexedDB.open("en-passant-local-v1", 3);
-          opening.onupgradeneeded = () => {
-            const tx = opening.transaction;
-            if (tx === null) throw new Error("Missing transaction");
-            tx.objectStore("chapters").createIndex("by-repertoire", "repertoireId");
-            for (const name of ["repertoire-moves", "game-moves"]) {
-              const store = opening.result.createObjectStore(name);
-              store.createIndex("by-source", "sourceId");
-              if (name === "game-moves") store.createIndex("by-position", "beforeKey");
-              if (name === "repertoire-moves") for (const move of moves) store.put(move, move.id);
-            }
-            tx.objectStore("metadata").put(23, "revision");
+for (const previousVersion of [3, 4]) {
+  for (const failUpgrade of [false, true]) {
+    test(`v${previousVersion} additive upgrade ${failUpgrade ? "rolls back on failure" : "preserves sources, schedules and occurrences"}`, async ({
+      page,
+    }) => {
+      await expectLocalOnly(page);
+      const metadata = { updatedAt: "2026-01-01", deletedAt: null, dirty: false };
+      await seedIndexedDb(page, {
+        repertoires: [{ id: "r", name: "White", handle: "r", orientation: "white", ...metadata }],
+        chapters: [
+          { id: "c", repertoireId: "r", pgnId: "p", name: "Main", handle: "c", ...metadata },
+        ],
+        pgns: [{ id: "p", pgn: "1. e4 *", ...metadata }],
+        trainingLineSchedules: [
+          {
+            repertoireId: "r",
+            chapterId: "c",
+            uciPath: "e2e4",
+            intervalIndex: 4,
+            dueAt: 123,
+            lastReviewedAt: 100,
+            algorithmVersion: 1,
+            ...metadata,
+          },
+        ],
+      });
+      const result = await page.evaluate(
+        async ({ failUpgrade, moves, previousVersion }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const opening = indexedDB.open("en-passant-local-v1", previousVersion);
+            opening.onupgradeneeded = () => {
+              const tx = opening.transaction;
+              if (tx === null) throw new Error("Missing transaction");
+              tx.objectStore("chapters").createIndex("by-repertoire", "repertoireId");
+              for (const name of ["repertoire-moves", "game-moves"]) {
+                const store = opening.result.createObjectStore(name);
+                store.createIndex("by-source", "sourceId");
+                if (name === "game-moves") store.createIndex("by-position", "beforeKey");
+                if (name === "repertoire-moves") for (const move of moves) store.put(move, move.id);
+              }
+              if (previousVersion === 4)
+                opening.result.createObjectStore("training-move-schedules");
+              tx.objectStore("metadata").put(23, "revision");
+            };
+            opening.onsuccess = () => resolve(opening.result);
+            opening.onerror = () => reject(opening.error);
+          });
+          async function snapshot(database: IDBDatabase) {
+            const tx = database.transaction([...database.objectStoreNames], "readonly");
+            return Object.fromEntries(
+              await Promise.all(
+                [...database.objectStoreNames].map(async (name) => {
+                  const values = await new Promise<unknown[]>((resolve, reject) => {
+                    const r = tx.objectStore(name).getAll();
+                    r.onsuccess = () => resolve(r.result as unknown[]);
+                    r.onerror = () => reject(r.error);
+                  });
+                  return [name, values];
+                }),
+              ),
+            );
+          }
+          const before = await snapshot(db);
+          db.close();
+          const originalCreate = IDBDatabase.prototype.createObjectStore;
+          const originalCursor = IDBObjectStore.prototype.openCursor;
+          IDBDatabase.prototype.createObjectStore = function (name, options) {
+            const store = originalCreate.call(this, name, options);
+            if (
+              failUpgrade &&
+              name === (previousVersion === 3 ? "training-move-schedules" : "game-imports")
+            )
+              store.transaction.abort();
+            return store;
           };
-          opening.onsuccess = () => resolve(opening.result);
-          opening.onerror = () => reject(opening.error);
-        });
-        async function snapshot(database: IDBDatabase) {
-          const tx = database.transaction([...database.objectStoreNames], "readonly");
-          return Object.fromEntries(
-            await Promise.all(
-              [...database.objectStoreNames].map(async (name) => {
-                const values = await new Promise<unknown[]>((resolve, reject) => {
-                  const r = tx.objectStore(name).getAll();
-                  r.onsuccess = () => resolve(r.result as unknown[]);
-                  r.onerror = () => reject(r.error);
-                });
-                return [name, values];
-              }),
-            ),
-          );
-        }
-        const before = await snapshot(db);
-        db.close();
-        const originalCreate = IDBDatabase.prototype.createObjectStore;
-        const originalCursor = IDBObjectStore.prototype.openCursor;
-        IDBDatabase.prototype.createObjectStore = function (name, options) {
-          const store = originalCreate.call(this, name, options);
-          if (failUpgrade && name === "training-move-schedules") store.transaction.abort();
-          return store;
-        };
-        IDBObjectStore.prototype.openCursor = function () {
-          throw new Error("Unexpected occurrence rebuild");
-        };
-        let failed = false;
-        try {
-          const path = "/src/storage/localDatabase.ts";
-          const storage = (await import(
-            /* @vite-ignore */ path
-          )) as typeof import("../../src/storage/localDatabase");
-          await storage.localDatabase().read([]);
-        } catch {
-          failed = true;
-        } finally {
-          IDBDatabase.prototype.createObjectStore = originalCreate;
-          IDBObjectStore.prototype.openCursor = originalCursor;
-        }
-        const reopened = await new Promise<IDBDatabase>((resolve, reject) => {
-          const r = indexedDB.open("en-passant-local-v1");
-          r.onsuccess = () => resolve(r.result);
-          r.onerror = () => reject(r.error);
-        });
-        const after = await snapshot(reopened);
-        const version = reopened.version;
-        reopened.close();
-        return { before, after, version, failed };
-      },
-      { failUpgrade, moves: indexPgnMoves("p", "1. e4 *", "tree") },
-    );
-    expect(result.failed).toBe(failUpgrade);
-    expect(result.version).toBe(failUpgrade ? 3 : 4);
-    expect(result.after).toEqual(
-      failUpgrade ? result.before : { ...result.before, "training-move-schedules": [] },
-    );
-  });
+          IDBObjectStore.prototype.openCursor = function () {
+            throw new Error("Unexpected occurrence rebuild");
+          };
+          let failed = false;
+          try {
+            const path = "/src/storage/localDatabase.ts";
+            const storage = (await import(
+              /* @vite-ignore */ path
+            )) as typeof import("../../src/storage/localDatabase");
+            await storage.localDatabase().read([]);
+          } catch {
+            failed = true;
+          } finally {
+            IDBDatabase.prototype.createObjectStore = originalCreate;
+            IDBObjectStore.prototype.openCursor = originalCursor;
+          }
+          const reopened = await new Promise<IDBDatabase>((resolve, reject) => {
+            const r = indexedDB.open("en-passant-local-v1");
+            r.onsuccess = () => resolve(r.result);
+            r.onerror = () => reject(r.error);
+          });
+          const after = await snapshot(reopened);
+          const version = reopened.version;
+          reopened.close();
+          return { before, after, version, failed };
+        },
+        { failUpgrade, previousVersion, moves: indexPgnMoves("p", "1. e4 *", "tree") },
+      );
+      expect(result.failed).toBe(failUpgrade);
+      expect(result.version).toBe(failUpgrade ? previousVersion : 5);
+      expect(result.after).toEqual(
+        failUpgrade
+          ? result.before
+          : { ...result.before, "training-move-schedules": [], "game-imports": [] },
+      );
+    });
+  }
 }
 
 test("saves a repeated terminal decision under its existing position identity", async ({

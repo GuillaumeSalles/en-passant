@@ -5,8 +5,10 @@ Cloudflare Pages project `enpassant`.
 
 ## Non-Negotiables
 
-- The app is local-only. Do not add authentication, backend calls, or automatic
-  imports/migrations. Production backups are imported only through an explicit user action.
+- The app is local-only. Do not add authentication, application backend calls,
+  or automatic imports/migrations beyond the explicitly authorized cases below.
+  Explicitly configured Lichess imports fetch directly from Lichess and check for
+  new games on startup. Production backups are imported only through an explicit user action.
 - This repository contains only the browser app. Persist through IndexedDB.
   Native clients and SQLite support are deferred; do not reintroduce them.
 - Never delete or reset a library to recover from an error. Report the failure and
@@ -78,6 +80,9 @@ Cloudflare Pages project `enpassant`.
 - Any change to the persisted occurrence format or indexing semantics needs an
   explicit schema version and a tested rebuild. Upgrade failures must roll back
   and preserve source documents; never recover by resetting the database.
+- Schema version 5 adds `game-imports` for the explicitly configured Lichess
+  username and resumable checkpoint. It leaves all documents and occurrences
+  unchanged and does not enable imports until the user configures a username.
 
 ## Tests And Checks
 
