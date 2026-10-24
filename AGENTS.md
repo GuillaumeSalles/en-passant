@@ -56,10 +56,13 @@ Cloudflare Pages project `enpassant`.
   transaction. Do not silently overwrite unrelated concurrent edits.
 - Future encrypted sync must remain an optional adapter; it must not become the
   source of truth or a prerequisite for editing and training.
-- The authorized local storage restructuring uses schema version 3 in the same
+- The authorized local storage restructuring uses schema version 4 in the same
   `en-passant-local-v1` database. Its additive v1 upgrade indexes existing local
   documents only; it never imports backups or account-linked data. The v2-to-v3
-  upgrade removes unused secondary indexes without rebuilding occurrences.
+  upgrade removes unused secondary indexes without rebuilding occurrences. The
+  v3-to-v4 upgrade adds independent move schedules without converting line
+  schedules or rebuilding occurrences. Move knowledge is keyed by repertoire,
+  canonical position before the move, and UCI move (including promotion).
 - Keep only indexes queried by production code: chapters `by-repertoire`, both
   move stores `by-source`, and game moves `by-position`. Add further indexes
   when an actual query needs them.

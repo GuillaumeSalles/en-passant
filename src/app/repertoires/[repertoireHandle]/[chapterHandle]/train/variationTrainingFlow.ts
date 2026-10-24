@@ -36,6 +36,7 @@ export type VariationTrainingPhase =
 
 export type VariationTrainingEvent =
   | { type: "RESET" }
+  | { type: "SAVE_FAILED" }
   | { type: "READY_FOR_LINE_MOVE" }
   | { type: "INTRO_MOVE_STARTED"; animationId: number | null; completedMoveId: number | null }
   | { type: "MOVE_SUBMITTED"; origin: TrainingMoveOrigin }
@@ -94,6 +95,10 @@ export function reduceVariationTrainingFlow(
         ? { type: "checking-move", origin: event.origin }
         : phase;
     case "checking-move":
+      if (event.type === "SAVE_FAILED")
+        return phase.origin === "replay"
+          ? { type: "awaiting-replay-move" }
+          : { type: "awaiting-line-move", notice: null };
       if (event.type === "MOVE_REJECTED") {
         return {
           type: "showing-feedback",
@@ -197,6 +202,8 @@ export function trainingInstruction(
       }
       if (phase.notice === "mistake") return "Try again.";
       return `${orientation === "black" ? "Black" : "White"} to play.`;
+    case "checking-move":
+      return "Saving move progress.";
     case "showing-feedback":
       return phase.feedback === "alternative"
         ? "That move belongs to an alternative line. Find another one."

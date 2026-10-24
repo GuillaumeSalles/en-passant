@@ -172,6 +172,7 @@ export type AppState = {
     session: TrainingSessionDraft | null;
     reviewQueue: TrainingReviewQueue | null;
     reviews: Record<string, TrainingLineReview>;
+    moveReviews: Record<string, import("./trainingMoves").TrainingMoveReview>;
   };
   preselectedVariation: number | null;
   highlights: Highlights;

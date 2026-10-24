@@ -88,7 +88,7 @@ export function trainingPath(repertoireHandle: string, chapterHandle: string): s
 }
 
 type TrainingLinePathOptions = {
-  startMove?: number;
+  startMove?: number | undefined;
 };
 
 export function trainingLinePath(
@@ -119,8 +119,10 @@ export function trainingLineReviewPath(
   repertoireHandle: string,
   chapterHandle: string,
   lineId: string,
+  options: TrainingLinePathOptions = {},
 ): string {
-  return `${trainingLinePath(repertoireHandle, chapterHandle, lineId)}?review=due`;
+  const path = trainingLinePath(repertoireHandle, chapterHandle, lineId, options);
+  return `${path}${options.startMove === undefined ? "?" : "&"}review=due`;
 }
 
 export function chapterTrainingLineReviewPath(

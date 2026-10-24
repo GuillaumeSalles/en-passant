@@ -171,6 +171,7 @@ export function isAlternativeTrainingMove(
   orientation: Orientation,
   from: string,
   to: string,
+  promotion: string | null = null,
 ): boolean {
   const expectedMove = pgn.moves[expectedMoveId];
   if (expectedMove === undefined || !isUserMove(expectedMove, orientation)) return false;
@@ -180,7 +181,7 @@ export function isAlternativeTrainingMove(
   return siblingIds.some((moveId) => {
     if (moveId === expectedMoveId) return false;
     const move = pgn.moves[moveId];
-    return move?.from === from && move.to === to;
+    return move?.from === from && move.to === to && move.promotion === promotion;
   });
 }
 

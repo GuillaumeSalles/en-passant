@@ -1,3 +1,4 @@
+import { recordTrainingMove } from "@/mutations/trainingMove";
 import { useState } from "@/app/AppStateProvider";
 import type { MoveAnnotationData } from "@/components/Chessboard/MoveAnnotation";
 import {
@@ -5,6 +6,9 @@ import {
   type Context,
   deleteMove,
   getChapterPgn,
+  getChapterScope,
+  getTrainingMoveTarget,
+  getTrainingMovesToSkip,
   getTrainingLinesWithScheduledPaths,
   getVariationMoveIds,
   isAlternativeTrainingMove,
@@ -76,6 +80,10 @@ function addTrainingMoveSilently({ state, route }: MutationContext, move: EvalMo
   moveFromEvalMove(state, route, move);
 }
 
+function addTrainingContextMoves({ state, route }: MutationContext, moves: EvalMove[]): void {
+  for (const move of moves) moveFromEvalMove(state, route, move, false);
+}
+
 function selectTrainingMoveSilently(
   state: StoreState<AppState>,
   _ctx: Context,
@@ -98,7 +106,9 @@ export function useVariationTrainingFlow(
     boundaryDelayMs?: number | Accessor<number>;
     onLineComplete?: () => void;
     startMove?: Accessor<number>;
-  } = {},
+    learning: boolean;
+    singleMove?: Accessor<boolean>;
+  } = { learning: false },
 ) {
   const state = useState();
   const ctx = useRouteContext();
@@ -133,11 +143,15 @@ export function useVariationTrainingFlow(
   const onMoveFromChessboard = useMutation(moveFromChessboard);
   const onMoveFromEvalMove = useMutation(moveFromEvalMove);
   const onAutoMoveFromEvalMove = useMutation(addTrainingMoveSilently, { context: true });
+  const onAddTrainingContextMoves = useMutation(addTrainingContextMoves, { context: true });
   const onDeleteMove = useMutation(deleteMove);
   const onSelectTrainingMoveSilently = useMutation(selectTrainingMoveSilently);
   const onUpdateTrainingStatus = useMutation(updateTrainingStatus);
   const onStartTrainingLine = useMutation(startTrainingLine);
   const onDiscardTrainingLine = useMutation(discardTrainingLine);
+  const onRecordTrainingMove = useMutation(recordTrainingMove, { context: true });
+  const recordedMoveKeys = new Set<string>();
+  let skippedMoves = false;
   const onMarkTrainingCorrectMove = useMutation(markTrainingCorrectMove);
   const onMarkTrainingMistake = useMutation(markTrainingMistake);
   const onPrepareTrainingReplayMove = useMutation(prepareTrainingReplayMove);
@@ -223,6 +237,7 @@ export function useVariationTrainingFlow(
   onCleanup(() => {
     pacingTimer.cancel();
     if (startedScope !== null) onDiscardTrainingLine(startedScope);
+    startedScope = null;
   });
 
   function dispatch(event: VariationTrainingEvent): boolean {
@@ -316,15 +331,48 @@ export function useVariationTrainingFlow(
       uciPath: line.uciPath,
       completedMoveId,
       finishLine: finishesLine,
+      scheduleMode: skippedMoves ? "from-moves" : "advance",
     });
     requestReplayOrBoundary();
+  }
+
+  function skipNotDueMoves(): void {
+    if (
+      options.learning ||
+      !isEnabled() ||
+      !boardIntroComplete() ||
+      currentPhase.type !== "awaiting-line-move" ||
+      currentPhase.notice !== null ||
+      nextMoveIds().length > 0
+    )
+      return;
+    const pgn = chapterPgn();
+    const scope = getChapterScope(state, ctx());
+    if (pgn === null || scope === null) return;
+    const remaining = variation().slice((currentMove()?.halfMoveNumber ?? -1) + 1);
+    const moves = getTrainingMovesToSkip(
+      scope.repertoire.id,
+      pgn,
+      orientation(),
+      remaining,
+      state.training.moveReviews,
+      Date.now(),
+    );
+    if (moves.length === 0) return;
+    skippedMoves = true;
+    onAddTrainingContextMoves(moves.map(moveToEvalMove));
+    const last = moves.at(-1);
+    if (last !== undefined && moves.length === remaining.length) {
+      dispatch({ type: "MOVE_SUBMITTED", origin: "line" });
+      completeLineAttempt(last.id);
+    }
   }
 
   createEffect(
     () => ({
       key: scopeKey(),
       line: activeLine(),
-      lineIds: lines().map((line) => line.id),
+      lineIds: options.singleMove?.() ? [props.lineId] : lines().map((line) => line.id),
       enabled: isEnabled(),
       orientation: orientation(),
       precedingMoves: precedingMoves(),
@@ -350,6 +398,8 @@ export function useVariationTrainingFlow(
       if (startedScope !== null) onDiscardTrainingLine(startedScope);
       dispatch({ type: "RESET" });
       setCompletedRepetitions(0);
+      recordedMoveKeys.clear();
+      skippedMoves = false;
       onStartTrainingLine({ lineIds, lineId: line.id, precedingMoves, variationIndex });
       startedScope = {
         key,
@@ -371,6 +421,10 @@ export function useVariationTrainingFlow(
       startsWithUserMove: startsWithUserMove(),
     }),
     ({ boardIntroComplete, enabled, firstPendingMove, phase, startsWithUserMove }) => {
+      if (enabled && boardIntroComplete && phase.type === "awaiting-line-move") {
+        untrack(skipNotDueMoves);
+        return;
+      }
       if (
         !enabled ||
         phase.type !== "initializing" ||
@@ -449,7 +503,7 @@ export function useVariationTrainingFlow(
     }
   }
 
-  const onPieceDrop = (
+  const onPieceDrop = async (
     sourceSquare: string,
     targetSquare: string,
     piece: string,
@@ -473,6 +527,10 @@ export function useVariationTrainingFlow(
         : variation()[currentHalfMoveNumber + 1];
     const expectedMove = expectedMoveId === undefined ? undefined : pgn.moves[expectedMoveId];
     if (expectedMove === undefined) return;
+    const scope = getChapterScope(state, ctx());
+    if (scope === null) return;
+    const target = getTrainingMoveTarget(scope.repertoire.id, pgn, expectedMove.id, orientation());
+    if (target === null) return;
 
     const origin = activePhase.type === "awaiting-replay-move" ? "replay" : "line";
     if (!dispatch({ type: "MOVE_SUBMITTED", origin })) return;
@@ -480,13 +538,46 @@ export function useVariationTrainingFlow(
     onMoveFromChessboard(sourceSquare, targetSquare, piece, animate);
     const playedMoveId = selectSelectedMoveId(state, ctx());
 
-    if (sourceSquare !== expectedMove.from || targetSquare !== expectedMove.to) {
+    const played = playedMoveId === null ? undefined : state.training.variation.moves[playedMoveId];
+    const correct =
+      sourceSquare === expectedMove.from &&
+      targetSquare === expectedMove.to &&
+      played?.promotion === expectedMove.promotion;
+    const alternative =
+      !correct &&
+      isAlternativeTrainingMove(
+        pgn,
+        expectedMove.id,
+        orientation(),
+        sourceSquare,
+        targetSquare,
+        played?.promotion ?? null,
+      );
+    const submittedScope = startedScope;
+    if (origin === "line" && !alternative && !recordedMoveKeys.has(target.key)) {
+      try {
+        await onRecordTrainingMove({
+          moveId: expectedMove.id,
+          outcome: options.learning ? "learned" : correct ? "correct" : "incorrect",
+        });
+      } catch {
+        if (submittedScope !== startedScope) return;
+        if (playedMoveId !== null) onDeleteMove(playedMoveId);
+        dispatch({ type: "SAVE_FAILED" });
+        return;
+      }
+      if (submittedScope !== startedScope) return;
+      recordedMoveKeys.add(target.key);
+    }
+
+    if (!correct) {
       const feedback = isAlternativeTrainingMove(
         pgn,
         expectedMove.id,
         orientation(),
         sourceSquare,
         targetSquare,
+        played?.promotion ?? null,
       )
         ? "alternative"
         : "mistake";
@@ -505,6 +596,7 @@ export function useVariationTrainingFlow(
         lineId: props.lineId,
         uciPath: line.uciPath,
         finishLine: finishesLine,
+        scheduleMode: skippedMoves ? "from-moves" : "advance",
       });
       requestReplayOrBoundary();
       return;
@@ -577,12 +669,29 @@ export function useVariationTrainingFlow(
       const line = allLines[(activeLineIndex() + offset) % allLines.length];
       if (line === undefined) continue;
       const key = trainingLineScheduleKey(state, ctx(), line.uciPath);
-      const review = key === null ? undefined : state.training.reviews[key];
+      const review = key === null ? undefined : reviews()[key];
       if (isTrainingReviewDue(review, Date.now())) return line;
     }
     return undefined;
   };
-  const canDrag = createMemo(() => canDragTrainingPiece(phase()) && nextMoveIds().length === 0);
+  const canDrag = createMemo(() => {
+    const current = phase();
+    if (!canDragTrainingPiece(current) || nextMoveIds().length > 0) return false;
+    if (
+      options.learning ||
+      current.type === "awaiting-replay-move" ||
+      (current.type === "awaiting-line-move" && current.notice !== null)
+    )
+      return true;
+    // Do not let a drag start on a move that will be skipped when the response settles.
+    const pgn = chapterPgn();
+    const scope = getChapterScope(state, ctx());
+    const moveId = variation()[(currentMove()?.halfMoveNumber ?? -1) + 1];
+    if (pgn === null || scope === null || moveId === undefined) return false;
+    const target = getTrainingMoveTarget(scope.repertoire.id, pgn, moveId, orientation());
+    const review = target === null ? undefined : state.training.moveReviews[target.key];
+    return review === undefined || !(review.dueAt > Date.now());
+  });
   const instruction = createMemo(() =>
     trainingInstruction(phase(), orientation(), nextMoveIds().length > 0),
   );

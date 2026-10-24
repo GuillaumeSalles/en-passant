@@ -4,6 +4,8 @@ import {
   emptyNormalizedPgn,
   EvalMove,
   getChapterPgn,
+  getChapterScope,
+  lineReviewFromMoves,
   getTrainingLinePgn,
   moveFromEvalMove,
   nextTrainingReview,
@@ -292,6 +294,7 @@ function finishTrainingLine(
   session: TrainingSessionDraft,
   lineId: string,
   uciPath: string,
+  skippedMoves: boolean,
 ): TrainingLineReview | null {
   const result = {
     lineId,
@@ -304,10 +307,25 @@ function finishTrainingLine(
   ];
   const key = trainingLineScheduleKey(state, ctx, uciPath);
   const currentReview = key === null ? undefined : state.training.reviews[key];
+  const scope = getChapterScope(state, ctx);
+  const pgn = getChapterPgn(state, ctx);
+  const moveReview =
+    skippedMoves && scope !== null && pgn !== null
+      ? lineReviewFromMoves(
+          scope.repertoire.id,
+          scope.chapter.id,
+          pgn,
+          scope.repertoire.orientation,
+          uciPath,
+          state.training.moveReviews,
+        )
+      : undefined;
   const review =
     currentReview === undefined
       ? null
-      : nextTrainingReview(currentReview, result.mistakeCount === 0, Date.now());
+      : skippedMoves
+        ? (moveReview ?? null)
+        : nextTrainingReview(currentReview, result.mistakeCount === 0, Date.now());
   state.set("training", {
     ...state.training,
     status: "success",
@@ -337,9 +355,10 @@ function finishTrainingLineAttempt(
   lineId: string,
   uciPath: string,
   finishLine: boolean,
+  skippedMoves: boolean,
 ): TrainingLineReview | null {
   if (finishLine) {
-    return finishTrainingLine(state, ctx, session, lineId, uciPath);
+    return finishTrainingLine(state, ctx, session, lineId, uciPath, skippedMoves);
   }
 
   state.set("training", {
@@ -361,7 +380,13 @@ function persistSchedule(ctx: MutationContext, schedule: TrainingLineReview | nu
 
 export function completeTrainingLine(
   ctx: MutationContext,
-  details: { lineId: string; uciPath: string; completedMoveId: number; finishLine: boolean },
+  details: {
+    lineId: string;
+    uciPath: string;
+    completedMoveId: number;
+    finishLine: boolean;
+    scheduleMode?: "advance" | "from-moves";
+  },
 ): void {
   const { state } = ctx;
   const session = state.training.session;
@@ -381,6 +406,7 @@ export function completeTrainingLine(
         details.lineId,
         details.uciPath,
         details.finishLine,
+        details.scheduleMode === "from-moves",
       ),
     );
     return;
@@ -419,7 +445,12 @@ export function prepareTrainingReplayMove(
 
 export function completeTrainingReplayMove(
   ctx: MutationContext,
-  details: { lineId: string; uciPath: string; finishLine: boolean },
+  details: {
+    lineId: string;
+    uciPath: string;
+    finishLine: boolean;
+    scheduleMode?: "advance" | "from-moves";
+  },
 ): void {
   const { state } = ctx;
   const session = state.training.session;
@@ -436,6 +467,7 @@ export function completeTrainingReplayMove(
         details.lineId,
         details.uciPath,
         details.finishLine,
+        details.scheduleMode === "from-moves",
       ),
     );
     return;

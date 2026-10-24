@@ -1,4 +1,9 @@
-export type StorageRecordKind = "repertoire" | "chapter" | "pgn" | "training-line-schedule";
+export type StorageRecordKind =
+  | "repertoire"
+  | "chapter"
+  | "pgn"
+  | "training-line-schedule"
+  | "training-move-schedule";
 
 export type StorageRecordRef = {
   kind: StorageRecordKind;
@@ -24,6 +29,7 @@ const RECORD_KINDS = new Set<StorageRecordKind>([
   "chapter",
   "pgn",
   "training-line-schedule",
+  "training-move-schedule",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

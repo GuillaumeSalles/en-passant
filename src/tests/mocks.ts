@@ -6,6 +6,8 @@ import { MutationContext, MutationRouter } from "@/lib/useMutation";
 
 export function createStorageMock(): Mocked<Storage> {
   return {
+    getAllTrainingMoveSchedules: vi.fn().mockResolvedValue([]),
+    recordTrainingMoveAttempts: vi.fn().mockResolvedValue([]),
     createChapter: vi.fn(),
     createRepertoireAndChapter: vi.fn(),
     deleteChapter: vi.fn(),

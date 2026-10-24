@@ -1,3 +1,4 @@
+import { getTrainingMoveTargets, nextTrainingMoveReview } from "./trainingMoves";
 import { describe, expect, test } from "vitest";
 import { normalizePgn } from "./pgnTree";
 import { getScheduledTrainingLines } from "./trainingQueue";
@@ -85,4 +86,41 @@ describe("training queue", () => {
       line: { uciPath: "e2e4 e7e5 g1f3", plyCount: 3 },
     });
   });
+});
+
+test("queues shared move decisions once, keeps legacy records until covered, and ignores removed moves", () => {
+  const pgn = normalizePgn("1. e4 e5 2. Nf3 Nc6 *");
+  const targets = getTrainingMoveTargets(repertoire.id, pgn, "white");
+  const moveReviews = Object.fromEntries(
+    targets.map((target) => [target.key, nextTrainingMoveReview(target, undefined, "correct", 0)]),
+  );
+  const legacy = review("e2e4 e7e5 g1f3 b8c6", 0);
+  const args = {
+    repertoires: { [repertoire.id]: repertoire },
+    chapters: { [chapter.id]: chapter, other: { ...chapter, id: "other" } },
+  };
+  const lines = getScheduledTrainingLines(
+    args.repertoires,
+    args.chapters,
+    { pgn },
+    { legacy },
+    4_000_000,
+    moveReviews,
+  );
+  expect(
+    lines.map((line) => ({ label: line.label, start: line.startMove, due: line.isDue })),
+  ).toEqual([
+    { label: "2. Nf3", start: 3, due: true },
+    { label: "1. e4", start: 1, due: true },
+  ]);
+  expect(legacy.intervalIndex).toBe(1);
+  const changed = getScheduledTrainingLines(
+    args.repertoires,
+    args.chapters,
+    { pgn: normalizePgn("1. e4 *") },
+    { legacy },
+    4_000_000,
+    moveReviews,
+  );
+  expect(changed.map((line) => line.label)).toEqual(["1. e4"]);
 });

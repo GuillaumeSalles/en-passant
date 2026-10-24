@@ -19,7 +19,13 @@ import {
 import { createMutationContext } from "@/tests/mocks";
 import { chapterStub, repertoireStub } from "@/tests/stubs";
 import { trainingLineScheduleKey, markLineLearned } from "@/mutations/learningSession";
-import { getTrainingLines, normalizePgn, selectTrainingSessionStats } from "@/lib/AppState";
+import {
+  getTrainingLines,
+  getTrainingMoveTargets,
+  nextTrainingMoveReview,
+  normalizePgn,
+  selectTrainingSessionStats,
+} from "@/lib/AppState";
 
 afterEach(() => vi.useRealTimers());
 
@@ -47,6 +53,41 @@ function scheduledLineKey(context: ReturnType<typeof createTrainingContext>): st
 }
 
 describe("training session", () => {
+  test("a skipped line uses existing move schedules without awarding review credit", () => {
+    const context = createTrainingContext();
+    const pgn = normalizePgn("1. e4 e5 *");
+    const target = getTrainingMoveTargets(repertoire.id, pgn, "white")[0];
+    if (target === undefined) throw new Error("Missing target");
+    const review = nextTrainingMoveReview(target, undefined, "correct", 100);
+    context.state.set("pgns", { [chapter.pgnId]: { status: "success", data: pgn } });
+    markLineLearned(context.state, context.route, "e2e4 e7e5");
+    context.state.set("training", {
+      ...context.state.training,
+      moveReviews: { [target.key]: review },
+    });
+    startTrainingLine(context.state, context.route, {
+      lineIds: ["line-a"],
+      lineId: "line-a",
+      variationIndex: 0,
+    });
+    completeTrainingLine(context, {
+      lineId: "line-a",
+      uciPath: "e2e4 e7e5",
+      completedMoveId: 2,
+      finishLine: true,
+      scheduleMode: "from-moves",
+    });
+    expect(context.state.training.moveReviews[target.key]).toEqual(review);
+    expect(context.state.training.reviews[scheduledLineKey(context)]).toMatchObject({
+      intervalIndex: 0,
+      dueAt: review.dueAt,
+      lastReviewedAt: 100,
+    });
+    expect(selectTrainingSessionStats(context.state, context.route)).toMatchObject({
+      moves: 0,
+      accuracy: null,
+    });
+  });
   test("reveals the canonical annotated line after training completes", () => {
     const context = createTrainingContext();
     const chapterPgn = normalizePgn(

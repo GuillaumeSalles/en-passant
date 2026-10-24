@@ -1,3 +1,4 @@
+import { trainingMoveReviewKey, type TrainingMoveReview } from "./trainingMoves";
 import { STARTING_FEN } from "@/lib/chess";
 import { emptyNormalizedPgn } from "./reactivePgn";
 import type {
@@ -60,6 +61,7 @@ export function emptyState(): AppState {
       session: null,
       reviewQueue: null,
       reviews: {},
+      moveReviews: {},
     },
     highlights: {
       squares: {},
@@ -75,6 +77,7 @@ export function onRepertoireAndChapterLoad(
   repertoires: NewSerializedRepertoire[],
   chapters: SerializedChapter[],
   trainingLineSchedules: TrainingLineReview[] = [],
+  trainingMoveSchedules: TrainingMoveReview[] = [],
 ): void {
   const newRepertoires: Record<string, Repertoire> = {};
   const newChapters: Record<string, Chapter> = {};
@@ -108,6 +111,9 @@ export function onRepertoireAndChapterLoad(
   });
   state.set("training", {
     ...state.training,
+    moveReviews: Object.fromEntries(
+      trainingMoveSchedules.map((review) => [trainingMoveReviewKey(review), review]),
+    ),
     reviews: Object.fromEntries(
       trainingLineSchedules.map((schedule) => [
         trainingLineReviewKey(schedule.repertoireId, schedule.chapterId, schedule.uciPath),

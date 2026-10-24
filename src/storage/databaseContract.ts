@@ -4,6 +4,7 @@ export const STORE_NAMES = [
   "chapters",
   "pgns",
   "training-line-schedules",
+  "training-move-schedules",
   "games",
 ] as const;
 export type StoreName = (typeof STORE_NAMES)[number];

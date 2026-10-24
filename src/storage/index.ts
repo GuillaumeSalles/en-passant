@@ -1,3 +1,12 @@
+import {
+  getLineMoveTargets,
+  normalizePgn,
+  nextTrainingMoveReview,
+  trainingMoveReviewKey,
+  type TrainingMoveReview,
+  type TrainingMoveIdentity,
+  type TrainingMoveOutcome,
+} from "@/lib/AppState";
 import type {
   NewSerializedRepertoire,
   SerializedChapter,
@@ -291,6 +300,7 @@ export type InitialRepertoireLoad = {
   repertoires: NewSerializedRepertoire[];
   chapters: SerializedChapter[];
   trainingLineSchedules: TrainingLineReview[];
+  trainingMoveSchedules: TrainingMoveReview[];
   createdDemo: boolean;
 };
 export async function getInitialRepertoiresAndChapters(): Promise<InitialRepertoireLoad> {
@@ -298,16 +308,118 @@ export async function getInitialRepertoiresAndChapters(): Promise<InitialReperto
     { store: "repertoires" },
     { store: "chapters" },
     { store: "training-line-schedules" },
+    { store: "training-move-schedules" },
   ]);
   return {
     repertoires: active(records<StoredRepertoire>(s, "repertoires")),
     chapters: active(records<StoredChapter>(s, "chapters")),
     trainingLineSchedules: records<StoredTrainingLineSchedule>(s, "training-line-schedules"),
+    trainingMoveSchedules: records<TrainingMoveReview>(s, "training-move-schedules"),
     createdDemo: false,
   };
 }
 export const getStoredRepertoiresAndChapters = getInitialRepertoiresAndChapters;
+export async function getAllTrainingMoveSchedules(): Promise<TrainingMoveReview[]> {
+  return records<TrainingMoveReview>(
+    await localDatabase().read([{ store: "training-move-schedules" }]),
+    "training-move-schedules",
+  );
+}
+
+export type TrainingMoveAttempt = {
+  identity: TrainingMoveIdentity;
+  chapterId: string;
+  uciPath: string;
+  outcome: TrainingMoveOutcome;
+  now: number;
+};
+
+// Recompute against the current stored review on each revision conflict; never overwrite a concurrent result.
+export async function recordTrainingMoveAttempts(
+  attempts: readonly TrainingMoveAttempt[],
+): Promise<TrainingMoveReview[]> {
+  if (attempts.length === 0) return [];
+  const chapterIds = [...new Set(attempts.map((attempt) => attempt.chapterId))];
+  const chapters = records<StoredChapter>(
+    await localDatabase().read(chapterIds.map((key) => ({ store: "chapters", key }))),
+    "chapters",
+  );
+  const pgnIds = chapters
+    .filter((chapter) => chapterIds.includes(chapter.id))
+    .map((chapter) => chapter.pgnId);
+  let saved: TrainingMoveReview[] = [];
+  await change(
+    (snapshot) => {
+      const current = new Map(
+        records<TrainingMoveReview>(snapshot, "training-move-schedules").map((review) => [
+          trainingMoveReviewKey(review),
+          review,
+        ]),
+      );
+      const updates = new Map<string, TrainingMoveReview>();
+      const activeChapters = active(records<StoredChapter>(snapshot, "chapters"));
+      const repertoires = active(records<StoredRepertoire>(snapshot, "repertoires"));
+      const pgns = active(records<StoredPgn>(snapshot, "pgns"));
+      for (const attempt of attempts) {
+        const chapter = activeChapters.find(
+          (entry) =>
+            entry.id === attempt.chapterId && entry.repertoireId === attempt.identity.repertoireId,
+        );
+        const repertoire = repertoires.find((entry) => entry.id === attempt.identity.repertoireId);
+        const source = pgns.find((entry) => entry.id === chapter?.pgnId);
+        if (chapter === undefined || repertoire === undefined || source === undefined)
+          throw new Error("The training chapter changed or was removed. Progress was not saved.");
+        const target = getLineMoveTargets(
+          repertoire.id,
+          normalizePgn(source.pgn),
+          repertoire.orientation,
+          attempt.uciPath,
+        ).find((entry) => entry.uciPath === attempt.uciPath);
+        const key = trainingMoveReviewKey(attempt.identity);
+        if (target?.key !== key)
+          throw new Error("The training move changed or was removed. Progress was not saved.");
+        if (updates.has(key)) continue;
+        updates.set(
+          key,
+          nextTrainingMoveReview(attempt.identity, current.get(key), attempt.outcome, attempt.now),
+        );
+      }
+      saved = [...updates.values()];
+      return put(
+        snapshot,
+        saved
+          .filter((review) => review !== current.get(trainingMoveReviewKey(review)))
+          .map((review) =>
+            record("training-move-schedules", trainingMoveReviewKey(review), {
+              ...review,
+              updatedAt: new Date().toISOString(),
+            }),
+          ),
+      );
+    },
+    attempts.map((attempt) => ({
+      kind: "training-move-schedule",
+      id: trainingMoveReviewKey(attempt.identity),
+    })),
+    [
+      ...chapterIds.map((key) => ({ store: "chapters" as const, key })),
+      ...pgnIds.map((key) => ({ store: "pgns" as const, key })),
+      ...[...new Set(attempts.map((attempt) => attempt.identity.repertoireId))].map((key) => ({
+        store: "repertoires" as const,
+        key,
+      })),
+      ...attempts.map((attempt) => ({
+        store: "training-move-schedules" as const,
+        key: trainingMoveReviewKey(attempt.identity),
+      })),
+    ],
+  );
+  return saved;
+}
+
 export const storage = {
+  getAllTrainingMoveSchedules,
+  recordTrainingMoveAttempts,
   createRepertoireAndChapter,
   createChapter,
   getInitialRepertoiresAndChapters,

@@ -73,7 +73,7 @@ export function VariationTraining(props: {
 
   const requestedStartMove = () =>
     parseTrainingStartMove(new URLSearchParams(location.search).get("startMove")) ?? 1;
-  const flow = useVariationTrainingFlow(props, { startMove: requestedStartMove });
+  const flow = useVariationTrainingFlow(props, { learning: false, startMove: requestedStartMove });
   createEffect(
     () => ({
       activeLinePlyCount: flow.activeLine()?.plyCount,

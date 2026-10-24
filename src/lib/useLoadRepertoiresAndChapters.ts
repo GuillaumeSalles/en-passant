@@ -10,7 +10,14 @@ export function useLoadRepertoiresAndChapters() {
   onSettled(() => {
     if (state.repertoires.status !== "not-loaded") return;
     void getInitialRepertoiresAndChapters()
-      .then((load) => loaded(load.repertoires, load.chapters, load.trainingLineSchedules))
+      .then((load) =>
+        loaded(
+          load.repertoires,
+          load.chapters,
+          load.trainingLineSchedules,
+          load.trainingMoveSchedules,
+        ),
+      )
       .catch(reportStorageError);
   });
 }

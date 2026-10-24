@@ -5,6 +5,8 @@ import type {
   TrainingLineReview,
 } from "@/lib/AppState";
 import { normalizePgn, trainingLineReviewKey } from "@/lib/AppState";
+import { getAllTrainingMoveSchedules } from "@/storage";
+import { trainingMoveReviewKey, type TrainingMoveReview } from "./app-state/trainingMoves";
 import type { Store, StoreState } from "@/lib/createStore";
 import { getAllChapters, getAllRepertoires, getAllTrainingLineSchedules, getPgn } from "@/storage";
 import { subscribeToRecordChanges, type StorageRecordRef } from "@/storage/recordChanges";
@@ -13,11 +15,13 @@ type RecordChangeReads = {
   getAllRepertoires: () => Promise<NewSerializedRepertoire[]>;
   getAllChapters: () => Promise<SerializedChapter[]>;
   getAllTrainingLineSchedules: () => Promise<TrainingLineReview[]>;
+  getAllTrainingMoveSchedules: () => Promise<TrainingMoveReview[]>;
   getPgn: (id: string) => Promise<string | undefined>;
 };
 
 const storageReads: RecordChangeReads = {
   getAllRepertoires,
+  getAllTrainingMoveSchedules,
   getAllChapters,
   getAllTrainingLineSchedules,
   getPgn,
@@ -44,11 +48,14 @@ export async function applyRecordChangesToState(
         ),
       ];
 
-  const [repertoires, chapters, trainingLineSchedules, pgns] = await Promise.all([
+  const [repertoires, chapters, trainingLineSchedules, moveReviews, pgns] = await Promise.all([
     kinds.has("repertoire") ? reads.getAllRepertoires() : null,
     structureChanged ? reads.getAllChapters() : null,
     structureChanged || kinds.has("training-line-schedule")
       ? reads.getAllTrainingLineSchedules()
+      : null,
+    structureChanged || kinds.has("training-move-schedule")
+      ? reads.getAllTrainingMoveSchedules()
       : null,
     Promise.all(
       loadedPgnIds.map(async (id) => ({
@@ -80,6 +87,15 @@ export async function applyRecordChangesToState(
           trainingLineReviewKey(schedule.repertoireId, schedule.chapterId, schedule.uciPath),
           schedule,
         ]),
+      ),
+    });
+  }
+
+  if (moveReviews !== null) {
+    state.set("training", {
+      ...state.training,
+      moveReviews: Object.fromEntries(
+        moveReviews.map((review) => [trainingMoveReviewKey(review), review]),
       ),
     });
   }

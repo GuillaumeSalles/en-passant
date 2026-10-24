@@ -1,5 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
-import { emptyState, normalizePgn, trainingLineReviewKey } from "@/lib/AppState";
+import {
+  emptyState,
+  normalizePgn,
+  trainingLineReviewKey,
+  trainingMoveReviewKey,
+  nextTrainingMoveReview,
+} from "@/lib/AppState";
 import { createStore } from "@/lib/createStore";
 import { applyRecordChangesToState } from "./recordChangeSync";
 
@@ -61,6 +67,7 @@ describe("record change state sync", () => {
         },
       ]),
       getAllTrainingLineSchedules: vi.fn(async () => [schedule]),
+      getAllTrainingMoveSchedules: vi.fn(async () => []),
       getPgn: vi.fn(async (id: string) => (id === "changed-pgn" ? "1. e4 c5 *" : undefined)),
     };
 
@@ -108,10 +115,37 @@ describe("record change state sync", () => {
       getAllRepertoires: vi.fn(async () => []),
       getAllChapters: vi.fn(async () => []),
       getAllTrainingLineSchedules: vi.fn(async () => []),
+      getAllTrainingMoveSchedules: vi.fn(async () => []),
       getPgn,
     });
 
     expect(getPgn).not.toHaveBeenCalled();
     expect(store.state.pgns["not-loaded-pgn"]).toBeUndefined();
   });
+});
+
+test("updates move knowledge from another tab without reloading unrelated PGNs", async () => {
+  const store = loadedStore();
+  const review = nextTrainingMoveReview(
+    { repertoireId: "r", positionKey: "position", uci: "e2e4" },
+    undefined,
+    "correct",
+    100,
+  );
+  const getPgn = vi.fn(async () => undefined);
+  const getAllTrainingLineSchedules = vi.fn(async () => []);
+  await applyRecordChangesToState(
+    store.state,
+    [{ kind: "training-move-schedule", id: trainingMoveReviewKey(review) }],
+    {
+      getAllRepertoires: vi.fn(async () => []),
+      getAllChapters: vi.fn(async () => []),
+      getAllTrainingLineSchedules,
+      getAllTrainingMoveSchedules: vi.fn(async () => [review]),
+      getPgn,
+    },
+  );
+  expect(store.state.training.moveReviews).toEqual({ [trainingMoveReviewKey(review)]: review });
+  expect(getPgn).not.toHaveBeenCalled();
+  expect(getAllTrainingLineSchedules).not.toHaveBeenCalled();
 });

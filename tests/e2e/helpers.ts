@@ -1,3 +1,4 @@
+import type { TrainingMoveReview } from "../../src/lib/app-state/trainingMoves";
 import { expect, type Page } from "@playwright/test";
 import type { StoredGame } from "../../src/lib/gameContracts";
 
@@ -126,6 +127,7 @@ export async function seedIndexedDb(
     chapters: ChapterRecord[];
     pgns: PgnRecord[];
     trainingLineSchedules?: TrainingLineScheduleRecord[];
+    trainingMoveSchedules?: TrainingMoveReview[];
     games?: StoredGame[];
     clearLocalStorage?: boolean;
   },
@@ -143,6 +145,7 @@ export async function seedIndexedDb(
       deletedAt: record.deletedAt,
     })),
     trainingLineSchedules: records.trainingLineSchedules ?? [],
+    trainingMoveSchedules: records.trainingMoveSchedules ?? [],
     games: records.games ?? [],
   };
   await gotoStorageOrigin(page);
@@ -165,6 +168,8 @@ export async function seedIndexedDb(
             db.createObjectStore("chapters");
             db.createObjectStore("pgns");
             db.createObjectStore("training-line-schedules");
+            if (records.trainingMoveSchedules.length > 0)
+              db.createObjectStore("training-move-schedules");
             db.createObjectStore("metadata");
             db.createObjectStore("games");
           };
@@ -179,7 +184,15 @@ export async function seedIndexedDb(
 
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(
-          ["repertoires", "chapters", "pgns", "training-line-schedules", "metadata", "games"],
+          [
+            "repertoires",
+            "chapters",
+            "pgns",
+            "training-line-schedules",
+            "metadata",
+            "games",
+            ...(records.trainingMoveSchedules.length > 0 ? ["training-move-schedules"] : []),
+          ],
           "readwrite",
         );
         transaction.onerror = () => reject(transaction.error);
@@ -198,6 +211,14 @@ export async function seedIndexedDb(
         }
         for (const game of records.games) {
           transaction.objectStore("games").put(game, game.id);
+        }
+        for (const schedule of records.trainingMoveSchedules) {
+          transaction
+            .objectStore("training-move-schedules")
+            .put(
+              schedule,
+              JSON.stringify([schedule.repertoireId, schedule.positionKey, schedule.uci]),
+            );
         }
         for (const schedule of records.trainingLineSchedules) {
           const key = `${schedule.repertoireId}/${schedule.chapterId}/${schedule.uciPath}`;
@@ -233,6 +254,10 @@ export async function storedTrainingLineUciPaths(page: Page): Promise<string[]> 
   return await readObjectStore(page, "training-line-schedules", (record) =>
     isRecord(record) && typeof record["uciPath"] === "string" ? record["uciPath"] : "",
   );
+}
+
+export async function storedTrainingMoves(page: Page): Promise<TrainingMoveReview[]> {
+  return readObjectStore(page, "training-move-schedules", (record) => record as TrainingMoveReview);
 }
 
 async function readObjectStore<T>(

@@ -13,8 +13,8 @@ import type { StoredPgn } from "./contracts";
 import type { StoredGame } from "@/lib/gameContracts";
 
 export const LOCAL_DATABASE_NAME = "en-passant-local-v1";
-// v2 added move occurrences; v3 removes unused secondary indexes only.
-export const LOCAL_DATABASE_VERSION = 3;
+// v4 adds independent move schedules without changing existing sources or occurrences.
+export const LOCAL_DATABASE_VERSION = 4;
 let connection: Promise<IDBDatabase> | undefined;
 
 function request<T>(value: IDBRequest<T>): Promise<T> {
@@ -80,6 +80,7 @@ function open(): Promise<IDBDatabase> {
       for (const name of [...STORE_NAMES, "metadata"]) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
       }
+      if (event.oldVersion >= 3) return;
       if (event.oldVersion >= 2) {
         // Existing occurrences remain byte-for-byte unchanged; no PGN rebuild is needed.
         tx.objectStore("chapters").deleteIndex("by-pgn");

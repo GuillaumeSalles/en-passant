@@ -11,6 +11,7 @@ import {
   pausePacingClock,
   seedIndexedDb,
   storedPgns,
+  storedTrainingMoves,
   storedTrainingLineUciPaths,
   type ChapterRecord,
   type RepertoireRecord,
@@ -1555,7 +1556,7 @@ test("waits one second at learning line boundaries", async ({ page }) => {
   await dragPiece(page, "e2", "e4");
 
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
-  await page.clock.runFor(999);
+  await advanceTrainingPacing(page, "line-boundary", 999);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.locator('[data-square="e2"]')).not.toHaveAttribute("data-piece");
 
@@ -1566,7 +1567,7 @@ test("waits one second at learning line boundaries", async ({ page }) => {
   await dragPiece(page, "e2", "e4");
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.getByRole("link", { name: "Next line" })).toHaveCount(0);
-  await page.clock.runFor(999);
+  await advanceTrainingPacing(page, "line-boundary", 999);
   await expect(page.locator('[data-square="e4"]')).toHaveAttribute("data-piece", "P");
   await expect(page.getByRole("link", { name: "Next line" })).toHaveCount(0);
 
@@ -1640,6 +1641,9 @@ test("learns a line with demonstrations, responses, and progressive comments", a
 
   await expect(page.getByText("Line learned.")).toBeVisible();
   await expect.poll(() => storedTrainingLineUciPaths(page)).toEqual(["e2e4 e7e5 g1f3"]);
+  await expect
+    .poll(async () => (await storedTrainingMoves(page)).map((review) => review.uci).sort())
+    .toEqual(["e2e4", "g1f3"]);
   await expect(page).toHaveURL(/\/v1-[A-Za-z0-9_-]+\/learn$/);
   await page.getByRole("link", { name: "Back to lines" }).click();
   await expect(page.locator('[data-learning-status="learned"]')).toHaveCount(1);

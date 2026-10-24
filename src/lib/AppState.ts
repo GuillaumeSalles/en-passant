@@ -1,3 +1,18 @@
+export {
+  reviewForTrainingLine,
+  getTrainingMoveTarget,
+  getTrainingMovesToSkip,
+  getTrainingMoveTargets,
+  getLineMoveTargets,
+  trainingMoveReviewKey,
+  nextTrainingMoveReview,
+  trainingMoveProgress,
+  lineReviewFromMoves,
+  type TrainingMoveReview,
+  type TrainingMoveIdentity,
+  type TrainingMoveTarget,
+  type TrainingMoveOutcome,
+} from "./app-state/trainingMoves";
 export type {
   AppState,
   Arrows,

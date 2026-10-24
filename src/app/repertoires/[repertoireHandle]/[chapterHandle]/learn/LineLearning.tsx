@@ -104,6 +104,7 @@ export function LineLearning(props: {
   const reinforcement = useVariationTrainingFlow(props, {
     enabled: () => flow().type === "reinforcement",
     repetitions: 2,
+    learning: true,
     boundaryDelayMs: LEARNING_BOUNDARY_DELAY,
     onLineComplete: () => {
       const line = activeLine();
